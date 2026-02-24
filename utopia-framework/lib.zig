@@ -2,6 +2,8 @@ const std = @import("std");
 
 pub const fs = @import("./fs.zig");
 pub const log = @import("./log.zig");
+pub const mem = @import("./mem.zig");
+pub const num = @import("./num.zig");
 
 pub const CliArgType = union(enum) {
     positional: void,

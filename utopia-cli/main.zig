@@ -3,6 +3,8 @@ const utopia = @import("utopia");
 const cli = @import("./cli.zig");
 const logger = @import("./logger.zig");
 
+pub const panic = std.debug.FullPanic(panicHandler);
+
 pub const utopia_logger: utopia.log.Interface = .{
     .enabled = logger.enabled,
     .record = logger.record,
@@ -23,7 +25,7 @@ pub fn main() !void {
     device.runFrame();
 }
 
-pub fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
+fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
     logger.deinit();
     std.debug.defaultPanic(msg, first_trace_addr);
 }

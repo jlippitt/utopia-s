@@ -2,8 +2,6 @@ const std = @import("std");
 const fw = @import("framework");
 const Cpu = @import("Cpu.zig");
 
-const log = fw.log;
-
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
 const pifdata_size = 2048;
 
@@ -83,7 +81,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     );
 
     const pifdata_path = device_args.pifdata_path orelse {
-        log.err("Running this device without a 'pifdata' ROM is not yet supported", .{});
+        fw.log.err("Running this device without a 'pifdata' ROM is not yet supported", .{});
         return error.ArgError;
     };
 
@@ -124,18 +122,17 @@ pub fn runFrame(self: *Self) void {
 fn read(core: *Cpu, address: u32) u32 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
 
-    _ = self;
-
     const page_index = address >> 20;
 
     if (page_index >= memory_map.len) {
         @branchHint(.unlikely);
-        log.unimplemented("64-bit addressing", .{});
+        fw.log.unimplemented("64-bit addressing", .{});
     }
 
-    switch (memory_map[page_index]) {
-        else => |page| log.todo("Read from memory page: {t}", .{page}),
-    }
+    return switch (memory_map[page_index]) {
+        .pifdata => fw.mem.readBe(u32, self.pifdata, address & 0x003f_ffff),
+        else => |page| fw.log.todo("Read from memory page: {t}", .{page}),
+    };
 }
 
 fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
@@ -149,10 +146,10 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
 
     if (page_index >= memory_map.len) {
         @branchHint(.unlikely);
-        log.unimplemented("64-bit addressing", .{});
+        fw.log.unimplemented("64-bit addressing", .{});
     }
 
     switch (memory_map[page_index]) {
-        else => |page| log.todo("Write to memory page: {t}", .{page}),
+        else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
 }
