@@ -1,6 +1,7 @@
 const fw = @import("framework");
-const alu = @import("./Cpu/alu.zig");
 const Cp0 = @import("./Cpu/Cp0.zig");
+const alu = @import("./Cpu/alu.zig");
+const memory = @import("./Cpu/memory.zig");
 
 const Self = @This();
 
@@ -78,15 +79,21 @@ pub fn set(self: *Self, reg: Register, value: u64) void {
     }
 }
 
-pub fn mapAddress(self: *Self, paddr: u32) ?u32 {
+pub fn mapAddress(self: *Self, vaddr: u32) ?u32 {
     _ = self;
 
-    if ((paddr & 0xc000_0000) == 0x8000_0000) {
+    if ((vaddr & 0xc000_0000) == 0x8000_0000) {
         @branchHint(.likely);
-        return paddr & 0x1fff_ffff;
+        return vaddr & 0x1fff_ffff;
     }
 
     fw.log.todo("TLB lookups", .{});
+}
+
+pub fn readWord(self: *Self, comptime bus: Bus, paddr: u32) u32 {
+    const value = bus.read(self, paddr);
+    fw.log.trace("  [{X:08} => {X:08}]", .{ paddr, value });
+    return value;
 }
 
 fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
@@ -96,6 +103,8 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o16 => alu.iTypeLogic(.XOR, core, word),
         0o17 => alu.lui(core, word),
         0o20 => Cp0.cop0(bus, core, word),
+        0o43 => memory.load(.LW, bus, core, word),
+        0o47 => memory.load(.LWU, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
 }
