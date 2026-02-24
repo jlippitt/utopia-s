@@ -8,6 +8,7 @@ pub const log = struct {
     pub const setLogger = fw.log.setLogger;
 };
 
+pub const Device = fw.Device;
 pub const DeviceError = fw.DeviceError;
 
 pub const DeviceType = enum {
@@ -15,29 +16,13 @@ pub const DeviceType = enum {
 };
 
 pub const DeviceArgs = union(DeviceType) {
-    n64: N64.Args,
-};
-
-pub const Device = struct {
     const Self = @This();
 
-    inner: fw.Device,
+    n64: N64.Args,
 
-    pub fn init(allocator: std.mem.Allocator, device_args: DeviceArgs) DeviceError!Self {
-        const inner = switch (device_args) {
-            .n64 => |n64_args| try N64.init(allocator, n64_args),
+    pub fn initDevice(self: Self, allocator: std.mem.Allocator) DeviceError!Device {
+        return switch (self) {
+            .n64 => |device_args| try N64.init(allocator, device_args),
         };
-
-        return .{
-            .inner = inner,
-        };
-    }
-
-    pub fn deinit(self: *Self) void {
-        self.inner.deinit();
-    }
-
-    pub fn runFrame(self: *Self) void {
-        self.inner.runFrame();
     }
 };
