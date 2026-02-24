@@ -5,7 +5,6 @@ const N64 = @import("device-n64");
 pub const log = struct {
     pub const Level = fw.log.Level;
     pub const Interface = fw.log.Interface;
-    pub const setLogger = fw.log.setLogger;
 };
 
 pub const Device = fw.Device;
