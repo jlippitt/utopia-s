@@ -1,0 +1,134 @@
+const std = @import("std");
+const fw = @import("framework");
+const Core = @import("../Cpu.zig");
+
+const Register = enum(u5) {
+    // zig fmt: off
+    Index,    Random,   EntryLo0,    EntryLo1,
+    Context,  PageMask, Wired,       R7,
+    BadVAddr, Count,    EntryHi,     Compare,
+    Status,   Cause,    EPC,         PRId,
+    Config,   LLAddr,   WatchLo,     WatchHi,
+    XContext, R21,      R22,         R23,
+    R24,      R25,      ParityError, CacheError,
+    TagLo,    TagHi,    ErrorEPC,    R31,
+    // zig fmt: on
+};
+
+const MType = packed struct(u32) {
+    _: u11,
+    rd: Register,
+    rt: Core.Register,
+    rs: u5,
+    opcode: u6,
+};
+
+const Self = @This();
+
+status: Status = .{},
+
+pub fn init() Self {
+    return .{};
+}
+
+fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
+    _ = bus;
+
+    return switch (reg) {
+        .Status => @as(u32, @bitCast(self.status)),
+        else => fw.log.todo("CPU CP0 register read: {t}", .{reg}),
+    };
+}
+
+fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
+    _ = bus;
+
+    switch (reg) {
+        .Status => {
+            fw.num.writeWithMask(
+                u32,
+                @ptrCast(&self.status),
+                @truncate(value),
+                0xfff7_ffff,
+            );
+
+            fw.log.trace("  Status: {any}", .{self.status});
+
+            if (self.status.ksu != 0) {
+                fw.log.warn("Unsupported: Non-kernel operating modes", .{});
+            }
+
+            if (self.status.kx) {
+                fw.log.warn("Unsupported: 64-bit addressing", .{});
+            }
+
+            if (self.status.rp) {
+                fw.log.warn("Unsupported: Low power mode", .{});
+            }
+        },
+        else => fw.log.todo("CPU CP0 register write: {t} <= {X:016}", .{ reg, value }),
+    }
+}
+
+pub fn cop0(comptime bus: Core.Bus, core: *Core, word: u32) void {
+    switch (@as(u5, @truncate(word >> 21))) {
+        0o00 => mfc0(bus, core, word),
+        0o01 => dmfc0(bus, core, word),
+        0o04 => mtc0(bus, core, word),
+        0o05 => mtc0(bus, core, word),
+        else => |rs| fw.log.todo("CPU COP0 rs: {o:02}", .{rs}),
+    }
+}
+
+fn mfc0(comptime bus: Core.Bus, core: *Core, word: u32) void {
+    const args: MType = @bitCast(word);
+    fw.log.trace("{X:08}: MFC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
+    const result: u32 = @truncate(core.cp0.get(bus, args.rd));
+    core.set(args.rt, fw.num.signExtend(u64, result));
+}
+
+fn dmfc0(comptime bus: Core.Bus, core: *Core, word: u32) void {
+    const args: MType = @bitCast(word);
+    fw.log.trace("{X:08}: DMFC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
+    core.set(args.rt, core.cp0.get(bus, args.rd));
+}
+
+fn mtc0(comptime bus: Core.Bus, core: *Core, word: u32) void {
+    const args: MType = @bitCast(word);
+    fw.log.trace("{X:08}: MTC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
+    const result: u32 = @truncate(core.get(args.rt));
+    core.cp0.set(bus, args.rd, fw.num.signExtend(u64, result));
+}
+
+fn dmtc0(comptime bus: Core.Bus, core: *Core, word: u32) void {
+    const args: MType = @bitCast(word);
+    fw.log.trace("{X:08}: DMTC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
+    core.cp0.set(bus, args.rd, core.get(args.rt));
+}
+
+const Status = packed struct(u32) {
+    ie: bool = false,
+    exl: bool = false,
+    erl: bool = false,
+    ksu: u2 = 0,
+    ux: bool = false,
+    sx: bool = false,
+    kx: bool = false,
+    im: u8 = 0,
+    de: bool = false,
+    ce: bool = false,
+    ch: bool = false,
+    _0: bool = false,
+    sr: bool = false,
+    ts: bool = false,
+    bev: bool = false,
+    _1: bool = false,
+    its: bool = false,
+    re: bool = false,
+    fr: bool = false,
+    rp: bool = false,
+    cu0: bool = false,
+    cu1: bool = false,
+    cu2: bool = false,
+    cu3: bool = false,
+};

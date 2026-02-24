@@ -1,5 +1,6 @@
 const fw = @import("framework");
 const alu = @import("./Cpu/alu.zig");
+const Cp0 = @import("./Cpu/Cp0.zig");
 
 const Self = @This();
 
@@ -37,6 +38,7 @@ pc: u32 = cold_reset_vector,
 target_pc: u32 = 0,
 pipe_state: PipeState = .normal,
 regs: [32]u64 = @splat(0),
+cp0: Cp0 = .init(),
 
 pub fn init() Self {
     return .{};
@@ -47,6 +49,7 @@ pub fn step(self: *Self, comptime bus: Bus) void {
 
     switch (@as(u6, @truncate(word >> 26))) {
         0o17 => alu.lui(self, word),
+        0o20 => Cp0.cop0(bus, self, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
 

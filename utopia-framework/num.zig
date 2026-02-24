@@ -19,3 +19,7 @@ pub fn signExtend(comptime T: type, value: anytype) T {
 pub fn zeroExtend(comptime T: type, value: anytype) T {
     return extend(.unsigned, T, value);
 }
+
+pub fn writeWithMask(comptime T: type, dst: *T, value: T, mask: T) void {
+    dst.* = (dst.* & ~mask) | (value & mask);
+}

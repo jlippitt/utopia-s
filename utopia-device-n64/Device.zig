@@ -94,7 +94,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     const self = try arena.allocator().create(Self);
 
     self.* = .{
-        .cpu = Cpu.init(),
+        .cpu = .init(),
         .rom = rom,
         .pifdata = pifdata[0..pifdata_size],
         .arena = arena,
