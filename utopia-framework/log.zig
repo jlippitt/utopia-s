@@ -65,14 +65,14 @@ pub fn trace(comptime fmt: []const u8, args: anytype) void {
     log(.trace, fmt, args);
 }
 
-pub fn panic(comptime fmt: []const u8, args: anytype) void {
+pub fn panic(comptime fmt: []const u8, args: anytype) noreturn {
     std.debug.panic(fmt, args);
 }
 
-pub fn todo(comptime fmt: []const u8, args: anytype) void {
-    panic("TODO: ", fmt, args);
+pub fn todo(comptime fmt: []const u8, args: anytype) noreturn {
+    panic("TODO: " ++ fmt, args);
 }
 
-pub fn unimplemented(comptime fmt: []const u8, args: anytype) void {
+pub fn unimplemented(comptime fmt: []const u8, args: anytype) noreturn {
     panic("Unimplemented: " ++ fmt, args);
 }

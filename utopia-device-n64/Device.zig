@@ -1,5 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
+const Cpu = @import("Cpu.zig");
+
 const log = fw.log;
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
@@ -25,8 +27,48 @@ pub const Args = struct {
     rom_path: []const u8,
 };
 
+const Page = enum {
+    rdram_registers,
+    rsp,
+    rdp_command,
+    rdp_span,
+    mips_interface,
+    video_interface,
+    audio_interface,
+    parallel_interface,
+    rdram_interface,
+    serial_interface,
+    dd_registers,
+    dd_ipl_rom,
+    cartridge_sram,
+    cartridge_rom,
+    pifdata,
+    unmapped,
+};
+
+const memory_map: [512]Page = blk: {
+    var pages: [512]Page = undefined;
+    pages[0x03f] = .rdram_registers;
+    pages[0x040] = .rsp;
+    pages[0x041] = .rdp_command;
+    pages[0x042] = .rdp_span;
+    pages[0x043] = .mips_interface;
+    pages[0x044] = .video_interface;
+    pages[0x045] = .audio_interface;
+    pages[0x046] = .parallel_interface;
+    pages[0x047] = .rdram_interface;
+    pages[0x048] = .serial_interface;
+    @memset(pages[0x050..0x060], .dd_registers);
+    @memset(pages[0x060..0x080], .dd_ipl_rom);
+    @memset(pages[0x080..0x100], .cartridge_sram);
+    @memset(pages[0x100..0x1fc], .cartridge_rom);
+    pages[0x1fc] = .pifdata;
+    break :blk pages;
+};
+
 const Self = @This();
 
+cpu: Cpu,
 rom: []align(8) const u8,
 pifdata: *align(4) [pifdata_size]u8,
 arena: std.heap.ArenaAllocator,
@@ -54,6 +96,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     const self = try arena.allocator().create(Self);
 
     self.* = .{
+        .cpu = Cpu.init(),
         .rom = rom,
         .pifdata = pifdata[0..pifdata_size],
         .arena = arena,
@@ -70,6 +113,46 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn runFrame(self: *Self) void {
+    while (true) {
+        self.cpu.step(.{
+            .read = read,
+            .write = write,
+        });
+    }
+}
+
+fn read(core: *Cpu, address: u32) u32 {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
+
     _ = self;
-    std.debug.print("Running frame...\n", .{});
+
+    const page_index = address >> 20;
+
+    if (page_index >= memory_map.len) {
+        @branchHint(.unlikely);
+        log.unimplemented("64-bit addressing", .{});
+    }
+
+    switch (memory_map[page_index]) {
+        else => |page| log.todo("Read from memory page: {t}", .{page}),
+    }
+}
+
+fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
+
+    _ = self;
+    _ = value;
+    _ = mask;
+
+    const page_index = address >> 20;
+
+    if (page_index >= memory_map.len) {
+        @branchHint(.unlikely);
+        log.unimplemented("64-bit addressing", .{});
+    }
+
+    switch (memory_map[page_index]) {
+        else => |page| log.todo("Write to memory page: {t}", .{page}),
+    }
 }

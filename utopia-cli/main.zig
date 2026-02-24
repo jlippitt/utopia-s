@@ -18,7 +18,6 @@ pub fn main() !void {
     _ = app_args;
 
     var device = try device_args.initDevice(allocator);
-
     defer device.deinit();
 
     device.runFrame();
