@@ -47,11 +47,7 @@ pub fn init() Self {
 pub fn step(self: *Self, comptime bus: Bus) void {
     const word = bus.read(self, self.mapAddress(self.pc) orelse return);
 
-    switch (@as(u6, @truncate(word >> 26))) {
-        0o17 => alu.lui(self, word),
-        0o20 => Cp0.cop0(bus, self, word),
-        else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
-    }
+    dispatch(bus, self, word);
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
@@ -91,4 +87,15 @@ pub fn mapAddress(self: *Self, paddr: u32) ?u32 {
     }
 
     fw.log.todo("TLB lookups", .{});
+}
+
+fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
+    switch (@as(u6, @truncate(word >> 26))) {
+        0o14 => alu.iTypeLogic(.AND, core, word),
+        0o15 => alu.iTypeLogic(.OR, core, word),
+        0o16 => alu.iTypeLogic(.XOR, core, word),
+        0o17 => alu.lui(core, word),
+        0o20 => Cp0.cop0(bus, core, word),
+        else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
+    }
 }
