@@ -26,6 +26,7 @@ const MType = packed struct(u32) {
 const Self = @This();
 
 status: Status = .{},
+config: Config = .{},
 
 pub fn init() Self {
     return .{};
@@ -36,6 +37,7 @@ fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
 
     return switch (reg) {
         .Status => @as(u32, @bitCast(self.status)),
+        .Config => @as(u32, @bitCast(self.config)),
         else => fw.log.todo("CPU CP0 register read: {t}", .{reg}),
     };
 }
@@ -64,6 +66,24 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
 
             if (self.status.rp) {
                 fw.log.warn("Unsupported: Low power mode", .{});
+            }
+        },
+        .Config => {
+            fw.num.writeWithMask(
+                u32,
+                @ptrCast(&self.config),
+                @truncate(value),
+                0x0f00_800f,
+            );
+
+            fw.log.trace("  Config: {any}", .{self.config});
+
+            if (!self.config.be) {
+                fw.log.warn("Unsupported: Little-endian mode", .{});
+            }
+
+            if (self.config.ep != 0) {
+                fw.log.warn("Unsupported: Non-default data transfer patterns", .{});
             }
         },
         else => fw.log.todo("CPU CP0 register write: {t} <= {X:016}", .{ reg, value }),
@@ -131,4 +151,15 @@ const Status = packed struct(u32) {
     cu1: bool = false,
     cu2: bool = false,
     cu3: bool = false,
+};
+
+const Config = packed struct(u32) {
+    k0: u3 = 0,
+    cu: bool = false,
+    __0: u11 = 0b110_0100_0110,
+    be: bool = true,
+    __1: u8 = 0b0000_0110,
+    ep: u4 = 0,
+    ec: u3 = 0b111,
+    __2: bool = false,
 };
