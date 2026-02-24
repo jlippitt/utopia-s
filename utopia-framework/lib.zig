@@ -1,11 +1,7 @@
 const std = @import("std");
 
 pub const fs = @import("./fs.zig");
-
-pub const DefaultArgs = struct {
-    allocator: std.mem.Allocator,
-    error_writer: ?*std.Io.Writer,
-};
+pub const log = @import("./log.zig");
 
 pub const CliArgType = union(enum) {
     positional: void,

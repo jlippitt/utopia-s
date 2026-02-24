@@ -1,4 +1,5 @@
 const std = @import("std");
+const log = @import("./log.zig");
 
 const max_file_size = 1024 * 1024 * 1024; // 1GiB
 
@@ -8,7 +9,6 @@ pub fn readFileAllocAligned(
     allocator: std.mem.Allocator,
     path: []const u8,
     comptime alignment: std.mem.Alignment,
-    error_writer: ?*std.Io.Writer,
 ) ReadAllocAlignedError![]align(alignment.toByteUnits()) u8 {
     return std.fs.cwd().readFileAllocOptions(
         allocator,
@@ -18,10 +18,7 @@ pub fn readFileAllocAligned(
         alignment,
         null,
     ) catch |err| {
-        if (error_writer) |writer| {
-            writer.print("Failed to read file '{s}': {t}\n", .{ path, err }) catch {};
-        }
-
+        log.err("Failed to read file '{s}': {t}", .{ path, err });
         return err;
     };
 }
