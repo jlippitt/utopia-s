@@ -3,6 +3,7 @@ const fw = @import("framework");
 const N64 = @import("device-n64");
 
 pub const DefaultArgs = fw.DefaultArgs;
+pub const DeviceError = fw.DeviceError;
 
 pub const DeviceType = enum {
     n64,
@@ -17,7 +18,7 @@ pub const Device = struct {
 
     inner: fw.Device,
 
-    pub fn init(args: DefaultArgs, device_args: DeviceArgs) !Self {
+    pub fn init(args: DefaultArgs, device_args: DeviceArgs) DeviceError!Self {
         const inner = switch (device_args) {
             .n64 => |n64_args| try N64.init(args, n64_args),
         };

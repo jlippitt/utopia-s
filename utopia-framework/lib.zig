@@ -1,7 +1,10 @@
 const std = @import("std");
 
+pub const fs = @import("./fs.zig");
+
 pub const DefaultArgs = struct {
     allocator: std.mem.Allocator,
+    error_writer: ?*std.Io.Writer,
 };
 
 pub const CliArgType = union(enum) {
@@ -21,13 +24,23 @@ pub fn Interface(comptime Self: type) type {
     };
 }
 
+pub const DeviceError = std.mem.Allocator.Error ||
+    std.fs.File.OpenError ||
+    std.fs.File.ReadError ||
+    error{
+        ArgError,
+    };
+
 pub const Device = struct {
     const Self = @This();
 
     ptr: *anyopaque,
     vtable: *const Interface(anyopaque),
 
-    pub fn init(inner: anytype, comptime iface: Interface(@typeInfo(@TypeOf(inner)).pointer.child)) !Self {
+    pub fn init(
+        inner: anytype,
+        comptime iface: Interface(@typeInfo(@TypeOf(inner)).pointer.child),
+    ) DeviceError!Self {
         const Inner = @typeInfo(@TypeOf(inner)).pointer.child;
 
         const gen = struct {

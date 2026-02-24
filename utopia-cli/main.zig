@@ -8,7 +8,19 @@ pub fn main() !void {
 
     _ = app_args;
 
-    var device = try utopia.Device.init(.{ .allocator = allocator }, device_args);
+    var error_buf: [256]u8 = undefined;
+    var stderr = std.fs.File.stderr().writer(&error_buf);
+
+    const default_args: utopia.DefaultArgs = .{
+        .allocator = allocator,
+        .error_writer = &stderr.interface,
+    };
+
+    var device = utopia.Device.init(default_args, device_args) catch |err| {
+        stderr.interface.flush() catch {};
+        return err;
+    };
+
     defer device.deinit();
 
     device.runFrame();

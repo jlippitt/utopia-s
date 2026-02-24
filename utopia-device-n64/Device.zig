@@ -33,28 +33,26 @@ arena: std.heap.ArenaAllocator,
 pub fn init(args: fw.DefaultArgs, device_args: Args) !fw.Device {
     var arena = std.heap.ArenaAllocator.init(args.allocator);
 
-    const cwd = std.fs.cwd();
-
-    const rom = try cwd.readFileAllocOptions(
+    const rom = try fw.fs.readFileAllocAligned(
         arena.allocator(),
         device_args.rom_path,
-        max_rom_size,
-        null,
         .@"8",
-        null,
+        args.error_writer,
     );
 
     const pifdata_path = device_args.pifdata_path orelse {
-        return error.MissingPifdata;
+        if (args.error_writer) |writer| {
+            writer.print("Running without 'pifdata' ROM is not yet supported\n", .{}) catch {};
+        }
+
+        return error.ArgError;
     };
 
-    const pifdata = try cwd.readFileAllocOptions(
+    const pifdata = try fw.fs.readFileAllocAligned(
         arena.allocator(),
         pifdata_path,
-        pifdata_size,
-        pifdata_size,
         .@"4",
-        null,
+        args.error_writer,
     );
 
     const self = try arena.allocator().create(Self);
