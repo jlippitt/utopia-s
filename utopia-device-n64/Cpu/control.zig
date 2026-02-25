@@ -1,6 +1,26 @@
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 
+const JumpParams = struct {
+    link: bool = false,
+};
+
+pub fn j(comptime params: JumpParams, core: *Core, word: u32) void {
+    const target = (core.pc & 0xf000_0000) | ((@as(u32, word) << 2) & 0x0fff_fffc);
+
+    fw.log.trace("{X:08}: J{s} 0x{X:08}", .{
+        core.pc,
+        if (params.link) "AL" else "",
+        target,
+    });
+
+    if (comptime params.link) {
+        core.link(.RA);
+    }
+
+    core.jump(target);
+}
+
 pub fn jr(core: *Core, word: u32) void {
     const args: Core.RType = @bitCast(word);
 

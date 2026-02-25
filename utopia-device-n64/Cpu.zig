@@ -167,6 +167,8 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
     switch (@as(u6, @truncate(word >> 26))) {
         0o00 => special(core, word),
         0o01 => regImm(core, word),
+        0o02 => control.j(.{}, core, word),
+        0o03 => control.j(.{ .link = true }, core, word),
         0o04 => control.branchBinary(.BEQ, .{}, core, word),
         0o05 => control.branchBinary(.BNE, .{}, core, word),
         0o06 => control.branchUnary(.BLEZ, .{}, core, word),
