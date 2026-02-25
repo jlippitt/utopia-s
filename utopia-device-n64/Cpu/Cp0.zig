@@ -30,6 +30,8 @@ compare: u32 = 0,
 status: Status = .{},
 cause: Cause = .{},
 config: Config = .{},
+watch_lo: WatchLo = .{},
+watch_hi: WatchHi = .{},
 tag_lo: TagLo = .{},
 
 pub fn init() Self {
@@ -45,6 +47,8 @@ fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
         .Status => @as(u32, @bitCast(self.status)),
         .Cause => @as(u32, @bitCast(self.cause)),
         .Config => @as(u32, @bitCast(self.config)),
+        .WatchLo => @as(u32, @bitCast(self.watch_lo)),
+        .WatchHi => @as(u32, @bitCast(self.watch_hi)),
         .TagLo => @as(u32, @bitCast(self.tag_lo)),
         .TagHi => 0,
         else => fw.log.todo("CPU CP0 register read: {t}", .{reg}),
@@ -112,6 +116,26 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
             if (self.config.ep != 0) {
                 fw.log.warn("Unsupported: Non-default data transfer patterns", .{});
             }
+        },
+        .WatchLo => {
+            fw.num.writeMasked(
+                u32,
+                @ptrCast(&self.watch_lo),
+                @truncate(value),
+                0xffff_fffb,
+            );
+
+            fw.log.trace("  WatchLo: {any}", .{self.watch_lo});
+        },
+        .WatchHi => {
+            fw.num.writeMasked(
+                u32,
+                @ptrCast(&self.watch_hi),
+                @truncate(value),
+                0x0000_000f,
+            );
+
+            fw.log.trace("  WatchHi: {any}", .{self.watch_hi});
         },
         .TagLo => {
             fw.num.writeMasked(
@@ -211,6 +235,18 @@ const Config = packed struct(u32) {
     ep: u4 = 0,
     ec: u3 = 0b111,
     __2: u1 = 0,
+};
+
+const WatchLo = packed struct(u32) {
+    write: bool = false,
+    read: bool = false,
+    __: u1 = 0,
+    paddr0: u29 = 0,
+};
+
+const WatchHi = packed struct(u32) {
+    paddr1: u4 = 0,
+    __: u28 = 0,
 };
 
 const TagLo = packed struct(u32) {

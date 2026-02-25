@@ -13,6 +13,7 @@ pub fn init() Self {
 pub fn read(self: *Self, address: u32) u32 {
     return switch (@as(u2, @truncate(address >> 2))) {
         0 => @bitCast(self.mode),
+        1 => 0x0202_0102,
         3 => @bitCast(self.mask),
         else => fw.log.panic("Unmapped MI register read: {X:08}", .{address}),
     };
