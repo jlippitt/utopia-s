@@ -28,6 +28,26 @@ pub const Args = struct {
     rom_path: []const u8,
 };
 
+pub const CicType = enum {
+    nus_6101,
+    nus_6102,
+    nus_6103,
+    nus_6105,
+    nus_6106,
+    mini_ipl3,
+
+    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+        _ = try writer.write(switch (self) {
+            .nus_6101 => "NUS-6101",
+            .nus_6102 => "NUS-6102",
+            .nus_6103 => "NUS-6103",
+            .nus_6105 => "NUS-6105",
+            .nus_6106 => "NUS-6106",
+            .mini_ipl3 => "Mini-IPL3",
+        });
+    }
+};
+
 const Page = enum {
     rdram_registers,
     rsp,
@@ -96,6 +116,27 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         pifdata_path,
         .@"4",
     );
+
+    // Use checksum of IPL3 to determine the CIC type
+    const ipl3_checksum = std.hash.crc.Crc32Cksum.hash(rom[0x0040..0x1000]);
+
+    const cic_type: CicType = switch (ipl3_checksum) {
+        0x0013_579c => .nus_6101,
+        0xd1f2_d592 => .nus_6102,
+        0x27df_61e2 => .nus_6103,
+        0x229f_516c => .nus_6105,
+        0xa0dd_69f7 => .nus_6106,
+        0x522f_d8eb => .mini_ipl3,
+        else => blk: {
+            fw.log.warn("No known CIC type for IPL3 checksum {X:08}. Defaulting to NUS-6102.", .{
+                ipl3_checksum,
+            });
+
+            break :blk .nus_6102;
+        },
+    };
+
+    fw.log.debug("CIC Type: {f}", .{cic_type});
 
     const self = try arena.allocator().create(Self);
 
