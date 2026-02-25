@@ -27,7 +27,7 @@ pub fn read(self: *Self, address: u32) u32 {
         return self.readRegister(@truncate(address >> 2));
     }
 
-    if (address == 0x0008_0000) {
+    if ((address & 0x000f_ffff) == 0x0008_0000) {
         return self.pc;
     }
 
@@ -45,7 +45,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         return;
     }
 
-    if (address == 0x0008_0000) {
+    if ((address & 0x000f_ffff) == 0x0008_0000) {
         fw.num.writeMasked(u12, &self.pc, @truncate(value), @truncate(mask));
         fw.log.debug("RSP PC: {X:08}", .{self.pc});
     }
