@@ -8,12 +8,18 @@ pub const LoadOp = enum {
 
 pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
     const args: Core.IType = @bitCast(word);
-    const offset = fw.num.signExtend(u64, args.imm);
+    const offset = fw.num.signExtend(u32, args.imm);
 
-    fw.log.trace("{X:08}: {t} {t}, {d}({t})", .{ core.pc, op, args.rt, offset, args.rs });
+    fw.log.trace("{X:08}: {t} {t}, {d}({t})", .{
+        core.pc,
+        op,
+        args.rt,
+        @as(i32, @bitCast(offset)),
+        args.rs,
+    });
 
-    const vaddr = core.get(args.rs) +% offset;
-    const paddr = core.mapAddress(@truncate(vaddr)) orelse return;
+    const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
+    const paddr = core.mapAddress(vaddr) orelse return;
 
     core.set(args.rt, switch (comptime op) {
         .LW => fw.num.signExtend(u64, core.readWord(bus, paddr)),

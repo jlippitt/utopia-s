@@ -1,6 +1,7 @@
 const fw = @import("framework");
 const Cp0 = @import("./Cpu/Cp0.zig");
 const alu = @import("./Cpu/alu.zig");
+const control = @import("./Cpu/control.zig");
 const memory = @import("./Cpu/memory.zig");
 
 const Self = @This();
@@ -28,6 +29,11 @@ pub const IType = packed struct(u32) {
     rt: Register,
     rs: Register,
     opcode: u6,
+};
+
+pub const BranchParams = struct {
+    link: bool = false,
+    likely: bool = false,
 };
 
 pub const Bus = struct {
@@ -96,15 +102,71 @@ pub fn readWord(self: *Self, comptime bus: Bus, paddr: u32) u32 {
     return value;
 }
 
+pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bool) void {
+    if (comptime params.link) {
+        self.link(.RA);
+    }
+
+    if (self.pipe_state == .delay) {
+        @branchHint(.unlikely);
+        return;
+    }
+
+    if (taken) {
+        fw.log.trace("  Branch taken", .{});
+        self.target_pc = self.pc +% offset +% 4;
+        self.pipe_state = .branch;
+        return;
+    }
+
+    fw.log.trace("  Branch not taken", .{});
+
+    if (comptime params.likely) {
+        self.pc +%= 4;
+        return;
+    }
+
+    self.target_pc = self.pc +% 8;
+    self.pipe_state = .branch;
+}
+
+pub fn link(self: *Self, reg: Register) void {
+    const address = if (self.pipe_state == .delay) self.target_pc +% 4 else self.pc +% 8;
+    self.set(reg, fw.num.signExtend(u64, address));
+}
+
 fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
     switch (@as(u6, @truncate(word >> 26))) {
+        0o01 => regImm(core, word),
+        0o04 => control.branchBinary(.BEQ, .{}, core, word),
+        0o05 => control.branchBinary(.BNE, .{}, core, word),
+        0o06 => control.branchUnary(.BLEZ, .{}, core, word),
+        0o07 => control.branchUnary(.BGTZ, .{}, core, word),
         0o14 => alu.iTypeLogic(.AND, core, word),
         0o15 => alu.iTypeLogic(.OR, core, word),
         0o16 => alu.iTypeLogic(.XOR, core, word),
         0o17 => alu.lui(core, word),
         0o20 => Cp0.cop0(bus, core, word),
+        0o24 => control.branchBinary(.BEQ, .{ .likely = true }, core, word),
+        0o25 => control.branchBinary(.BNE, .{ .likely = true }, core, word),
+        0o26 => control.branchUnary(.BLEZ, .{ .likely = true }, core, word),
+        0o27 => control.branchUnary(.BGTZ, .{ .likely = true }, core, word),
         0o43 => memory.load(.LW, bus, core, word),
         0o47 => memory.load(.LWU, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
+    }
+}
+
+fn regImm(core: *Self, word: u32) void {
+    switch (@as(u5, @truncate(word >> 16))) {
+        0o00 => control.branchUnary(.BLTZ, .{}, core, word),
+        0o01 => control.branchUnary(.BGEZ, .{}, core, word),
+        0o02 => control.branchUnary(.BLTZ, .{ .likely = true }, core, word),
+        0o03 => control.branchUnary(.BGEZ, .{ .likely = true }, core, word),
+        0o20 => control.branchUnary(.BLTZ, .{ .link = true }, core, word),
+        0o21 => control.branchUnary(.BGEZ, .{ .link = true }, core, word),
+        0o22 => control.branchUnary(.BLTZ, .{ .link = true, .likely = true }, core, word),
+        0o23 => control.branchUnary(.BGEZ, .{ .link = true, .likely = true }, core, word),
+        else => |rt| fw.log.todo("CPU RegImm rt: {o:02}", .{rt}),
     }
 }
