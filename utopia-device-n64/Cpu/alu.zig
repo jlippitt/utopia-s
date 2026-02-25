@@ -2,6 +2,12 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 
+pub fn lui(core: *Core, word: u32) void {
+    const args: Core.IType = @bitCast(word);
+    fw.log.trace("{X:08}: LUI {t}, 0x{X:04}", .{ core.pc, args.rt, args.imm });
+    core.set(args.rt, fw.num.signExtend(u64, @as(u32, args.imm) << 16));
+}
+
 pub const LogicOp = enum {
     AND,
     OR,
@@ -17,6 +23,12 @@ pub const LogicOp = enum {
         };
     }
 };
+
+pub fn iTypeLogic(comptime op: LogicOp, core: *Core, word: u32) void {
+    const args: Core.IType = @bitCast(word);
+    fw.log.trace("{X:08}: {t}I {t}, {t}, 0x{X:04}", .{ core.pc, op, args.rt, args.rs, args.imm });
+    core.set(args.rt, op.apply(core.get(args.rs), args.imm));
+}
 
 pub const ArithmeticOp = enum {
     ADD,
@@ -47,18 +59,6 @@ pub const ArithmeticOp = enum {
     }
 };
 
-pub fn lui(core: *Core, word: u32) void {
-    const args: Core.IType = @bitCast(word);
-    fw.log.trace("{X:08}: LUI {t}, 0x{X:04}", .{ core.pc, args.rt, args.imm });
-    core.set(args.rt, fw.num.signExtend(u64, @as(u32, args.imm) << 16));
-}
-
-pub fn iTypeLogic(comptime op: LogicOp, core: *Core, word: u32) void {
-    const args: Core.IType = @bitCast(word);
-    fw.log.trace("{X:08}: {t}I {t}, {t}, 0x{X:04}", .{ core.pc, op, args.rt, args.rs, args.imm });
-    core.set(args.rt, op.apply(core.get(args.rs), args.imm));
-}
-
 pub fn iTypeArithmetic(
     comptime op: ArithmeticOp,
     comptime signedness: std.builtin.Signedness,
@@ -79,5 +79,6 @@ pub fn iTypeArithmetic(
 
     core.set(args.rt, op.apply(signedness, core.get(args.rs), offset) catch {
         fw.log.todo("CPU overflow exceptions", .{});
+        return;
     });
 }

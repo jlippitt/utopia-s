@@ -102,6 +102,11 @@ pub fn readWord(self: *Self, comptime bus: Bus, paddr: u32) u32 {
     return value;
 }
 
+pub fn writeWord(self: *Self, comptime bus: Bus, paddr: u32, value: u32, mask: u32) void {
+    fw.log.trace("  [{X:08} <= {X:08}]", .{ paddr, value });
+    return bus.write(self, paddr, value, mask);
+}
+
 pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bool) void {
     if (comptime params.link) {
         self.link(.RA);
@@ -157,6 +162,7 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o31 => alu.iTypeArithmetic(.DADD, .unsigned, core, word),
         0o43 => memory.load(.LW, bus, core, word),
         0o47 => memory.load(.LWU, bus, core, word),
+        0o53 => memory.store(.SW, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
 }
