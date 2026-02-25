@@ -9,12 +9,14 @@ pub const LoadOp = enum {
     LHU,
     LW,
     LWU,
+    LD,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
             .LB, .LBU => 0,
             .LH, .LHU => 1,
             .LW, .LWU => 3,
+            .LD => 7,
         };
     }
 };
@@ -62,6 +64,7 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
         },
         .LW => fw.num.signExtend(u64, core.readWord(bus, paddr)),
         .LWU => fw.num.zeroExtend(u64, core.readWord(bus, paddr)),
+        .LD => core.readDoubleWord(bus, paddr),
     });
 }
 

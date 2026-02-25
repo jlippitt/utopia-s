@@ -115,6 +115,12 @@ pub fn readWord(self: *Self, comptime bus: Bus, paddr: u32) u32 {
     return value;
 }
 
+pub fn readDoubleWord(self: *Self, comptime bus: Bus, paddr: u32) u64 {
+    const hi = self.readWord(bus, paddr);
+    const lo = self.readWord(bus, paddr +% 4);
+    return @as(u64, hi) << 32 | lo;
+}
+
 pub fn writeWord(self: *Self, comptime bus: Bus, paddr: u32, value: u32, mask: u32) void {
     fw.log.trace("  [{X:08} <= {X:08}]", .{ paddr, value });
     return bus.write(self, paddr, value, mask);
@@ -196,6 +202,7 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o47 => memory.load(.LWU, bus, core, word),
         0o53 => memory.store(.SW, bus, core, word),
         0o57 => memory.cache(core, word),
+        0o67 => memory.load(.LD, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
 }
