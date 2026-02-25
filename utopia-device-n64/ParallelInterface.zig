@@ -103,10 +103,6 @@ pub fn readRom(self: *const Self, address: u32) u32 {
 fn transferDma(self: *Self, direction: DmaDirection, raw_len: u24) void {
     const len = (raw_len + 1) & ~@as(u24, 1);
 
-    if ((self.dram_addr & 7) != 0) {
-        fw.log.unimplemented("PI DMA with misaligned DRAM address: {X:08}", .{self.dram_addr});
-    }
-
     switch (direction) {
         .read => {
             // TODO: PI DMA reads
