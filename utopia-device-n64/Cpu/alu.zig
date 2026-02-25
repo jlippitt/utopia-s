@@ -39,6 +39,8 @@ pub fn rTypeLogic(comptime op: LogicOp, core: *Core, word: u32) void {
 pub const ArithmeticOp = enum {
     ADD,
     DADD,
+    SUB,
+    DSUB,
 
     fn apply(
         comptime op: @This(),
@@ -52,7 +54,12 @@ pub const ArithmeticOp = enum {
                     u64,
                     try std.math.add(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
                 ),
-                .DADD => @bitCast(try std.math.add(i64, @bitCast(lhs), @bitCast(rhs))),
+                .DADD => @bitCast(try std.math.sub(i64, @bitCast(lhs), @bitCast(rhs))),
+                .SUB => fw.num.signExtend(
+                    u64,
+                    try std.math.add(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
+                ),
+                .DSUB => @bitCast(try std.math.sub(i64, @bitCast(lhs), @bitCast(rhs))),
             },
             .unsigned => switch (comptime op) {
                 .ADD => fw.num.signExtend(
@@ -60,6 +67,11 @@ pub const ArithmeticOp = enum {
                     @as(u32, @truncate(lhs)) +% @as(u32, @truncate(rhs)),
                 ),
                 .DADD => lhs +% rhs,
+                .SUB => fw.num.signExtend(
+                    u64,
+                    @as(u32, @truncate(lhs)) -% @as(u32, @truncate(rhs)),
+                ),
+                .DSUB => lhs -% rhs,
             },
         };
     }
@@ -84,6 +96,30 @@ pub fn iTypeArithmetic(
     });
 
     core.set(args.rt, op.apply(signedness, core.get(args.rs), offset) catch {
+        @branchHint(.cold);
+        fw.log.todo("CPU overflow exceptions", .{});
+        return;
+    });
+}
+
+pub fn rTypeArithmetic(
+    comptime op: ArithmeticOp,
+    comptime signedness: std.builtin.Signedness,
+    core: *Core,
+    word: u32,
+) void {
+    const args: Core.RType = @bitCast(word);
+
+    fw.log.trace("{X:08}: {t}{s} {t}, {t}, {t}", .{
+        core.pc,
+        op,
+        if (signedness == .unsigned) "U" else "",
+        args.rd,
+        args.rs,
+        args.rt,
+    });
+
+    core.set(args.rd, op.apply(signedness, core.get(args.rs), core.get(args.rt)) catch {
         @branchHint(.cold);
         fw.log.todo("CPU overflow exceptions", .{});
         return;
