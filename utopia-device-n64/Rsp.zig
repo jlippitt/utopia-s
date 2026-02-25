@@ -20,7 +20,7 @@ pub fn init(allocator: std.mem.Allocator) !Self {
 
 pub fn read(self: *Self, address: u32) u32 {
     if ((address & 0x000c_0000) == 0) {
-        return fw.mem.readBe(u32, self.mem, address & 0x1fff);
+        return fw.mem.readBe(u32, self.mem, address & 0x1ffc);
     }
 
     if ((address & 0x000c_0000) == 0x0004_0000) {
@@ -36,7 +36,7 @@ pub fn read(self: *Self, address: u32) u32 {
 
 pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     if ((address & 0x000c_0000) == 0) {
-        fw.mem.writeBe(u32, self.mem, address & 0x1fff, value, mask);
+        fw.mem.writeBe(u32, self.mem, address & 0x1ffc, value, mask);
         return;
     }
 

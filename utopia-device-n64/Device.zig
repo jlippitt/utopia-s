@@ -3,9 +3,9 @@ const fw = @import("framework");
 const Cpu = @import("./Cpu.zig");
 const Rsp = @import("./Rsp.zig");
 const ParallelInterface = @import("./ParallelInterface.zig");
+const SerialInterface = @import("./SerialInterface.zig");
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
-const pifdata_size = 2048;
 
 pub const Args = struct {
     pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
@@ -71,8 +71,8 @@ const Self = @This();
 cpu: Cpu,
 rsp: Rsp,
 pi: ParallelInterface,
+si: SerialInterface,
 rom: []align(8) const u8,
-pifdata: *align(4) [pifdata_size]u8,
 arena: std.heap.ArenaAllocator,
 
 pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.Device {
@@ -101,8 +101,8 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .cpu = .init(),
         .rsp = try .init(arena.allocator()),
         .pi = .init(),
+        .si = .init(pifdata),
         .rom = rom,
-        .pifdata = pifdata[0..pifdata_size],
         .arena = arena,
     };
 
@@ -138,7 +138,8 @@ fn read(core: *Cpu, address: u32) u32 {
     return switch (memory_map[page_index]) {
         .rsp => self.rsp.read(address),
         .parallel_interface => self.pi.read(address),
-        .pifdata => fw.mem.readBe(u32, self.pifdata, address & 0x003f_ffff),
+        .serial_interface => self.si.read(address),
+        .pifdata => self.si.readPif(address),
         else => |page| fw.log.todo("Read from memory page: {t}", .{page}),
     };
 }
@@ -158,6 +159,8 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
         .video_interface => {}, // TODO
         .audio_interface => {}, // TODO
         .parallel_interface => self.pi.write(address, value, mask),
+        .serial_interface => self.si.write(address, value, mask),
+        .pifdata => self.si.writePif(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
 }
