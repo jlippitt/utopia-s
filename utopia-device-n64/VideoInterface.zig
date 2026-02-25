@@ -139,7 +139,7 @@ pub fn handleNewLineEvent(self: *Self) bool {
         // TODO: VI interrupts
     }
 
-    self.getDevice().clock.reschedule(.vi_new_line, self.cycles_per_line);
+    self.getDevice().clock.schedule(.vi_new_line, self.cycles_per_line);
 
     return frame_complete;
 }
