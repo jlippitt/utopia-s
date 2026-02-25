@@ -41,6 +41,7 @@ pub const ArithmeticOp = enum {
     DADD,
     SUB,
     DSUB,
+    SLT,
 
     fn apply(
         comptime op: @This(),
@@ -60,6 +61,7 @@ pub const ArithmeticOp = enum {
                     try std.math.add(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
                 ),
                 .DSUB => @bitCast(try std.math.sub(i64, @bitCast(lhs), @bitCast(rhs))),
+                .SLT => @intFromBool(@as(i64, @bitCast(lhs)) < @as(i64, @bitCast(rhs))),
             },
             .unsigned => switch (comptime op) {
                 .ADD => fw.num.signExtend(
@@ -72,6 +74,7 @@ pub const ArithmeticOp = enum {
                     @as(u32, @truncate(lhs)) -% @as(u32, @truncate(rhs)),
                 ),
                 .DSUB => lhs -% rhs,
+                .SLT => @intFromBool(lhs < rhs),
             },
         };
     }
