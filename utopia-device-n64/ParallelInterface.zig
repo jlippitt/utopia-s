@@ -2,12 +2,15 @@ const fw = @import("framework");
 
 const Self = @This();
 
+rom: []align(8) const u8,
 status: Status = .{},
 bsd_dom1: BsdDom = .{},
 bsd_dom2: BsdDom = .{},
 
-pub fn init() Self {
-    return .{};
+pub fn init(rom: []align(8) const u8) Self {
+    return .{
+        .rom = rom,
+    };
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -62,6 +65,17 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         },
         else => fw.log.panic("Unmapped PI register write: {X:08} <= {X:08}", .{ address, value }),
     }
+}
+
+pub fn readRom(self: *const Self, address: u32) u32 {
+    const index = address & 0x0fff_fffc;
+
+    if (index >= self.rom.len) {
+        fw.log.warn("Cartridge ROM read out of range: {X:08}", .{address});
+        return 0;
+    }
+
+    return fw.mem.readBe(u32, self.rom, index);
 }
 
 const Status = packed struct(u32) {

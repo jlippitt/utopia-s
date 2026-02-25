@@ -94,7 +94,6 @@ rsp: Rsp,
 rdp: Rdp,
 pi: ParallelInterface,
 si: SerialInterface,
-rom: []align(8) const u8,
 arena: std.heap.ArenaAllocator,
 
 pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.Device {
@@ -153,9 +152,8 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .cpu = .init(),
         .rsp = try .init(arena.allocator()),
         .rdp = .init(),
-        .pi = .init(),
+        .pi = .init(rom),
         .si = .init(pifdata, cic_seed),
-        .rom = rom,
         .arena = arena,
     };
 
@@ -195,6 +193,7 @@ fn read(core: *Cpu, address: u32) u32 {
         .serial_interface => self.si.read(address),
         .dd_registers => std.math.maxInt(u32), // TODO
         .dd_ipl_rom => 0, // TODO
+        .cartridge_rom => self.pi.readRom(address),
         .pifdata => self.si.readPif(address),
         else => |page| fw.log.todo("Read from memory page: {t}", .{page}),
     };
