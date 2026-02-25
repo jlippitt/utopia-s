@@ -3,6 +3,7 @@ const Cp0 = @import("./Cpu/Cp0.zig");
 const alu = @import("./Cpu/alu.zig");
 const control = @import("./Cpu/control.zig");
 const memory = @import("./Cpu/memory.zig");
+const shift = @import("./Cpu/shift.zig");
 
 const Self = @This();
 
@@ -189,7 +190,22 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
 
 fn special(core: *Self, word: u32) void {
     switch (@as(u6, @truncate(word))) {
+        0o00 => shift.fixed(.SLL, core, word),
+        0o02 => shift.fixed(.SRL, core, word),
+        0o03 => shift.fixed(.SRA, core, word),
+        0o04 => shift.variable(.SLL, core, word),
+        0o06 => shift.variable(.SRL, core, word),
+        0o07 => shift.variable(.SRA, core, word),
         0o10 => control.jr(core, word),
+        0o24 => shift.variable(.DSLL, core, word),
+        0o26 => shift.variable(.DSRL, core, word),
+        0o27 => shift.variable(.DSRA, core, word),
+        0o70 => shift.fixed(.DSLL, core, word),
+        0o72 => shift.fixed(.DSRL, core, word),
+        0o73 => shift.fixed(.DSRA, core, word),
+        0o74 => shift.fixed32(.DSLL, core, word),
+        0o76 => shift.fixed32(.DSRL, core, word),
+        0o77 => shift.fixed32(.DSRA, core, word),
         else => |funct| fw.log.todo("CPU Special funct: {o:02}", .{funct}),
     }
 }
