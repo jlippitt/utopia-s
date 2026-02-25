@@ -6,6 +6,11 @@ pub fn build(b: *std.Build) void {
 
     const clap = b.dependency("clap", .{});
 
+    const log_level = b.option([]const u8, "log-level", "Maximum log level");
+
+    const options = b.addOptions();
+    options.addOption(?[]const u8, "log_level", log_level);
+
     const utopia_framework = b.addModule("utopia", .{
         .root_source_file = b.path("utopia-framework/lib.zig"),
         .target = target,
@@ -36,6 +41,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .link_libc = true,
             .imports = &.{
+                .{ .name = "options", .module = options.createModule() },
                 .{ .name = "utopia", .module = utopia },
                 .{ .name = "clap", .module = clap.module("clap") },
             },

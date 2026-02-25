@@ -1,10 +1,20 @@
 const builtin = @import("builtin");
 const std = @import("std");
+const options = @import("options");
 const utopia = @import("utopia");
 
 const log_path = "./log";
 
-const max_level: utopia.log.Level = if (builtin.mode == .Debug) .trace else .info;
+pub const default_level: utopia.log.Level = switch (builtin.mode) {
+    .Debug => .debug,
+    .ReleaseSafe => .info,
+    .ReleaseFast, .ReleaseSmall => .err,
+};
+
+const max_level: utopia.log.Level = if (options.log_level) |level_string|
+    @field(utopia.log.Level, level_string)
+else
+    default_level;
 
 var file: std.fs.File = undefined;
 var writer: std.fs.File.Writer = undefined;
