@@ -139,6 +139,8 @@ fn read(core: *Cpu, address: u32) u32 {
         .rsp => self.rsp.read(address),
         .parallel_interface => self.pi.read(address),
         .serial_interface => self.si.read(address),
+        .dd_registers => std.math.maxInt(u32), // TODO
+        .dd_ipl_rom => 0, // TODO
         .pifdata => self.si.readPif(address),
         else => |page| fw.log.todo("Read from memory page: {t}", .{page}),
     };
@@ -160,6 +162,8 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
         .audio_interface => {}, // TODO
         .parallel_interface => self.pi.write(address, value, mask),
         .serial_interface => self.si.write(address, value, mask),
+        .dd_registers => {}, // TODO
+        .dd_ipl_rom => {}, // TODO
         .pifdata => self.si.writePif(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
