@@ -3,6 +3,7 @@ const register = @import("./register.zig");
 
 const Self = @This();
 
+mode: Mode = .{},
 mask: Mask = .{},
 
 pub fn init() Self {
@@ -11,6 +12,7 @@ pub fn init() Self {
 
 pub fn read(self: *Self, address: u32) u32 {
     return switch (@as(u2, @truncate(address >> 2))) {
+        0 => @bitCast(self.mode),
         3 => @bitCast(self.mask),
         else => fw.log.panic("Unmapped MI register read: {X:08}", .{address}),
     };
@@ -18,6 +20,32 @@ pub fn read(self: *Self, address: u32) u32 {
 
 pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     switch (@as(u2, @truncate(address >> 2))) {
+        0 => {
+            // Only the lower 7 bits ('repeat_count') are written this way
+            fw.num.writeMasked(u32, @ptrCast(&self.mode), @truncate(value), @truncate(mask & 7));
+
+            const masked_value = value & mask;
+
+            register.setFlag(&self.mode, "repeat", masked_value, 7);
+            register.setFlag(&self.mode, "ebus", masked_value, 9);
+            register.setFlag(&self.mode, "upper", masked_value, 12);
+
+            if (self.mode.repeat) {
+                fw.log.unimplemented("MI Repeat Mode", .{});
+            }
+
+            if (self.mode.ebus) {
+                fw.log.unimplemented("MI EBus Mode", .{});
+            }
+
+            if (self.mode.upper) {
+                fw.log.unimplemented("MI Upper Mode", .{});
+            }
+
+            // TODO: RDP interrupts
+
+            fw.log.debug("MI_MODE: {any}", .{self.mask});
+        },
         3 => {
             const masked_value = value & mask;
 
@@ -33,6 +61,14 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         else => fw.log.panic("Unmapped MI register write: {X:08} <= {X:08}", .{ address, value }),
     }
 }
+
+const Mode = packed struct(u32) {
+    repeat_count: u7 = 0,
+    repeat: bool = false,
+    ebus: bool = false,
+    upper: bool = false,
+    __: u22 = 0,
+};
 
 const Mask = packed struct(u32) {
     sp: bool = false,
