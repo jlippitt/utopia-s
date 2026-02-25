@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const Cic = @import("./Cic.zig");
 const Cpu = @import("./Cpu.zig");
 const Rsp = @import("./Rsp.zig");
 const Rdp = @import("./Rdp.zig");
@@ -8,6 +9,7 @@ const RdramInterface = @import("./RdramInterface.zig");
 const SerialInterface = @import("./SerialInterface.zig");
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
+const rdram_size = 8 * 1024 * 1024; // 8MiB
 
 pub const Args = struct {
     pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
@@ -27,26 +29,6 @@ pub const Args = struct {
 
     pifdata_path: ?[]const u8,
     rom_path: []const u8,
-};
-
-pub const CicType = enum {
-    nus_6101,
-    nus_6102,
-    nus_6103,
-    nus_6105,
-    nus_6106,
-    mini_ipl3,
-
-    pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        _ = try writer.write(switch (self) {
-            .nus_6101 => "NUS-6101",
-            .nus_6102 => "NUS-6102",
-            .nus_6103 => "NUS-6103",
-            .nus_6105 => "NUS-6105",
-            .nus_6106 => "NUS-6106",
-            .mini_ipl3 => "Mini-IPL3",
-        });
-    }
 };
 
 const Page = enum {
@@ -91,6 +73,7 @@ const memory_map: [512]Page = blk: {
 const Self = @This();
 
 cpu: Cpu,
+rdram: *align(4) [rdram_size]u8,
 rsp: Rsp,
 rdp: Rdp,
 pi: ParallelInterface,
@@ -118,45 +101,24 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .@"4",
     );
 
-    // Use checksum of IPL3 to determine the CIC type
-    const ipl3_checksum = std.hash.crc.Crc32Cksum.hash(rom[0x0040..0x1000]);
+    const rdram = try arena.allocator().alignedAlloc(u8, .@"4", rdram_size);
 
-    const cic_type: CicType = switch (ipl3_checksum) {
-        0x0013_579c => .nus_6101,
-        0xd1f2_d592 => .nus_6102,
-        0x27df_61e2 => .nus_6103,
-        0x229f_516c => .nus_6105,
-        0xa0dd_69f7 => .nus_6106,
-        0x522f_d8eb => .mini_ipl3,
-        else => blk: {
-            fw.log.warn("No known CIC type for IPL3 checksum {X:08}. Defaulting to NUS-6102.", .{
-                ipl3_checksum,
-            });
+    const cic = Cic.init(rom[0x0040..0x1000]);
 
-            break :blk .nus_6102;
-        },
-    };
-
-    fw.log.debug("CIC Type: {f}", .{cic_type});
-
-    // Determine 'magic' CIC seed value that should be written to PIF RAM
-    const cic_seed: u32 = switch (cic_type) {
-        .nus_6101 => 0x0004_3f3f,
-        .nus_6102, .mini_ipl3 => 0x0000_3f3f,
-        .nus_6103 => 0x0000_783f,
-        .nus_6105 => 0x0000_913f,
-        .nus_6106 => 0x0000_853f,
-    };
+    if (cic.getRamSizeAddress()) |address| {
+        fw.mem.writeBe(u32, rdram, address, rdram_size);
+    }
 
     const self = try arena.allocator().create(Self);
 
     self.* = .{
         .cpu = .init(),
+        .rdram = rdram[0..rdram_size],
         .rsp = try .init(arena.allocator()),
         .rdp = .init(),
         .pi = .init(rom),
         .ri = .init(),
-        .si = .init(pifdata, cic_seed),
+        .si = .init(pifdata, cic.getSeed()),
         .arena = arena,
     };
 
@@ -182,6 +144,10 @@ pub fn runFrame(self: *Self) void {
 fn read(core: *Cpu, address: u32) u32 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
 
+    if (address < rdram_size) {
+        return fw.mem.readBe(u32, self.rdram, address & 0xffff_fffc);
+    }
+
     const page_index = address >> 20;
 
     if (page_index >= memory_map.len) {
@@ -205,6 +171,11 @@ fn read(core: *Cpu, address: u32) u32 {
 
 fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
+
+    if (address < rdram_size) {
+        fw.mem.writeMaskedBe(u32, self.rdram, address & 0xffff_fffc, value, mask);
+        return;
+    }
 
     const page_index = address >> 20;
 
