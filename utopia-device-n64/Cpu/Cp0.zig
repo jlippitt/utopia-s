@@ -25,7 +25,10 @@ const MType = packed struct(u32) {
 
 const Self = @This();
 
+count: u32 = 0,
+compare: u32 = 0,
 status: Status = .{},
+cause: Cause = .{},
 config: Config = .{},
 
 pub fn init() Self {
@@ -36,7 +39,10 @@ fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
     _ = bus;
 
     return switch (reg) {
+        .Count => self.count,
+        .Compare => self.compare,
         .Status => @as(u32, @bitCast(self.status)),
+        .Cause => @as(u32, @bitCast(self.cause)),
         .Config => @as(u32, @bitCast(self.config)),
         else => fw.log.todo("CPU CP0 register read: {t}", .{reg}),
     };
@@ -46,6 +52,14 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
     _ = bus;
 
     switch (reg) {
+        .Count => {
+            self.count = @truncate(value);
+            fw.log.trace("  Count: {X:08}", .{self.count});
+        },
+        .Compare => {
+            self.compare = @truncate(value);
+            fw.log.trace("  Compare: {X:08}", .{self.compare});
+        },
         .Status => {
             fw.num.writeMasked(
                 u32,
@@ -67,6 +81,16 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
             if (self.status.rp) {
                 fw.log.warn("Unsupported: Low power mode", .{});
             }
+        },
+        .Cause => {
+            fw.num.writeMasked(
+                u32,
+                @ptrCast(&self.cause),
+                @truncate(value),
+                0x0000_0030,
+            );
+
+            fw.log.trace("  Cause: {any}", .{self.cause});
         },
         .Config => {
             fw.num.writeMasked(
@@ -138,11 +162,11 @@ const Status = packed struct(u32) {
     de: bool = false,
     ce: bool = false,
     ch: bool = false,
-    _0: bool = false,
+    __0: bool = false,
     sr: bool = false,
     ts: bool = false,
     bev: bool = false,
-    _1: bool = false,
+    __1: u1 = 0,
     its: bool = false,
     re: bool = false,
     fr: bool = false,
@@ -153,6 +177,17 @@ const Status = packed struct(u32) {
     cu3: bool = false,
 };
 
+const Cause = packed struct(u32) {
+    __0: u2 = 0,
+    exc_code: u5 = 0,
+    __1: u1 = 0,
+    ip: u8 = 0,
+    __2: u12 = 0,
+    ce: u2 = 0,
+    __3: u1 = 0,
+    bd: bool = false,
+};
+
 const Config = packed struct(u32) {
     k0: u3 = 0,
     cu: bool = false,
@@ -161,5 +196,5 @@ const Config = packed struct(u32) {
     __1: u8 = 0b0000_0110,
     ep: u4 = 0,
     ec: u3 = 0b111,
-    __2: bool = false,
+    __2: u1 = 0,
 };
