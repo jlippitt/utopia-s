@@ -3,11 +3,17 @@ const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 
 pub const LoadOp = enum {
+    LB,
+    LBU,
+    LH,
+    LHU,
     LW,
     LWU,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
+            .LB, .LBU => 0,
+            .LH, .LHU => 1,
             .LW, .LWU => 3,
         };
     }
@@ -34,6 +40,26 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
     }
 
     core.set(args.rt, switch (comptime op) {
+        .LB => blk: {
+            const input = core.readWord(bus, paddr);
+            const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
+            break :blk fw.num.signExtend(u64, @as(u8, @truncate(input >> shift)));
+        },
+        .LBU => blk: {
+            const input = core.readWord(bus, paddr);
+            const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
+            break :blk fw.num.zeroExtend(u64, @as(u8, @truncate(input >> shift)));
+        },
+        .LH => blk: {
+            const input = core.readWord(bus, paddr);
+            const shift: u5 = @intCast((paddr & 2 ^ 2) * 8);
+            break :blk fw.num.signExtend(u64, @as(u16, @truncate(input >> shift)));
+        },
+        .LHU => blk: {
+            const input = core.readWord(bus, paddr);
+            const shift: u5 = @intCast((paddr & 2 ^ 2) * 8);
+            break :blk fw.num.zeroExtend(u64, @as(u16, @truncate(input >> shift)));
+        },
         .LW => fw.num.signExtend(u64, core.readWord(bus, paddr)),
         .LWU => fw.num.zeroExtend(u64, core.readWord(bus, paddr)),
     });
