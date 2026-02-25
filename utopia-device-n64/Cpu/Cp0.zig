@@ -47,7 +47,7 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
 
     switch (reg) {
         .Status => {
-            fw.num.writeWithMask(
+            fw.num.writeMasked(
                 u32,
                 @ptrCast(&self.status),
                 @truncate(value),
@@ -69,7 +69,7 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
             }
         },
         .Config => {
-            fw.num.writeWithMask(
+            fw.num.writeMasked(
                 u32,
                 @ptrCast(&self.config),
                 @truncate(value),
