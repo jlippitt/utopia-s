@@ -155,6 +155,8 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
 
     switch (memory_map[page_index]) {
         .rsp => self.rsp.write(address, value, mask),
+        .video_interface => {}, // TODO
+        .audio_interface => {}, // TODO
         .parallel_interface => self.pi.write(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
