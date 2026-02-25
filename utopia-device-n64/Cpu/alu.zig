@@ -19,7 +19,7 @@ pub const LogicOp = enum {
             .AND => lhs & rhs,
             .OR => lhs | rhs,
             .XOR => lhs ^ rhs,
-            .NOR => !(lhs | rhs),
+            .NOR => ~(lhs | rhs),
         };
     }
 };
@@ -28,6 +28,12 @@ pub fn iTypeLogic(comptime op: LogicOp, core: *Core, word: u32) void {
     const args: Core.IType = @bitCast(word);
     fw.log.trace("{X:08}: {t}I {t}, {t}, 0x{X:04}", .{ core.pc, op, args.rt, args.rs, args.imm });
     core.set(args.rt, op.apply(core.get(args.rs), args.imm));
+}
+
+pub fn rTypeLogic(comptime op: LogicOp, core: *Core, word: u32) void {
+    const args: Core.RType = @bitCast(word);
+    fw.log.trace("{X:08}: {t} {t}, {t}, {t}", .{ core.pc, op, args.rd, args.rs, args.rt });
+    core.set(args.rd, op.apply(core.get(args.rs), core.get(args.rt)));
 }
 
 pub const ArithmeticOp = enum {
