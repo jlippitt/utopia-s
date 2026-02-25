@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Cpu = @import("./Cpu.zig");
 const Rsp = @import("./Rsp.zig");
+const ParallelInterface = @import("./ParallelInterface.zig");
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
 const pifdata_size = 2048;
@@ -69,6 +70,7 @@ const Self = @This();
 
 cpu: Cpu,
 rsp: Rsp,
+pi: ParallelInterface,
 rom: []align(8) const u8,
 pifdata: *align(4) [pifdata_size]u8,
 arena: std.heap.ArenaAllocator,
@@ -98,6 +100,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     self.* = .{
         .cpu = .init(),
         .rsp = try .init(arena.allocator()),
+        .pi = .init(),
         .rom = rom,
         .pifdata = pifdata[0..pifdata_size],
         .arena = arena,
@@ -134,6 +137,7 @@ fn read(core: *Cpu, address: u32) u32 {
 
     return switch (memory_map[page_index]) {
         .rsp => self.rsp.read(address),
+        .parallel_interface => self.pi.read(address),
         .pifdata => fw.mem.readBe(u32, self.pifdata, address & 0x003f_ffff),
         else => |page| fw.log.todo("Read from memory page: {t}", .{page}),
     };
@@ -151,6 +155,7 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
 
     switch (memory_map[page_index]) {
         .rsp => self.rsp.write(address, value, mask),
+        .parallel_interface => self.pi.write(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
 }
