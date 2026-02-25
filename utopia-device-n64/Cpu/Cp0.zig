@@ -30,6 +30,7 @@ compare: u32 = 0,
 status: Status = .{},
 cause: Cause = .{},
 config: Config = .{},
+tag_lo: TagLo = .{},
 
 pub fn init() Self {
     return .{};
@@ -44,6 +45,8 @@ fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
         .Status => @as(u32, @bitCast(self.status)),
         .Cause => @as(u32, @bitCast(self.cause)),
         .Config => @as(u32, @bitCast(self.config)),
+        .TagLo => @as(u32, @bitCast(self.tag_lo)),
+        .TagHi => 0,
         else => fw.log.todo("CPU CP0 register read: {t}", .{reg}),
     };
 }
@@ -110,6 +113,17 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
                 fw.log.warn("Unsupported: Non-default data transfer patterns", .{});
             }
         },
+        .TagLo => {
+            fw.num.writeMasked(
+                u32,
+                @ptrCast(&self.tag_lo),
+                @truncate(value),
+                0x0fff_ffc0,
+            );
+
+            fw.log.trace("  TagLo: {any}", .{self.tag_lo});
+        },
+        .TagHi => {}, // Always zero
         else => fw.log.todo("CPU CP0 register write: {t} <= {X:016}", .{ reg, value }),
     }
 }
@@ -197,4 +211,11 @@ const Config = packed struct(u32) {
     ep: u4 = 0,
     ec: u3 = 0b111,
     __2: u1 = 0,
+};
+
+const TagLo = packed struct(u32) {
+    __0: u6 = 0,
+    p_state: u2 = 0,
+    p_tag_lo: u20 = 0,
+    __1: u4 = 0,
 };
