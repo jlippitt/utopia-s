@@ -8,6 +8,7 @@ const Self = @This();
 
 pifdata: *align(4) [pif_size]u8,
 pif_rom_locked: bool = false,
+status: Status = .{},
 
 pub fn init(pifdata: []align(4) u8) Self {
     // Command byte should be zero at reset
@@ -19,9 +20,8 @@ pub fn init(pifdata: []align(4) u8) Self {
 }
 
 pub fn read(self: *Self, address: u32) u32 {
-    _ = self;
-
     return switch (@as(u4, @truncate(address >> 2))) {
+        6 => @bitCast(self.status),
         else => fw.log.panic("Unmapped SI register read: {X:08}", .{address}),
     };
 }
@@ -31,6 +31,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     _ = mask;
 
     switch (@as(u4, @truncate(address >> 2))) {
+        6 => {}, // TODO: SI interrupts
         else => fw.log.panic("Unmapped SI register write: {X:08} <= {X:08}", .{ address, value }),
     }
 }
@@ -62,7 +63,7 @@ pub fn writePif(self: *Self, address: u32, value: u32, mask: u32) void {
         return;
     }
 
-    if (index < pif_size) {
+    if (index >= pif_size) {
         @branchHint(.unlikely);
         fw.log.warn("PIF write out of range: {X:08} <= {X:08}", .{ address, value });
         return;
@@ -99,3 +100,14 @@ fn processPifCommand(self: *Self) void {
 
     self.pifdata[0x7ff] = 0;
 }
+
+const Status = packed struct(u32) {
+    dma_busy: bool = false,
+    io_busy: bool = false,
+    read_pending: bool = false,
+    dma_error: bool = false,
+    pch_state: u4 = 0,
+    dma_state: u4 = 0,
+    interrupt: bool = false,
+    __: u19 = 0,
+};
