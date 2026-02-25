@@ -50,9 +50,9 @@ pub const ArithmeticOp = enum {
             .signed => switch (comptime op) {
                 .ADD => fw.num.signExtend(
                     u64,
-                    try std.math.add(u32, @truncate(lhs), @truncate(rhs)),
+                    try std.math.add(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
                 ),
-                .DADD => try std.math.add(u64, lhs, rhs),
+                .DADD => @bitCast(try std.math.add(i64, @bitCast(lhs), @bitCast(rhs))),
             },
             .unsigned => switch (comptime op) {
                 .ADD => fw.num.signExtend(
