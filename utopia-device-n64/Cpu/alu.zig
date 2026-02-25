@@ -78,6 +78,7 @@ pub fn iTypeArithmetic(
     });
 
     core.set(args.rt, op.apply(signedness, core.get(args.rs), offset) catch {
+        @branchHint(.cold);
         fw.log.todo("CPU overflow exceptions", .{});
         return;
     });

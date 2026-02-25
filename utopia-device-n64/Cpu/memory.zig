@@ -29,7 +29,7 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
     const paddr = core.mapAddress(vaddr) orelse return;
 
     if ((paddr & op.alignMask()) != 0) {
-        @branchHint(.unlikely);
+        @branchHint(.cold);
         fw.log.todo("CPU alignment exceptions", .{});
     }
 
@@ -65,7 +65,7 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
     const paddr = core.mapAddress(vaddr) orelse return;
 
     if ((paddr & op.alignMask()) != 0) {
-        @branchHint(.unlikely);
+        @branchHint(.cold);
         fw.log.todo("CPU alignment exceptions", .{});
     }
 

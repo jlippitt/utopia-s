@@ -1,16 +1,26 @@
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 
+pub fn jr(core: *Core, word: u32) void {
+    const args: Core.RType = @bitCast(word);
+
+    fw.log.trace("{X:08}: JR {t}", .{ core.pc, args.rs });
+
+    const target: u32 = @truncate(core.get(args.rs));
+
+    if ((target & 3) != 0) {
+        @branchHint(.cold);
+        fw.log.todo("CPU alignment exceptions", .{});
+    }
+
+    core.jump(target);
+}
+
 pub const UnaryBranchOp = enum {
     BLTZ,
     BLEZ,
     BGEZ,
     BGTZ,
-};
-
-pub const BinaryBranchOp = enum {
-    BEQ,
-    BNE,
 };
 
 pub fn branchUnary(
@@ -42,6 +52,11 @@ pub fn branchUnary(
 
     core.branch(params, offset, taken);
 }
+
+pub const BinaryBranchOp = enum {
+    BEQ,
+    BNE,
+};
 
 pub fn branchBinary(
     comptime op: BinaryBranchOp,

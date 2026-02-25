@@ -31,6 +31,15 @@ pub const IType = packed struct(u32) {
     opcode: u6,
 };
 
+pub const RType = packed struct(u32) {
+    funct: u6,
+    sa: u5,
+    rd: Register,
+    rt: Register,
+    rs: Register,
+    opcode: u6,
+};
+
 pub const BranchParams = struct {
     link: bool = false,
     likely: bool = false,
@@ -107,6 +116,16 @@ pub fn writeWord(self: *Self, comptime bus: Bus, paddr: u32, value: u32, mask: u
     return bus.write(self, paddr, value, mask);
 }
 
+pub fn jump(self: *Self, target: u32) void {
+    if (self.pipe_state == .delay) {
+        @branchHint(.unlikely);
+        return;
+    }
+
+    self.target_pc = target;
+    self.pipe_state = .branch;
+}
+
 pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bool) void {
     if (comptime params.link) {
         self.link(.RA);
@@ -142,6 +161,7 @@ pub fn link(self: *Self, reg: Register) void {
 
 fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
     switch (@as(u6, @truncate(word >> 26))) {
+        0o00 => special(core, word),
         0o01 => regImm(core, word),
         0o04 => control.branchBinary(.BEQ, .{}, core, word),
         0o05 => control.branchBinary(.BNE, .{}, core, word),
@@ -164,6 +184,13 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o47 => memory.load(.LWU, bus, core, word),
         0o53 => memory.store(.SW, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
+    }
+}
+
+fn special(core: *Self, word: u32) void {
+    switch (@as(u6, @truncate(word))) {
+        0o10 => control.jr(core, word),
+        else => |funct| fw.log.todo("CPU Special funct: {o:02}", .{funct}),
     }
 }
 
