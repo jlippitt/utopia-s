@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Cpu = @import("./Cpu.zig");
 const Rsp = @import("./Rsp.zig");
+const Rdp = @import("./Rdp.zig");
 const ParallelInterface = @import("./ParallelInterface.zig");
 const SerialInterface = @import("./SerialInterface.zig");
 
@@ -70,6 +71,7 @@ const Self = @This();
 
 cpu: Cpu,
 rsp: Rsp,
+rdp: Rdp,
 pi: ParallelInterface,
 si: SerialInterface,
 rom: []align(8) const u8,
@@ -100,6 +102,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     self.* = .{
         .cpu = .init(),
         .rsp = try .init(arena.allocator()),
+        .rdp = .init(),
         .pi = .init(),
         .si = .init(pifdata),
         .rom = rom,
@@ -137,6 +140,7 @@ fn read(core: *Cpu, address: u32) u32 {
 
     return switch (memory_map[page_index]) {
         .rsp => self.rsp.read(address),
+        .rdp_command => self.rdp.readCommand(address),
         .parallel_interface => self.pi.read(address),
         .serial_interface => self.si.read(address),
         .dd_registers => std.math.maxInt(u32), // TODO
@@ -158,6 +162,7 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
 
     switch (memory_map[page_index]) {
         .rsp => self.rsp.write(address, value, mask),
+        .rdp_command => self.rdp.writeCommand(address, value, mask),
         .video_interface => {}, // TODO
         .audio_interface => {}, // TODO
         .parallel_interface => self.pi.write(address, value, mask),
