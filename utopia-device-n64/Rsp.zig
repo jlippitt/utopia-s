@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const register = @import("register.zig");
 
 const mem_size = 8192;
 
@@ -60,10 +61,34 @@ pub fn readRegister(self: *Self, index: u3) u32 {
 }
 
 pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
-    _ = self;
-    _ = mask;
-
     switch (index) {
+        4 => {
+            const masked_value = value & mask;
+
+            register.setFlag(&self.status, "halted", masked_value, 0);
+            register.setFlag(&self.status, "sstep", masked_value, 5);
+            register.setFlag(&self.status, "intbreak", masked_value, 7);
+            register.setFlag(&self.status, "sig0", masked_value, 9);
+            register.setFlag(&self.status, "sig1", masked_value, 11);
+            register.setFlag(&self.status, "sig2", masked_value, 13);
+            register.setFlag(&self.status, "sig3", masked_value, 15);
+            register.setFlag(&self.status, "sig4", masked_value, 17);
+            register.setFlag(&self.status, "sig5", masked_value, 19);
+            register.setFlag(&self.status, "sig6", masked_value, 21);
+            register.setFlag(&self.status, "sig7", masked_value, 23);
+
+            if ((masked_value & 4) != 0) {
+                self.status.broke = false;
+            }
+
+            if (!self.status.halted) {
+                fw.log.todo("RSP core", .{});
+            }
+
+            // TODO: RSP interrupts
+
+            fw.log.debug("SP_STATUS: {any}", .{self.status});
+        },
         else => fw.log.panic("Unmapped RSP register write: {} <= {X:08}", .{ index, value }),
     }
 }
