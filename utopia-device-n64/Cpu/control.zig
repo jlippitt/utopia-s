@@ -36,6 +36,22 @@ pub fn jr(core: *Core, word: u32) void {
     core.jump(target);
 }
 
+pub fn jalr(core: *Core, word: u32) void {
+    const args: Core.RType = @bitCast(word);
+
+    fw.log.trace("{X:08}: JALR {t}, {t}", .{ core.pc, args.rd, args.rs });
+
+    const target: u32 = @truncate(core.get(args.rs));
+
+    if ((target & 3) != 0) {
+        @branchHint(.cold);
+        fw.log.todo("CPU alignment exceptions", .{});
+    }
+
+    core.link(args.rd);
+    core.jump(target);
+}
+
 pub const UnaryBranchOp = enum {
     BLTZ,
     BLEZ,
