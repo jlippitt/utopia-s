@@ -1,4 +1,5 @@
 const std = @import("std");
+const Device = @import("./Device.zig");
 const fw = @import("framework");
 
 const pif_size = 0x800;
@@ -10,9 +11,12 @@ pifdata: *align(4) [pif_size]u8,
 pif_rom_locked: bool = false,
 status: Status = .{},
 
-pub fn init(pifdata: []align(4) u8) Self {
+pub fn init(pifdata: []align(4) u8, cic_seed: u32) Self {
     // Command byte should be zero at reset
     pifdata[0x7ff] = 0;
+
+    // CIC seed should be present at reset
+    fw.mem.writeBe(u32, pifdata, 0x7e4, cic_seed);
 
     return .{
         .pifdata = pifdata[0..pif_size],
@@ -69,7 +73,7 @@ pub fn writePif(self: *Self, address: u32, value: u32, mask: u32) void {
         return;
     }
 
-    fw.mem.writeBe(u32, self.pifdata, index, value, mask);
+    fw.mem.writeMaskedBe(u32, self.pifdata, index, value, mask);
 
     if (index == 0x7fc) {
         self.processPifCommand();

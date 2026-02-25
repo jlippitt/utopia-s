@@ -138,6 +138,15 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
 
     fw.log.debug("CIC Type: {f}", .{cic_type});
 
+    // Determine 'magic' CIC seed value that should be written to PIF RAM
+    const cic_seed: u32 = switch (cic_type) {
+        .nus_6101 => 0x0004_3f3f,
+        .nus_6102, .mini_ipl3 => 0x0000_3f3f,
+        .nus_6103 => 0x0000_783f,
+        .nus_6105 => 0x0000_913f,
+        .nus_6106 => 0x0000_853f,
+    };
+
     const self = try arena.allocator().create(Self);
 
     self.* = .{
@@ -145,7 +154,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .rsp = try .init(arena.allocator()),
         .rdp = .init(),
         .pi = .init(),
-        .si = .init(pifdata),
+        .si = .init(pifdata, cic_seed),
         .rom = rom,
         .arena = arena,
     };
