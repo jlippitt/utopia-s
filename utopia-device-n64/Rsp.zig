@@ -56,6 +56,8 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 pub fn readRegister(self: *Self, index: u3) u32 {
     return switch (index) {
         4 => @bitCast(self.status),
+        5 => @intFromBool(self.status.dma_full),
+        6 => @intFromBool(self.status.dma_busy),
         else => fw.log.panic("Unmapped RSP register read: {}", .{index}),
     };
 }
