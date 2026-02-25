@@ -76,11 +76,8 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
     }
 }
 
-fn checkAlignment(address: u32, mask: u32) bool {
-    if ((address & mask) != 0) {
-        fw.log.todo("CPU alignment exceptions", .{});
-        return false;
-    }
-
-    return true;
+pub fn cache(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: CACHE", .{core.pc});
+    // TODO
 }
