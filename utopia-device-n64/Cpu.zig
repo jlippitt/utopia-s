@@ -3,6 +3,7 @@ const Cp0 = @import("./Cpu/Cp0.zig");
 const alu = @import("./Cpu/alu.zig");
 const control = @import("./Cpu/control.zig");
 const memory = @import("./Cpu/memory.zig");
+const mul_div = @import("./Cpu/mul_div.zig");
 const shift = @import("./Cpu/shift.zig");
 
 const Self = @This();
@@ -55,6 +56,8 @@ pc: u32 = cold_reset_vector,
 target_pc: u32 = 0,
 pipe_state: PipeState = .normal,
 regs: [32]u64 = @splat(0),
+lo: u64 = 0,
+hi: u64 = 0,
 cp0: Cp0 = .init(),
 
 pub fn init() Self {
@@ -197,9 +200,17 @@ fn special(core: *Self, word: u32) void {
         0o06 => shift.variable(.SRL, core, word),
         0o07 => shift.variable(.SRA, core, word),
         0o10 => control.jr(core, word),
+        0o20 => mul_div.mfhi(core, word),
+        0o21 => mul_div.mthi(core, word),
+        0o22 => mul_div.mflo(core, word),
+        0o23 => mul_div.mtlo(core, word),
         0o24 => shift.variable(.DSLL, core, word),
         0o26 => shift.variable(.DSRL, core, word),
         0o27 => shift.variable(.DSRA, core, word),
+        0o30 => mul_div.mulDiv(.MULT, core, word),
+        0o31 => mul_div.mulDiv(.MULTU, core, word),
+        0o34 => mul_div.mulDiv(.DMULT, core, word),
+        0o35 => mul_div.mulDiv(.DMULTU, core, word),
         0o44 => alu.rTypeLogic(.AND, core, word),
         0o45 => alu.rTypeLogic(.OR, core, word),
         0o46 => alu.rTypeLogic(.XOR, core, word),
