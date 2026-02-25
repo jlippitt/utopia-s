@@ -4,6 +4,7 @@ const Cpu = @import("./Cpu.zig");
 const Rsp = @import("./Rsp.zig");
 const Rdp = @import("./Rdp.zig");
 const ParallelInterface = @import("./ParallelInterface.zig");
+const RdramInterface = @import("./RdramInterface.zig");
 const SerialInterface = @import("./SerialInterface.zig");
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
@@ -93,6 +94,7 @@ cpu: Cpu,
 rsp: Rsp,
 rdp: Rdp,
 pi: ParallelInterface,
+ri: RdramInterface,
 si: SerialInterface,
 arena: std.heap.ArenaAllocator,
 
@@ -153,6 +155,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .rsp = try .init(arena.allocator()),
         .rdp = .init(),
         .pi = .init(rom),
+        .ri = .init(),
         .si = .init(pifdata, cic_seed),
         .arena = arena,
     };
@@ -190,6 +193,7 @@ fn read(core: *Cpu, address: u32) u32 {
         .rsp => self.rsp.read(address),
         .rdp_command => self.rdp.readCommand(address),
         .parallel_interface => self.pi.read(address),
+        .rdram_interface => self.ri.read(address),
         .serial_interface => self.si.read(address),
         .dd_registers => std.math.maxInt(u32), // TODO
         .dd_ipl_rom => 0, // TODO
@@ -215,6 +219,7 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
         .video_interface => {}, // TODO
         .audio_interface => {}, // TODO
         .parallel_interface => self.pi.write(address, value, mask),
+        .rdram_interface => self.ri.write(address, value, mask),
         .serial_interface => self.si.write(address, value, mask),
         .dd_registers => {}, // TODO
         .dd_ipl_rom => {}, // TODO
