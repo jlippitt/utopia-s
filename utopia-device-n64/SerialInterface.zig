@@ -98,7 +98,7 @@ fn processPifCommand(self: *Self) void {
         result |= 0x80;
     }
 
-    self.pifdata[0x7ff] = 0;
+    self.pifdata[0x7ff] = result;
 }
 
 const Status = packed struct(u32) {
