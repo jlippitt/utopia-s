@@ -1,13 +1,19 @@
 const fw = @import("framework");
+const Device = @import("./Device.zig");
+const Clock = @import("./Clock.zig");
+
+const default_h_total = 3093;
+const default_v_total = 525;
 
 const Self = @This();
 
 ctrl: Control = .{},
 origin: u24 = 0,
 width: u12 = 0,
+v_current: u10 = 0,
 v_intr: u10 = 0,
 burst: Burst = .{},
-v_total: u10 = 0,
+v_total: u10 = default_v_total,
 h_total: HTotal = .{},
 h_total_leap: HTotalLeap = .{},
 h_video: Range = .{},
@@ -15,9 +21,16 @@ v_video: Range = .{},
 v_burst: Range = .{},
 x_scale: Scale = .{},
 y_scale: Scale = .{},
+cycles_per_line: u64 = 0,
 
-pub fn init() Self {
-    return .{};
+pub fn init(clock: *Clock) Self {
+    const cycles_per_line = cyclesPerLine(default_h_total);
+    fw.log.debug("Cycles Per Line: {}", .{cycles_per_line});
+    clock.schedule(.vi_new_line, cycles_per_line);
+
+    return .{
+        .cycles_per_line = cycles_per_line,
+    };
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -26,6 +39,7 @@ pub fn read(self: *Self, address: u32) u32 {
         1 => self.origin,
         2 => self.width,
         3 => self.v_intr,
+        4 => self.v_current,
         5 => @bitCast(self.burst),
         6 => self.v_total,
         7 => @bitCast(self.h_total),
@@ -69,6 +83,14 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         7 => {
             fw.num.writeMasked(u32, @ptrCast(&self.h_total), value, mask);
             fw.log.debug("H_TOTAL: {any}", .{self.h_total});
+
+            const cycles_per_line = cyclesPerLine(default_h_total);
+
+            if (cycles_per_line != self.cycles_per_line) {
+                self.cycles_per_line = cycles_per_line;
+                fw.log.debug("Cycles Per Line: {}", .{self.cycles_per_line});
+                self.getDevice().clock.reschedule(.vi_new_line, cycles_per_line);
+            }
         },
         8 => {
             fw.num.writeMasked(u32, @ptrCast(&self.h_total_leap), value, mask);
@@ -96,6 +118,42 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         },
         else => fw.log.panic("Unmapped VI register write: {X:08} <= {X:08}", .{ address, value }),
     }
+}
+
+pub fn handleNewLineEvent(self: *Self) bool {
+    var frame_complete: bool = false;
+
+    self.v_current += 2;
+
+    if (self.v_current >= self.v_total) {
+        const serrate: u10 = @intFromBool(self.ctrl.serrate);
+        self.v_current = self.v_current & serrate ^ serrate;
+        // TODO: Render
+        fw.log.debug("Frame Complete", .{});
+        frame_complete = true;
+    }
+
+    fw.log.trace("VI_V_CURRENT: {}", .{self.v_current});
+
+    if (self.v_current == self.v_intr) {
+        // TODO: VI interrupts
+    }
+
+    self.getDevice().clock.reschedule(.vi_new_line, self.cycles_per_line);
+
+    return frame_complete;
+}
+
+fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("vi", self));
+}
+
+fn cyclesPerLine(h_total: u12) u64 {
+    return @intFromFloat(
+        @as(f64, @floatFromInt(
+            Device.clock_rate * (@as(u64, h_total) + 1),
+        )) / Device.video_dac_rate,
+    );
 }
 
 const ColorMode = enum(u2) {
@@ -137,7 +195,7 @@ const Burst = packed struct(u32) {
 };
 
 const HTotal = packed struct(u32) {
-    h_total: u12 = 0,
+    h_total: u12 = default_h_total,
     __0: u4 = 0,
     leap: u5 = 0,
     __1: u11 = 0,

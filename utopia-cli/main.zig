@@ -22,7 +22,9 @@ pub fn main() !void {
     var device = try device_args.initDevice(allocator);
     defer device.deinit();
 
-    device.runFrame();
+    while (true) {
+        device.runFrame();
+    }
 }
 
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {

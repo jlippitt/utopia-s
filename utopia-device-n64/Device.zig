@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Cic = @import("./Cic.zig");
+const Clock = @import("./Clock.zig");
 const Cpu = @import("./Cpu.zig");
 const Rsp = @import("./Rsp.zig");
 const Rdp = @import("./Rdp.zig");
@@ -9,6 +10,11 @@ const VideoInterface = @import("./VideoInterface.zig");
 const ParallelInterface = @import("./ParallelInterface.zig");
 const RdramInterface = @import("./RdramInterface.zig");
 const SerialInterface = @import("./SerialInterface.zig");
+
+// Divide by 2 for CPU clock and by 3 for RCP clock
+pub const clock_rate = 187_500_000;
+
+pub const video_dac_rate = 1_000_000.0 * (18.0 * 227.5 / 286.0) * 17.0 / 5.0;
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
 const rdram_size = 8 * 1024 * 1024; // 8MiB
@@ -75,6 +81,7 @@ const memory_map: [512]Page = blk: {
 const Self = @This();
 
 cpu: Cpu,
+clock: Clock,
 rdram: *align(4) [rdram_size]u8,
 rsp: Rsp,
 rdp: Rdp,
@@ -113,15 +120,19 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         fw.mem.writeBe(u32, rdram, address, rdram_size);
     }
 
+    var clock = Clock.init();
+    const vi = VideoInterface.init(&clock);
+
     const self = try arena.allocator().create(Self);
 
     self.* = .{
         .cpu = .init(),
+        .clock = clock,
         .rdram = rdram[0..rdram_size],
         .rsp = try .init(arena.allocator()),
         .rdp = .init(),
         .mi = .init(),
-        .vi = .init(),
+        .vi = vi,
         .pi = .init(rom),
         .ri = .init(),
         .si = .init(pifdata, cic.getSeed()),
@@ -144,6 +155,18 @@ pub fn runFrame(self: *Self) void {
             .read = read,
             .write = write,
         });
+
+        self.clock.addCycles(4);
+
+        while (self.clock.nextEvent()) |event| {
+            @branchHint(.unlikely);
+
+            switch (event) {
+                .vi_new_line => if (self.vi.handleNewLineEvent()) {
+                    return;
+                },
+            }
+        }
     }
 }
 
