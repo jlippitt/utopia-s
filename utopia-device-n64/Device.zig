@@ -142,6 +142,8 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     return fw.Device.init(self, .{
         .deinit = deinit,
         .runFrame = runFrame,
+        .getScreenSize = getScreenSize,
+        .getPixels = getPixels,
     });
 }
 
@@ -168,6 +170,16 @@ pub fn runFrame(self: *Self) void {
             }
         }
     }
+}
+
+pub fn getScreenSize(self: *const Self) fw.ScreenSize {
+    _ = self;
+    return .{ .x = 640, .y = 480 };
+}
+
+pub fn getPixels(self: *const Self) []const u8 {
+    _ = self;
+    return &[1]u8{0} ** 640 ** 480 ** 4;
 }
 
 fn read(core: *Cpu, address: u32) u32 {

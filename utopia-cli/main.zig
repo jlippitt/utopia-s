@@ -1,4 +1,5 @@
 const std = @import("std");
+const sdl3 = @import("sdl3");
 const utopia = @import("utopia");
 const cli = @import("./cli.zig");
 const logger = @import("./logger.zig");
@@ -19,11 +20,49 @@ pub fn main() !void {
 
     _ = app_args;
 
+    try sdl3.init(.everything);
+    defer sdl3.quit(.everything);
+
     var device = try device_args.initDevice(allocator);
     defer device.deinit();
 
-    while (true) {
+    const size = device.getScreenSize();
+
+    const window = try sdl3.video.Window.init("Utopia-S", size.x, size.y, .{});
+    defer window.deinit();
+
+    try window.setPosition(.{ .centered = null }, .{ .centered = null });
+
+    const renderer = try sdl3.render.Renderer.init(window, null);
+    defer renderer.deinit();
+
+    const texture = try renderer.createTexture(
+        .packed_xrgb_8_8_8_8,
+        .streaming,
+        size.x,
+        size.y,
+    );
+    defer texture.deinit();
+
+    outer: while (true) {
+        while (sdl3.events.poll()) |event| {
+            switch (event) {
+                .quit => break :outer,
+                .key_down => |key| if (key.scancode) |scancode| {
+                    switch (scancode) {
+                        .escape => break :outer,
+                        else => {},
+                    }
+                },
+                else => {},
+            }
+        }
+
         device.runFrame();
+
+        try texture.update(null, device.getPixels().ptr, size.x * 4);
+        try renderer.renderTexture(texture, null, null);
+        try renderer.present();
     }
 }
 

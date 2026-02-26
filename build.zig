@@ -5,6 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const clap = b.dependency("clap", .{});
+    const sdl3 = b.dependency("sdl3", .{});
 
     const log_level = b.option([]const u8, "log-level", "Maximum log level");
 
@@ -42,6 +43,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
             .imports = &.{
                 .{ .name = "options", .module = options.createModule() },
+                .{ .name = "sdl3", .module = sdl3.module("sdl3") },
                 .{ .name = "utopia", .module = utopia },
                 .{ .name = "clap", .module = clap.module("clap") },
             },
