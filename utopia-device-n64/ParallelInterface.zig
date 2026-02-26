@@ -47,7 +47,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
             fw.log.trace("PI_DRAM_ADDR: {X:08}", .{self.dram_addr});
         },
         1 => {
-            fw.num.writeMasked(u32, &self.cart_addr, @truncate(value), mask & ~@as(u32, 1));
+            fw.num.writeMasked(u32, &self.cart_addr, value, mask & ~@as(u32, 1));
             fw.log.trace("PI_CART_ADDR: {X:08}", .{self.cart_addr});
         },
         2 => self.transferDma(.read, @truncate(value & mask)),
