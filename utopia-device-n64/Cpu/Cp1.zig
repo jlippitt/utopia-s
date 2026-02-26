@@ -4,6 +4,10 @@ const Core = @import("../Cpu.zig");
 const arithmetic = @import("./Cp1/arithmetic.zig");
 const compare = @import("./Cp1/compare.zig");
 const convert = @import("./Cp1/convert.zig");
+const memory = @import("./Cp1/memory.zig");
+
+pub const load = memory.load;
+pub const store = memory.store;
 
 // zig fmt: off
 const Register = enum(u5) {
@@ -16,10 +20,10 @@ const Register = enum(u5) {
 
 // zig fmt: off
 const ControlRegister = enum(u5) {
-    FCR0,  FCR1,  FCR2,  FCR3,  FCR4,  FCR5,  FCR6,  FCR7,
+    Revision,  FCR1,  FCR2,  FCR3,  FCR4,  FCR5,  FCR6,  FCR7,
     FCR8,  FCR9,  FCR10, FCR11, FCR12, FCR13, FCR14, FCR15,
     FCR16, FCR17, FCR18, FCR19, FCR20, FCR21, FCR22, FCR23,
-    FCR24, FCR25, FCR26, FCR27, FCR28, FCR29, FCR30, FCR31,
+    FCR24, FCR25, FCR26, FCR27, FCR28, FCR29, FCR30, Status,
 };
 // zig fmt: on
 
@@ -54,6 +58,16 @@ pub const IType = packed struct(u32) {
     rs: Core.Register,
     opcode: u6,
 };
+
+pub fn MType(comptime T: type) type {
+    return packed struct(u32) {
+        _: u11,
+        fs: T,
+        rt: Core.Register,
+        rs: u5,
+        opcode: u6,
+    };
+}
 
 const Self = @This();
 
@@ -133,6 +147,12 @@ pub fn cop1(core: *Core, word: u32) void {
     const rs: u5 = @truncate(word >> 21);
 
     switch (rs) {
+        0o00 => mfc1(core, word),
+        0o01 => dmfc1(core, word),
+        0o02 => cfc1(core, word),
+        0o04 => mtc1(core, word),
+        0o05 => dmtc1(core, word),
+        0o06 => ctc1(core, word),
         0o10 => branchOp(core, word),
         0o20 => floatOp(.S, core, word),
         0o21 => floatOp(.D, core, word),
@@ -202,89 +222,56 @@ fn intOp(comptime fmt: Format, core: *Core, word: u32) void {
     }
 }
 
-pub const LoadOp = enum {
-    LWC1,
-    LDC1,
-
-    fn alignMask(comptime op: @This()) u32 {
-        return switch (comptime op) {
-            .LWC1 => 3,
-            .LDC1 => 7,
-        };
-    }
-};
-
-pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
-    const args: IType = @bitCast(word);
-    const offset = fw.num.signExtend(u32, args.imm);
-
-    fw.log.trace("{X:08}: {t} {t}, {d}({t})", .{
-        core.pc,
-        op,
-        args.ft,
-        @as(i32, @bitCast(offset)),
-        args.rs,
-    });
-
-    const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
-    const paddr = core.mapAddress(vaddr) orelse return;
-
-    if ((paddr & op.alignMask()) != 0) {
-        @branchHint(.cold);
-        fw.log.todo("CPU alignment exceptions", .{});
-    }
-
-    switch (comptime op) {
-        .LWC1 => core.cp1.set(.W, args.ft, @bitCast(core.readWord(bus, paddr))),
-        .LDC1 => core.cp1.set(.L, args.ft, @bitCast(core.readDoubleWord(bus, paddr))),
-    }
+fn mfc1(core: *Core, word: u32) void {
+    const args: MType(Register) = @bitCast(word);
+    fw.log.trace("{X:08}: MFC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
+    core.set(args.rt, fw.num.signExtend(u64, core.cp1.get(.W, args.fs)));
 }
 
-pub const StoreOp = enum {
-    SWC1,
-    SDC1,
+fn dmfc1(core: *Core, word: u32) void {
+    const args: MType(Register) = @bitCast(word);
+    fw.log.trace("{X:08}: DMFC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
+    core.set(args.rt, @bitCast(core.cp1.get(.L, args.fs)));
+}
 
-    fn alignMask(comptime op: @This()) u32 {
-        return switch (comptime op) {
-            .SWC1 => 3,
-            .SDC1 => 7,
-        };
-    }
-};
+fn mtc1(core: *Core, word: u32) void {
+    const args: MType(Register) = @bitCast(word);
+    fw.log.trace("{X:08}: MTC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
+    core.cp1.set(.W, args.fs, fw.num.truncate(i32, core.get(args.rt)));
+}
 
-pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
-    const args: IType = @bitCast(word);
-    const offset = fw.num.signExtend(u32, args.imm);
+fn dmtc1(core: *Core, word: u32) void {
+    const args: MType(Register) = @bitCast(word);
+    fw.log.trace("{X:08}: DMTC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
+    core.cp1.set(.L, args.fs, @bitCast(core.get(args.rt)));
+}
 
-    fw.log.trace("{X:08}: {t} {t}, {d}({t})", .{
-        core.pc,
-        op,
-        args.ft,
-        @as(i32, @bitCast(offset)),
-        args.rs,
-    });
+fn cfc1(core: *Core, word: u32) void {
+    const args: MType(ControlRegister) = @bitCast(word);
 
-    const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
-    const paddr = core.mapAddress(vaddr) orelse return;
+    fw.log.trace("{X:08}: CFC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
 
-    if ((paddr & op.alignMask()) != 0) {
-        @branchHint(.cold);
-        fw.log.todo("CPU alignment exceptions", .{});
-    }
+    core.set(args.rt, fw.num.signExtend(u64, switch (args.fs) {
+        .Revision => 0x0000_0a00,
+        .Status => @as(u32, @bitCast(core.cp1.csr)),
+        else => fw.log.unimplemented("Read from CPU CP1 {t}", .{args.fs}),
+    }));
+}
 
-    switch (comptime op) {
-        .SWC1 => core.writeWord(
-            bus,
-            paddr,
-            @bitCast(core.cp1.get(.W, args.ft)),
-            std.math.maxInt(u32),
-        ),
-        .SDC1 => core.writeDoubleWord(
-            bus,
-            paddr,
-            @bitCast(core.cp1.get(.L, args.ft)),
-            std.math.maxInt(u64),
-        ),
+fn ctc1(core: *Core, word: u32) void {
+    const args: MType(ControlRegister) = @bitCast(word);
+
+    fw.log.trace("{X:08}: CTC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
+
+    const value: u32 = @truncate(core.get(args.rt));
+
+    switch (args.fs) {
+        .Revision => {}, // Not writable
+        .Status => {
+            core.cp1.csr = @bitCast(value);
+            fw.log.trace("  CSR: {any}", .{core.cp1.csr});
+        },
+        else => fw.log.unimplemented("Read from CPU CP1 {t}", .{args.fs}),
     }
 }
 
@@ -295,7 +282,7 @@ const RoundingMode = enum(u2) {
     floor,
 };
 
-const Csr = struct {
+const Csr = packed struct(u32) {
     rm: RoundingMode = .round,
     flags: u5 = 0,
     enables: u5 = 0,
