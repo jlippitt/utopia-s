@@ -108,11 +108,15 @@ pub const StoreOp = enum {
     SB,
     SH,
     SW,
+    SWL,
+    SWR,
     SD,
+    SDL,
+    SDR,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
-            .SB => 0,
+            .SB, .SWL, .SWR, .SDL, .SDR => 0,
             .SH => 1,
             .SW => 3,
             .SD => 7,
@@ -156,7 +160,31 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
             core.writeWord(bus, paddr, output, mask);
         },
         .SW => core.writeWord(bus, paddr, @truncate(value), std.math.maxInt(u32)),
+        .SWL => {
+            const shift: u5 = @intCast((paddr & 3) * 8);
+            const output = @as(u32, @truncate(value)) >> shift;
+            const mask = @as(u32, std.math.maxInt(u32)) >> shift;
+            core.writeWord(bus, paddr & ~@as(u32, 3), output, mask);
+        },
+        .SWR => {
+            const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
+            const output = @as(u32, @truncate(value)) << shift;
+            const mask = @as(u32, std.math.maxInt(u32)) << shift;
+            core.writeWord(bus, paddr & ~@as(u32, 3), output, mask);
+        },
         .SD => core.writeDoubleWord(bus, paddr, value, std.math.maxInt(u64)),
+        .SDL => {
+            const shift: u6 = @intCast((paddr & 7) * 8);
+            const output = value >> shift;
+            const mask = @as(u64, std.math.maxInt(u64)) >> shift;
+            core.writeDoubleWord(bus, paddr & ~@as(u32, 7), output, mask);
+        },
+        .SDR => {
+            const shift: u6 = @intCast((paddr & 7 ^ 7) * 8);
+            const output = value << shift;
+            const mask = @as(u64, std.math.maxInt(u64)) << shift;
+            core.writeDoubleWord(bus, paddr & ~@as(u32, 7), output, mask);
+        },
     }
 }
 
