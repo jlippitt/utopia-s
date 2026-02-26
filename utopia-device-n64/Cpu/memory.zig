@@ -70,10 +70,12 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
 
 pub const StoreOp = enum {
     SW,
+    SD,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
             .SW => 3,
+            .SD => 7,
         };
     }
 };
@@ -102,6 +104,7 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
 
     switch (comptime op) {
         .SW => core.writeWord(bus, paddr, @truncate(value), std.math.maxInt(u32)),
+        .SD => core.writeDoubleWord(bus, paddr, value, std.math.maxInt(u64)),
     }
 }
 

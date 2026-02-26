@@ -126,6 +126,11 @@ pub fn writeWord(self: *Self, comptime bus: Bus, paddr: u32, value: u32, mask: u
     return bus.write(self, paddr, value, mask);
 }
 
+pub fn writeDoubleWord(self: *Self, comptime bus: Bus, paddr: u32, value: u64, mask: u64) void {
+    self.writeWord(bus, paddr, @truncate(value >> 32), @truncate(mask >> 32));
+    self.writeWord(bus, paddr +% 4, @truncate(value), @truncate(mask));
+}
+
 pub fn jump(self: *Self, target: u32) void {
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
@@ -203,6 +208,7 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o53 => memory.store(.SW, bus, core, word),
         0o57 => memory.cache(core, word),
         0o67 => memory.load(.LD, bus, core, word),
+        0o77 => memory.store(.SD, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
 }
