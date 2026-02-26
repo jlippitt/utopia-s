@@ -60,7 +60,7 @@ fn write(self: *Self, index: u5, regs: Entry) void {
     entry.entry_hi = .{
         .asid = regs.entry_hi.asid,
         .global = regs.entry_lo[0].global or regs.entry_lo[1].global,
-        .vpn2 = regs.entry_hi.vpn2 & ~mask,
+        .vpn2 = regs.entry_hi.vpn2 & ~@as(u27, mask),
         .region = regs.entry_hi.region,
     };
 
