@@ -1,5 +1,6 @@
 const fw = @import("framework");
 const Cp0 = @import("./Cpu/Cp0.zig");
+const Cp1 = @import("./Cpu/Cp1.zig");
 const alu = @import("./Cpu/alu.zig");
 const control = @import("./Cpu/control.zig");
 const memory = @import("./Cpu/memory.zig");
@@ -60,6 +61,7 @@ lo: u64 = 0,
 hi: u64 = 0,
 ll_bit: bool = false,
 cp0: Cp0 = .init(),
+cp1: Cp1 = .init(),
 
 pub fn init() Self {
     return .{};
@@ -194,6 +196,7 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o16 => alu.iTypeLogic(.XOR, core, word),
         0o17 => alu.lui(core, word),
         0o20 => Cp0.cop0(bus, core, word),
+        0o21 => Cp1.cop1(core, word),
         0o24 => control.branchBinary(.BEQ, .{ .likely = true }, core, word),
         0o25 => control.branchBinary(.BNE, .{ .likely = true }, core, word),
         0o26 => control.branchUnary(.BLEZ, .{ .likely = true }, core, word),
@@ -219,10 +222,14 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o56 => memory.store(.SWR, bus, core, word),
         0o57 => memory.cache(core, word),
         0o60 => memory.load(.LL, bus, core, word),
+        0o61 => Cp1.load(.LWC1, bus, core, word),
         0o64 => memory.load(.LLD, bus, core, word),
+        0o65 => Cp1.load(.LDC1, bus, core, word),
         0o67 => memory.load(.LD, bus, core, word),
         0o70 => memory.store(.SC, bus, core, word),
+        0o71 => Cp1.store(.SWC1, bus, core, word),
         0o74 => memory.store(.SCD, bus, core, word),
+        0o75 => Cp1.store(.SDC1, bus, core, word),
         0o77 => memory.store(.SD, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }

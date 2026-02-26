@@ -41,6 +41,10 @@ pub fn init() Self {
     return .{};
 }
 
+pub fn fr(self: *const Self) bool {
+    return self.status.fr;
+}
+
 pub fn setLLAddr(self: *Self, value: u32) void {
     self.ll_addr = value;
     fw.log.trace("  LLAddr: {X:08}", self.ll_addr);
