@@ -26,9 +26,10 @@ pub fn main() !void {
     var device = try device_args.initDevice(allocator);
     defer device.deinit();
 
-    const size = device.getScreenSize();
+    var src_size = device.getScreenSize();
+    var dst_size = try getBestSize(src_size, null);
 
-    const window = try sdl3.video.Window.init("Utopia-S", size.x, size.y, .{});
+    const window = try sdl3.video.Window.init("Utopia-S", dst_size.x, dst_size.y, .{});
     defer window.deinit();
 
     try window.setPosition(.{ .centered = null }, .{ .centered = null });
@@ -36,11 +37,11 @@ pub fn main() !void {
     const renderer = try sdl3.render.Renderer.init(window, null);
     defer renderer.deinit();
 
-    const texture = try renderer.createTexture(
+    var texture = try renderer.createTexture(
         .packed_xbgr_8_8_8_8,
         .streaming,
-        size.x,
-        size.y,
+        src_size.x,
+        src_size.y,
     );
     defer texture.deinit();
 
@@ -60,7 +61,28 @@ pub fn main() !void {
 
         device.runFrame();
 
-        try texture.update(null, device.getPixels().ptr, size.x * 4);
+        const new_size = device.getScreenSize();
+
+        if (new_size.x != src_size.x or new_size.y != src_size.y) {
+            const display = try window.getDisplayForWindow();
+
+            src_size = new_size;
+            dst_size = try getBestSize(src_size, display);
+
+            try window.setSize(dst_size.x, dst_size.y);
+            try window.setPosition(.{ .centered = display }, .{ .centered = display });
+
+            texture.deinit();
+
+            texture = try renderer.createTexture(
+                .packed_xbgr_8_8_8_8,
+                .streaming,
+                src_size.x,
+                src_size.y,
+            );
+        }
+
+        try texture.update(null, device.getPixels().ptr, src_size.x * 4);
         try renderer.renderTexture(texture, null, null);
         try renderer.present();
     }
@@ -69,4 +91,26 @@ pub fn main() !void {
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
     logger.deinit();
     std.debug.defaultPanic(msg, first_trace_addr);
+}
+
+fn getBestSize(
+    min_size: utopia.ScreenSize,
+    active_display: ?sdl3.video.Display,
+) !utopia.ScreenSize {
+    const display = active_display orelse (try sdl3.video.getDisplays())[0];
+    const bounds = try display.getUsableBounds();
+
+    const max_size: utopia.ScreenSize = .{
+        .x = @intCast(bounds.w),
+        .y = @intCast(bounds.h),
+    };
+
+    const x_scale = max_size.x / min_size.x;
+    const y_scale = max_size.y / min_size.y;
+    const scale = @min(x_scale, y_scale);
+
+    return .{
+        .x = min_size.x * scale,
+        .y = min_size.y * scale,
+    };
 }

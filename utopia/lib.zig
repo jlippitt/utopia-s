@@ -9,6 +9,7 @@ pub const log = struct {
 
 pub const Device = fw.Device;
 pub const DeviceError = fw.DeviceError;
+pub const ScreenSize = fw.ScreenSize;
 
 pub const DeviceType = enum {
     n64,
