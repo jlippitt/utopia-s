@@ -1,0 +1,45 @@
+const fw = @import("framework");
+const Core = @import("../../Cpu.zig");
+const Cp1 = @import("../Cp1.zig");
+
+const RoundOp = enum {
+    ROUND,
+    TRUNC,
+    CEIL,
+    FLOOR,
+};
+
+pub fn round(
+    comptime op: RoundOp,
+    comptime dst_fmt: Cp1.Format,
+    comptime src_fmt: Cp1.Format,
+    core: *Core,
+    word: u32,
+) void {
+    const args: Cp1.RType = @bitCast(word);
+
+    fw.log.trace("{X:08}: {t}.{t}.{t} {t}, {t}", .{
+        core.pc,
+        op,
+        dst_fmt,
+        src_fmt,
+        args.fd,
+        args.fs,
+    });
+
+    const value = core.cp1.get(src_fmt, args.fs);
+
+    core.cp1.set(dst_fmt, args.fd, @intFromFloat(switch (comptime op) {
+        .ROUND => roundEven(value),
+        .TRUNC => @trunc(value),
+        .CEIL => @ceil(value),
+        .FLOOR => @floor(value),
+    }));
+}
+
+fn roundEven(value: anytype) @TypeOf(value) {
+    return if (@mod(value, 1.0) == 0.5)
+        @round(value * 2.0) / 2.0
+    else
+        @round(value);
+}

@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 const arithmetic = @import("./Cp1/arithmetic.zig");
+const convert = @import("./Cp1/convert.zig");
 
 // zig fmt: off
 const Register = enum(u5) {
@@ -139,6 +140,14 @@ fn floatOp(comptime fmt: Format, core: *Core, word: u32) void {
         0o05 => arithmetic.unary(.ABS, fmt, core, word),
         0o06 => arithmetic.unary(.MOV, fmt, core, word),
         0o07 => arithmetic.unary(.NEG, fmt, core, word),
+        0o10 => convert.round(.ROUND, .L, fmt, core, word),
+        0o11 => convert.round(.TRUNC, .L, fmt, core, word),
+        0o12 => convert.round(.CEIL, .L, fmt, core, word),
+        0o13 => convert.round(.FLOOR, .L, fmt, core, word),
+        0o14 => convert.round(.ROUND, .W, fmt, core, word),
+        0o15 => convert.round(.TRUNC, .W, fmt, core, word),
+        0o16 => convert.round(.CEIL, .W, fmt, core, word),
+        0o17 => convert.round(.FLOOR, .W, fmt, core, word),
         else => |funct| fw.log.todo("CPU COP1 float op: {o:02}", .{funct}),
     }
 }
