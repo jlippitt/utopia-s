@@ -8,6 +8,7 @@ const mul_div = @import("./Cpu/mul_div.zig");
 const shift = @import("./Cpu/shift.zig");
 
 pub const Interrupt = Cp0.Interrupt;
+pub const Exception = Cp0.Exception;
 
 const Self = @This();
 
@@ -53,6 +54,7 @@ pub const BranchParams = struct {
 pub const Bus = struct {
     read: fn (self: *Self, address: u32) u32,
     write: fn (self: *Self, address: u32, value: u32, mask: u32) void,
+    scheduleInterrupt: fn (self: *Self) void,
 };
 
 pc: u32 = cold_reset_vector,
@@ -69,14 +71,18 @@ pub fn init() Self {
     return .{};
 }
 
-pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+pub fn clearInterrupt(self: *Self, comptime bus: Bus, interrupt: Interrupt) void {
     fw.log.trace("CPU Interrupt Cleared: {t}", .{interrupt});
-    self.cp0.clearInterrupt(interrupt);
+    self.cp0.clearInterrupt(bus, interrupt);
 }
 
-pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+pub fn raiseInterrupt(self: *Self, comptime bus: Bus, interrupt: Interrupt) void {
     fw.log.trace("CPU Interrupt Raised: {t}", .{interrupt});
-    self.cp0.raiseInterrupt(interrupt);
+    self.cp0.raiseInterrupt(bus, interrupt);
+}
+
+pub fn handleInterruptEvent(self: *Self) void {
+    self.except(.interrupt);
 }
 
 pub fn step(self: *Self, comptime bus: Bus) void {
@@ -187,6 +193,11 @@ pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bo
 pub fn link(self: *Self, reg: Register) void {
     const address = if (self.pipe_state == .delay) self.target_pc +% 4 else self.pc +% 8;
     self.set(reg, fw.num.signExtend(u64, address));
+}
+
+pub fn except(self: *Self, exception: Exception) void {
+    self.pc = self.cp0.except(exception, self.pc, self.pipe_state == .delay);
+    self.pipe_state = .except;
 }
 
 fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {

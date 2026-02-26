@@ -40,6 +40,12 @@ pub const Args = struct {
     rom_path: []const u8,
 };
 
+pub const CpuBus: Cpu.Bus = .{
+    .read = read,
+    .write = write,
+    .scheduleInterrupt = scheduleInterrupt,
+};
+
 const Page = enum {
     rdram_registers,
     rsp,
@@ -156,10 +162,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn runFrame(self: *Self) void {
     while (true) {
-        self.cpu.step(.{
-            .read = read,
-            .write = write,
-        });
+        self.cpu.step(CpuBus);
 
         self.clock.addCycles(4);
 
@@ -167,6 +170,7 @@ pub fn runFrame(self: *Self) void {
             @branchHint(.unlikely);
 
             switch (event) {
+                .cpu_interrupt => self.cpu.handleInterruptEvent(),
                 .vi_new_line => if (self.vi.handleNewLineEvent()) {
                     return;
                 },
@@ -243,4 +247,9 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
         .pifdata => self.si.writePif(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
+}
+
+fn scheduleInterrupt(core: *Cpu) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
+    self.clock.reschedule(.cpu_interrupt, 0);
 }

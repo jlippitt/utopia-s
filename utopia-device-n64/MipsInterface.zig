@@ -47,7 +47,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 
             // TODO: RDP interrupts
 
-            fw.log.debug("MI_MODE: {any}", .{self.mask});
+            fw.log.debug("MI_MODE: {any}", .{self.mode});
         },
         3 => {
             const masked_value = value & mask;
@@ -73,7 +73,7 @@ pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
 
 pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
     fw.log.debug("MI Interrupt Raised: {t}", .{interrupt});
-    self.interrupt |= ~@intFromEnum(interrupt);
+    self.interrupt |= @intFromEnum(interrupt);
     self.updateCpuState();
 }
 
@@ -81,9 +81,9 @@ fn updateCpuState(self: *Self) void {
     const cpu = &self.getDevice().cpu;
 
     if (self.interrupt & @as(u32, @bitCast(self.mask)) != 0) {
-        cpu.raiseInterrupt(.rcp);
+        cpu.raiseInterrupt(Device.CpuBus, .rcp);
     } else {
-        cpu.clearInterrupt(.rcp);
+        cpu.clearInterrupt(Device.CpuBus, .rcp);
     }
 }
 

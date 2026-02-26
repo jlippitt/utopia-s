@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 
 pub const EventType = enum {
+    cpu_interrupt,
     vi_new_line,
 };
 

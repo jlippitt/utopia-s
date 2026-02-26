@@ -3,11 +3,7 @@ const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 const Tlb = @import("./Cp0/Tlb.zig");
 
-pub const Interrupt = enum(u8) {
-    rcp = 0x04,
-    dd = 0x08,
-    timer = 0x80,
-};
+const exception_vector = 0x8000_0180;
 
 const Register = enum(u5) {
     // zig fmt: off
@@ -30,7 +26,21 @@ const MType = packed struct(u32) {
     opcode: u6,
 };
 
-const Self = @This();
+pub const Interrupt = enum(u8) {
+    rcp = 0x04,
+    dd = 0x08,
+    timer = 0x80,
+};
+
+const ExceptionType = enum(u5) {
+    interrupt = 0,
+};
+
+pub const Exception = union(ExceptionType) {
+    interrupt: void,
+};
+
+pub const Self = @This();
 
 index: Tlb.Index = .{},
 entry_lo: [2]Tlb.EntryLo = @splat(.{}),
@@ -62,15 +72,37 @@ pub fn setLLAddr(self: *Self, value: u32) void {
     fw.log.trace("  LLAddr: {X:08}", .{self.ll_addr});
 }
 
-pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+pub fn clearInterrupt(self: *Self, comptime bus: Core.Bus, interrupt: Interrupt) void {
+    _ = bus;
     self.cause.ip &= ~@intFromEnum(interrupt);
     fw.log.trace("  Cause: {any}", .{self.cause});
 }
 
-pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+pub fn raiseInterrupt(self: *Self, comptime bus: Core.Bus, interrupt: Interrupt) void {
     self.cause.ip |= @intFromEnum(interrupt);
     fw.log.trace("  Cause: {any}", .{self.cause});
-    self.checkPendingInterrupts();
+    self.checkPendingInterrupts(bus);
+}
+
+pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
+    if (self.status.exl or self.status.erl) {
+        fw.log.unimplemented("Nested exceptions", .{});
+    }
+
+    fw.log.debug("-- Exception: {any} --", .{exception});
+
+    self.status.exl = true;
+    fw.log.trace("  Status: {any}", .{self.status});
+
+    self.cause.bd = delay;
+    self.cause.exc_code = exception;
+    self.cause.ce = 0;
+    fw.log.trace("  Cause: {any}", .{self.cause});
+
+    self.epc = fw.num.signExtend(u64, if (delay) pc -% 4 else pc);
+    fw.log.trace("  EPC: {X:016}", .{self.epc});
+
+    return exception_vector;
 }
 
 fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
@@ -86,19 +118,19 @@ fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
         .Compare => self.compare,
         .Status => @as(u32, @bitCast(self.status)),
         .Cause => @as(u32, @bitCast(self.cause)),
+        .EPC => self.epc,
         .Config => @as(u32, @bitCast(self.config)),
         .LLAddr => self.ll_addr,
         .WatchLo => @as(u32, @bitCast(self.watch_lo)),
         .WatchHi => @as(u32, @bitCast(self.watch_hi)),
         .TagLo => @as(u32, @bitCast(self.tag_lo)),
         .TagHi => 0,
+        .ErrorEPC => self.error_epc,
         else => fw.log.todo("CPU CP0 register read: {t}", .{reg}),
     };
 }
 
 fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
-    _ = bus;
-
     switch (reg) {
         .Index => {
             fw.num.writeMasked(u32, @ptrCast(&self.index), @truncate(value), 0x8000_003f);
@@ -150,7 +182,7 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
                 fw.log.warn("Unsupported: Low power mode", .{});
             }
 
-            self.checkPendingInterrupts();
+            self.checkPendingInterrupts(bus);
         },
         .Cause => {
             fw.num.writeMasked(
@@ -162,7 +194,7 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
 
             fw.log.trace("  Cause: {any}", .{self.cause});
 
-            self.checkPendingInterrupts();
+            self.checkPendingInterrupts(bus);
         },
         .EPC => {
             self.epc = value;
@@ -226,7 +258,7 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
     }
 }
 
-fn checkPendingInterrupts(self: *Self) void {
+fn checkPendingInterrupts(self: *Self, comptime bus: Core.Bus) void {
     if (!self.status.ie or self.status.exl or self.status.erl) {
         return;
     }
@@ -235,7 +267,7 @@ fn checkPendingInterrupts(self: *Self) void {
         return;
     }
 
-    fw.log.todo("CPU interrupts", .{});
+    bus.scheduleInterrupt(self.getCore());
 }
 
 fn getCore(self: *Self) *Core {
@@ -248,7 +280,7 @@ pub fn cop0(comptime bus: Core.Bus, core: *Core, word: u32) void {
     if (rs >= 0o20) {
         return switch (@as(u6, @truncate(word))) {
             0o02 => Tlb.tlbwi(core, word),
-            0o30 => eret(core, word),
+            0o30 => eret(bus, core, word),
             else => |funct| fw.log.todo("CPU COP0 funct: {o:02}", .{funct}),
         };
     }
@@ -288,7 +320,7 @@ fn dmtc0(comptime bus: Core.Bus, core: *Core, word: u32) void {
     core.cp0.set(bus, args.rd, core.get(args.rt));
 }
 
-fn eret(core: *Core, word: u32) void {
+fn eret(comptime bus: Core.Bus, core: *Core, word: u32) void {
     _ = word;
 
     fw.log.trace("{X:08}: ERET", .{core.pc});
@@ -305,7 +337,7 @@ fn eret(core: *Core, word: u32) void {
 
     core.ll_bit = false;
     core.pipe_state = .except;
-    core.cp0.checkPendingInterrupts();
+    core.cp0.checkPendingInterrupts(bus);
 }
 
 const Status = packed struct(u32) {
@@ -337,7 +369,7 @@ const Status = packed struct(u32) {
 
 const Cause = packed struct(u32) {
     __0: u2 = 0,
-    exc_code: u5 = 0,
+    exc_code: ExceptionType = .interrupt,
     __1: u1 = 0,
     ip: u8 = 0,
     __2: u12 = 0,
