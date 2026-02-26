@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 const arithmetic = @import("./Cp1/arithmetic.zig");
+const compare = @import("./Cp1/compare.zig");
 const convert = @import("./Cp1/convert.zig");
 
 // zig fmt: off
@@ -10,6 +11,15 @@ const Register = enum(u5) {
     F8,  F9,  F10, F11, F12, F13, F14, F15,
     F16, F17, F18, F19, F20, F21, F22, F23,
     F24, F25, F26, F27, F28, F29, F30, F31,
+};
+// zig fmt: on
+
+// zig fmt: off
+const ControlRegister = enum(u5) {
+    FCR0,  FCR1,  FCR2,  FCR3,  FCR4,  FCR5,  FCR6,  FCR7,
+    FCR8,  FCR9,  FCR10, FCR11, FCR12, FCR13, FCR14, FCR15,
+    FCR16, FCR17, FCR18, FCR19, FCR20, FCR21, FCR22, FCR23,
+    FCR24, FCR25, FCR26, FCR27, FCR28, FCR29, FCR30, FCR31,
 };
 // zig fmt: on
 
@@ -38,7 +48,7 @@ pub const RType = packed struct(u32) {
     opcode: u6,
 };
 
-const IType = packed struct(u32) {
+pub const IType = packed struct(u32) {
     imm: u16,
     ft: Register,
     rs: Core.Register,
@@ -48,6 +58,7 @@ const IType = packed struct(u32) {
 const Self = @This();
 
 regs: [32]u64 = @splat(0),
+csr: Csr = .{},
 
 pub fn init() Self {
     return .{};
@@ -122,11 +133,22 @@ pub fn cop1(core: *Core, word: u32) void {
     const rs: u5 = @truncate(word >> 21);
 
     switch (rs) {
+        0o10 => branchOp(core, word),
         0o20 => floatOp(.S, core, word),
         0o21 => floatOp(.D, core, word),
         0o24 => intOp(.W, core, word),
         0o25 => intOp(.L, core, word),
         else => fw.log.todo("CPU COP1 rs: {o:02}", .{rs}),
+    }
+}
+
+fn branchOp(core: *Core, word: u32) void {
+    switch (@as(u5, @truncate(word >> 16))) {
+        0o00 => compare.branch(.BC1F, .{}, core, word),
+        0o01 => compare.branch(.BC1T, .{}, core, word),
+        0o02 => compare.branch(.BC1F, .{ .likely = true }, core, word),
+        0o03 => compare.branch(.BC1T, .{ .likely = true }, core, word),
+        else => |rt| fw.log.todo("CPU COP1 branch op: {o:02}", .{rt}),
     }
 }
 
@@ -152,6 +174,22 @@ fn floatOp(comptime fmt: Format, core: *Core, word: u32) void {
         0o41 => convert.cvt(.CVT, .D, fmt, core, word),
         0o44 => convert.cvt(.CVT, .W, fmt, core, word),
         0o45 => convert.cvt(.CVT, .L, fmt, core, word),
+        0o60 => compare.c(.F, fmt, core, word),
+        0o61 => compare.c(.UN, fmt, core, word),
+        0o62 => compare.c(.EQ, fmt, core, word),
+        0o63 => compare.c(.UEQ, fmt, core, word),
+        0o64 => compare.c(.OLT, fmt, core, word),
+        0o65 => compare.c(.ULT, fmt, core, word),
+        0o66 => compare.c(.OLE, fmt, core, word),
+        0o67 => compare.c(.ULE, fmt, core, word),
+        0o70 => compare.c(.SF, fmt, core, word),
+        0o71 => compare.c(.NGLE, fmt, core, word),
+        0o72 => compare.c(.SEQ, fmt, core, word),
+        0o73 => compare.c(.NGL, fmt, core, word),
+        0o74 => compare.c(.LT, fmt, core, word),
+        0o75 => compare.c(.NGE, fmt, core, word),
+        0o76 => compare.c(.LE, fmt, core, word),
+        0o77 => compare.c(.NGT, fmt, core, word),
         else => |funct| fw.log.todo("CPU COP1 float op: {o:02}", .{funct}),
     }
 }
@@ -249,3 +287,21 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
         ),
     }
 }
+
+const RoundingMode = enum(u2) {
+    round,
+    trunc,
+    ceil,
+    floor,
+};
+
+const Csr = struct {
+    rm: RoundingMode = .round,
+    flags: u5 = 0,
+    enables: u5 = 0,
+    cause: u6 = 0,
+    __0: u5 = 0,
+    c: bool = false,
+    fs: bool = false,
+    __: u7 = 0,
+};
