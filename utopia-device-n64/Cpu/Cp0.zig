@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
+const Tlb = @import("./Cp0/Tlb.zig");
 
 const Register = enum(u5) {
     // zig fmt: off
@@ -25,7 +26,11 @@ const MType = packed struct(u32) {
 
 const Self = @This();
 
+index: Tlb.Index = .{},
+entry_lo: [2]Tlb.EntryLo = @splat(.{}),
+page_mask: Tlb.PageMask = .{},
 count: u32 = 0,
+entry_hi: Tlb.EntryHi = .{},
 compare: u32 = 0,
 status: Status = .{},
 cause: Cause = .{},
@@ -36,6 +41,7 @@ watch_lo: WatchLo = .{},
 watch_hi: WatchHi = .{},
 error_epc: u64 = 0,
 tag_lo: TagLo = .{},
+tlb: Tlb = .init(),
 
 pub fn init() Self {
     return .{};
@@ -47,14 +53,19 @@ pub fn fr(self: *const Self) bool {
 
 pub fn setLLAddr(self: *Self, value: u32) void {
     self.ll_addr = value;
-    fw.log.trace("  LLAddr: {X:08}", self.ll_addr);
+    fw.log.trace("  LLAddr: {X:08}", .{self.ll_addr});
 }
 
 fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
     _ = bus;
 
     return switch (reg) {
+        .Index => @as(u32, @bitCast(self.index)),
+        .EntryLo0 => @bitCast(self.entry_lo[0]),
+        .EntryLo1 => @bitCast(self.entry_lo[1]),
+        .PageMask => @bitCast(self.page_mask),
         .Count => self.count,
+        .EntryHi => @bitCast(self.entry_hi),
         .Compare => self.compare,
         .Status => @as(u32, @bitCast(self.status)),
         .Cause => @as(u32, @bitCast(self.cause)),
@@ -72,9 +83,29 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
     _ = bus;
 
     switch (reg) {
+        .Index => {
+            fw.num.writeMasked(u32, @ptrCast(&self.index), @truncate(value), 0x8000_003f);
+            fw.log.trace("  Index: {any}", .{self.index});
+        },
+        .EntryLo0 => {
+            fw.num.writeMasked(u64, @ptrCast(&self.entry_lo[0]), value, 0x0000_0000_3fff_ffff);
+            fw.log.trace("  EntryLo0: {any}", .{self.entry_lo[0]});
+        },
+        .EntryLo1 => {
+            fw.num.writeMasked(u64, @ptrCast(&self.entry_lo[1]), value, 0x0000_0000_3fff_ffff);
+            fw.log.trace("  EntryLo1: {any}", .{self.entry_lo[1]});
+        },
+        .PageMask => {
+            fw.num.writeMasked(u64, @ptrCast(&self.page_mask), value, 0x0000_0000_01ff_e000);
+            fw.log.trace("  PageMask: {any}", .{self.page_mask});
+        },
         .Count => {
             self.count = @truncate(value);
             fw.log.trace("  Count: {X:08}", .{self.count});
+        },
+        .EntryHi => {
+            fw.num.writeMasked(u64, @ptrCast(&self.entry_hi), value, 0xc000_00ff_ffff_e0ff);
+            fw.log.trace("  EntryHi: {any}", .{self.entry_hi});
         },
         .Compare => {
             self.compare = @truncate(value);
