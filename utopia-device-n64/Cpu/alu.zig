@@ -55,7 +55,7 @@ pub const ArithmeticOp = enum {
                     u64,
                     try std.math.add(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
                 ),
-                .DADD => @bitCast(try std.math.sub(i64, @bitCast(lhs), @bitCast(rhs))),
+                .DADD => @bitCast(try std.math.add(i64, @bitCast(lhs), @bitCast(rhs))),
                 .SUB => fw.num.signExtend(
                     u64,
                     try std.math.add(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
