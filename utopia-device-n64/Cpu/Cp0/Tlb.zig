@@ -1,3 +1,8 @@
+const fw = @import("framework");
+const Core = @import("../../Cpu.zig");
+
+const mask_filter = 0xaaa;
+
 pub const Index = packed struct(u32) {
     index: u6 = 0,
     __: u25 = 0,
@@ -28,8 +33,63 @@ pub const PageMask = packed struct(u64) {
     __1: u39 = 0,
 };
 
+const Entry = struct {
+    page_mask: PageMask = .{},
+    entry_hi: EntryHi = .{},
+    entry_lo: [2]EntryLo = @splat(.{}),
+};
+
 const Self = @This();
+
+entries: [32]Entry = @splat(.{}),
 
 pub fn init() Self {
     return .{};
+}
+
+fn write(self: *Self, index: u5, regs: Entry) void {
+    const filtered = regs.page_mask.mask & mask_filter;
+    const mask = filtered | (filtered >> 1);
+
+    var entry = &self.entries[index];
+
+    entry.page_mask = .{
+        .mask = mask,
+    };
+
+    entry.entry_hi = .{
+        .asid = regs.entry_hi.asid,
+        .global = regs.entry_lo[0].global or regs.entry_lo[1].global,
+        .vpn2 = regs.entry_hi.vpn2 & ~mask,
+        .region = regs.entry_hi.region,
+    };
+
+    for (0..1) |id| {
+        // Note: Fields are explicitly copied to avoid copying bits that aren't assigned to a
+        // named struct field. This is important as some of those bits are writable on the CP0
+        // register but shouldn't be carried over to the TLB entry.
+        entry.entry_lo[id] = .{
+            .global = regs.entry_lo[id].global,
+            .valid = regs.entry_lo[id].valid,
+            .dirty = regs.entry_lo[id].dirty,
+            .cache = regs.entry_lo[id].cache,
+            .pfn = regs.entry_lo[id].pfn,
+        };
+    }
+
+    fw.log.trace("TLB Entry {}: {any}", .{ index, entry.* });
+}
+
+pub fn tlbwi(core: *Core, word: u32) void {
+    _ = word;
+
+    fw.log.trace("{X:08}: TLBWI", .{core.pc});
+
+    const index: u5 = @truncate(core.cp0.index.index);
+
+    core.cp0.tlb.write(index, .{
+        .page_mask = core.cp0.page_mask,
+        .entry_hi = core.cp0.entry_hi,
+        .entry_lo = core.cp0.entry_lo,
+    });
 }

@@ -210,6 +210,7 @@ pub fn cop0(comptime bus: Core.Bus, core: *Core, word: u32) void {
 
     if (rs >= 0o20) {
         return switch (@as(u6, @truncate(word))) {
+            0o02 => Tlb.tlbwi(core, word),
             0o30 => eret(core, word),
             else => |funct| fw.log.todo("CPU COP0 funct: {o:02}", .{funct}),
         };
