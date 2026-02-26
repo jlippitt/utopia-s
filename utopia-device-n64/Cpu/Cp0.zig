@@ -29,13 +29,21 @@ count: u32 = 0,
 compare: u32 = 0,
 status: Status = .{},
 cause: Cause = .{},
+epc: u64 = 0,
 config: Config = .{},
+ll_addr: u32 = 0,
 watch_lo: WatchLo = .{},
 watch_hi: WatchHi = .{},
+error_epc: u64 = 0,
 tag_lo: TagLo = .{},
 
 pub fn init() Self {
     return .{};
+}
+
+pub fn setLLAddr(self: *Self, value: u32) void {
+    self.ll_addr = value;
+    fw.log.trace("  LLAddr: {X:08}", self.ll_addr);
 }
 
 fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
@@ -47,6 +55,7 @@ fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
         .Status => @as(u32, @bitCast(self.status)),
         .Cause => @as(u32, @bitCast(self.cause)),
         .Config => @as(u32, @bitCast(self.config)),
+        .LLAddr => self.ll_addr,
         .WatchLo => @as(u32, @bitCast(self.watch_lo)),
         .WatchHi => @as(u32, @bitCast(self.watch_hi)),
         .TagLo => @as(u32, @bitCast(self.tag_lo)),
@@ -99,6 +108,10 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
 
             fw.log.trace("  Cause: {any}", .{self.cause});
         },
+        .EPC => {
+            self.epc = value;
+            fw.log.trace("  EPC: {X:016}", .{self.epc});
+        },
         .Config => {
             fw.num.writeMasked(
                 u32,
@@ -117,6 +130,7 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
                 fw.log.warn("Unsupported: Non-default data transfer patterns", .{});
             }
         },
+        .LLAddr => self.setLLAddr(@truncate(value)),
         .WatchLo => {
             fw.num.writeMasked(
                 u32,
@@ -147,18 +161,31 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
 
             fw.log.trace("  TagLo: {any}", .{self.tag_lo});
         },
+        .ErrorEPC => {
+            self.error_epc = value;
+            fw.log.trace("  ErrorEPC: {X:016}", .{self.error_epc});
+        },
         .TagHi => {}, // Always zero
         else => fw.log.todo("CPU CP0 register write: {t} <= {X:016}", .{ reg, value }),
     }
 }
 
 pub fn cop0(comptime bus: Core.Bus, core: *Core, word: u32) void {
-    switch (@as(u5, @truncate(word >> 21))) {
+    const rs: u5 = @truncate(word >> 21);
+
+    if (rs >= 0o20) {
+        return switch (@as(u6, @truncate(word))) {
+            0o30 => eret(core, word),
+            else => |funct| fw.log.todo("CPU COP0 funct: {o:02}", .{funct}),
+        };
+    }
+
+    switch (rs) {
         0o00 => mfc0(bus, core, word),
         0o01 => dmfc0(bus, core, word),
         0o04 => mtc0(bus, core, word),
         0o05 => mtc0(bus, core, word),
-        else => |rs| fw.log.todo("CPU COP0 rs: {o:02}", .{rs}),
+        else => fw.log.todo("CPU COP0 rs: {o:02}", .{rs}),
     }
 }
 
@@ -186,6 +213,25 @@ fn dmtc0(comptime bus: Core.Bus, core: *Core, word: u32) void {
     const args: MType = @bitCast(word);
     fw.log.trace("{X:08}: DMTC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
     core.cp0.set(bus, args.rd, core.get(args.rt));
+}
+
+fn eret(core: *Core, word: u32) void {
+    _ = word;
+
+    fw.log.trace("{X:08}: ERET", .{core.pc});
+
+    if (core.cp0.status.erl) {
+        core.cp0.status.erl = false;
+        core.pc = @truncate(core.cp0.error_epc);
+    } else {
+        core.cp0.status.exl = false;
+        core.pc = @truncate(core.cp0.epc);
+    }
+
+    fw.log.trace("  Status: {any}", .{core.cp0.status});
+
+    core.ll_bit = false;
+    core.pipe_state = .except;
 }
 
 const Status = packed struct(u32) {

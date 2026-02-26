@@ -14,13 +14,15 @@ pub const LoadOp = enum {
     LD,
     LDL,
     LDR,
+    LL,
+    LLD,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
             .LB, .LBU, .LWL, .LWR, .LDL, .LDR => 0,
             .LH, .LHU => 1,
-            .LW, .LWU => 3,
-            .LD => 7,
+            .LW, .LWU, .LL => 3,
+            .LD, .LLD => 7,
         };
     }
 };
@@ -101,6 +103,16 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
             const mask = @as(u64, std.math.maxInt(u64)) >> shift;
             break :blk (old & ~mask) | (new & mask);
         },
+        .LL => blk: {
+            core.cp0.setLLAddr(paddr >> 4);
+            core.ll_bit = true;
+            break :blk fw.num.signExtend(u64, core.readWord(bus, paddr));
+        },
+        .LLD => blk: {
+            core.cp0.setLLAddr(paddr >> 4);
+            core.ll_bit = true;
+            break :blk core.readDoubleWord(bus, paddr);
+        },
     });
 }
 
@@ -113,13 +125,15 @@ pub const StoreOp = enum {
     SD,
     SDL,
     SDR,
+    SC,
+    SCD,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
             .SB, .SWL, .SWR, .SDL, .SDR => 0,
             .SH => 1,
-            .SW => 3,
-            .SD => 7,
+            .SW, .SC => 3,
+            .SD, .SCD => 7,
         };
     }
 };
@@ -184,6 +198,20 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
             const output = value << shift;
             const mask = @as(u64, std.math.maxInt(u64)) << shift;
             core.writeDoubleWord(bus, paddr & ~@as(u32, 7), output, mask);
+        },
+        .SC => {
+            if (core.ll_bit) {
+                core.writeWord(bus, paddr, @truncate(value), std.math.maxInt(u32));
+            }
+
+            core.set(args.rt, @intFromBool(core.ll_bit));
+        },
+        .SCD => {
+            if (core.ll_bit) {
+                core.writeDoubleWord(bus, paddr, value, std.math.maxInt(u64));
+            }
+
+            core.set(args.rt, @intFromBool(core.ll_bit));
         },
     }
 }

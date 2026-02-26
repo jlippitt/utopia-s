@@ -58,6 +58,7 @@ pipe_state: PipeState = .normal,
 regs: [32]u64 = @splat(0),
 lo: u64 = 0,
 hi: u64 = 0,
+ll_bit: bool = false,
 cp0: Cp0 = .init(),
 
 pub fn init() Self {
@@ -217,7 +218,11 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o55 => memory.store(.SDR, bus, core, word),
         0o56 => memory.store(.SWR, bus, core, word),
         0o57 => memory.cache(core, word),
+        0o60 => memory.load(.LL, bus, core, word),
+        0o64 => memory.load(.LLD, bus, core, word),
         0o67 => memory.load(.LD, bus, core, word),
+        0o70 => memory.store(.SC, bus, core, word),
+        0o74 => memory.store(.SCD, bus, core, word),
         0o77 => memory.store(.SD, bus, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
