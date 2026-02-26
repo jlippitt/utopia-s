@@ -27,28 +27,26 @@ pub fn main() !void {
     defer device.deinit();
 
     var src_size = device.getScreenSize();
-    var dst_size = try getBestSize(src_size, null);
 
-    const window = try sdl3.video.Window.init("Utopia-S", dst_size.x, dst_size.y, .{});
+    const init_size = try getBestSize(src_size, null);
+
+    const window = try sdl3.video.Window.init("Utopia-S", init_size.x, init_size.y, .{});
     defer window.deinit();
-
-    try window.setPosition(.{ .centered = null }, .{ .centered = null });
 
     const renderer = try sdl3.render.Renderer.init(window, null);
     defer renderer.deinit();
 
-    var texture = try renderer.createTexture(
-        .packed_xbgr_8_8_8_8,
-        .streaming,
-        src_size.x,
-        src_size.y,
-    );
+    var texture = try resizeWindow(window, renderer, src_size);
     defer texture.deinit();
 
     outer: while (true) {
         while (sdl3.events.poll()) |event| {
             switch (event) {
                 .quit => break :outer,
+                .window_display_changed => {
+                    texture.deinit();
+                    texture = try resizeWindow(window, renderer, src_size);
+                },
                 .key_down => |key| if (key.scancode) |scancode| {
                     switch (scancode) {
                         .escape => break :outer,
@@ -64,22 +62,9 @@ pub fn main() !void {
         const new_size = device.getScreenSize();
 
         if (new_size.x != src_size.x or new_size.y != src_size.y) {
-            const display = try window.getDisplayForWindow();
-
-            src_size = new_size;
-            dst_size = try getBestSize(src_size, display);
-
-            try window.setSize(dst_size.x, dst_size.y);
-            try window.setPosition(.{ .centered = display }, .{ .centered = display });
-
             texture.deinit();
-
-            texture = try renderer.createTexture(
-                .packed_xbgr_8_8_8_8,
-                .streaming,
-                src_size.x,
-                src_size.y,
-            );
+            texture = try resizeWindow(window, renderer, new_size);
+            src_size = new_size;
         }
 
         try texture.update(null, device.getPixels().ptr, src_size.x * 4);
@@ -91,6 +76,25 @@ pub fn main() !void {
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
     logger.deinit();
     std.debug.defaultPanic(msg, first_trace_addr);
+}
+
+fn resizeWindow(
+    window: sdl3.video.Window,
+    renderer: sdl3.render.Renderer,
+    src_size: utopia.ScreenSize,
+) !sdl3.render.Texture {
+    const display = try window.getDisplayForWindow();
+    const dst_size = try getBestSize(src_size, display);
+
+    try window.setSize(dst_size.x, dst_size.y);
+    try window.setPosition(.{ .centered = display }, .{ .centered = display });
+
+    return try renderer.createTexture(
+        .packed_xbgr_8_8_8_8,
+        .streaming,
+        src_size.x,
+        src_size.y,
+    );
 }
 
 fn getBestSize(
