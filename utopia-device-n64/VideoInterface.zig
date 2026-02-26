@@ -1,9 +1,13 @@
+const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 const Clock = @import("./Clock.zig");
 
+const default_width = 640;
+const default_height = 474;
 const default_h_total = 3093;
 const default_v_total = 525;
+const pixel_array_size = default_width * default_height * 4;
 
 const Self = @This();
 
@@ -22,15 +26,31 @@ v_burst: Range = .{},
 x_scale: Scale = .{},
 y_scale: Scale = .{},
 cycles_per_line: u64 = 0,
+screen_size: fw.ScreenSize = .{
+    .x = default_width,
+    .y = default_height,
+},
+pixels: *[pixel_array_size]u8,
 
-pub fn init(clock: *Clock) Self {
+pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) !Self {
+    const pixels = try arena.allocator().alloc(u8, pixel_array_size);
+
     const cycles_per_line = cyclesPerLine(default_h_total);
     fw.log.debug("Cycles Per Line: {}", .{cycles_per_line});
     clock.schedule(.vi_new_line, cycles_per_line);
 
     return .{
         .cycles_per_line = cycles_per_line,
+        .pixels = pixels[0..pixel_array_size],
     };
+}
+
+pub fn getScreenSize(self: *const Self) fw.ScreenSize {
+    return self.screen_size;
+}
+
+pub fn getPixels(self: *const Self) []const u8 {
+    return self.pixels;
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -128,8 +148,7 @@ pub fn handleNewLineEvent(self: *Self) bool {
     if (self.v_current >= self.v_total) {
         const serrate: u10 = @intFromBool(self.ctrl.serrate);
         self.v_current = self.v_current & serrate ^ serrate;
-        // TODO: Render
-        fw.log.debug("Frame Complete", .{});
+        self.render();
         frame_complete = true;
     }
 
@@ -144,7 +163,58 @@ pub fn handleNewLineEvent(self: *Self) bool {
     return frame_complete;
 }
 
+fn render(self: *Self) void {
+    const dst_width = @as(u32, self.h_video.size()) * @as(u32, self.x_scale.scale) / 1024;
+    const dst_height = @as(u32, self.v_video.size()) * @as(u32, self.y_scale.scale) / 2048;
+
+    var color_mode: ColorMode = .blank;
+
+    if (dst_width != 0 and dst_height != 0) {
+        color_mode = self.ctrl.color_mode;
+        self.screen_size = .{ .x = dst_width, .y = dst_height };
+    }
+
+    fw.log.debug("Rendering Frame: {d}x{d} ({t})", .{
+        dst_width,
+        dst_height,
+        color_mode,
+    });
+
+    switch (color_mode) {
+        .blank => @memset(self.pixels, 0),
+        .rgba32 => {
+            const rdram = self.getDeviceConst().rdram;
+            const dst_pitch = dst_width * 4;
+            const src_pitch = @as(u32, self.width) * 4;
+            const min_pitch = @min(dst_pitch, src_pitch);
+
+            var dst_index: u32 = 0;
+            var src_index: u32 = self.origin;
+
+            for (0..dst_height) |_| {
+                @memcpy(
+                    self.pixels[dst_index..][0..min_pitch],
+                    rdram[src_index..][0..min_pitch],
+                );
+
+                @memset(
+                    self.pixels[(dst_index + min_pitch)..(dst_index + dst_pitch)],
+                    0,
+                );
+
+                dst_index += dst_pitch;
+                src_index += src_pitch;
+            }
+        },
+        else => fw.log.unimplemented("Color mode: {t}", .{color_mode}),
+    }
+}
+
 fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("vi", self));
+}
+
+fn getDeviceConst(self: *Self) *const Device {
     return @alignCast(@fieldParentPtr("vi", self));
 }
 
@@ -213,6 +283,10 @@ const Range = packed struct(u32) {
     __0: u6 = 0,
     start: u10 = 0,
     __1: u6 = 0,
+
+    fn size(self: @This()) u10 {
+        return self.end - self.start;
+    }
 };
 
 const Scale = packed struct(u32) {

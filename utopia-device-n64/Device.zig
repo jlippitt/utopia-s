@@ -121,7 +121,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
     }
 
     var clock = Clock.init();
-    const vi = VideoInterface.init(&clock);
+    const vi = try VideoInterface.init(&arena, &clock);
 
     const self = try arena.allocator().create(Self);
 
@@ -129,7 +129,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .cpu = .init(),
         .clock = clock,
         .rdram = rdram[0..rdram_size],
-        .rsp = try .init(arena.allocator()),
+        .rsp = try .init(&arena),
         .rdp = .init(),
         .mi = .init(),
         .vi = vi,
@@ -173,13 +173,11 @@ pub fn runFrame(self: *Self) void {
 }
 
 pub fn getScreenSize(self: *const Self) fw.ScreenSize {
-    _ = self;
-    return .{ .x = 640, .y = 480 };
+    return self.vi.getScreenSize();
 }
 
 pub fn getPixels(self: *const Self) []const u8 {
-    _ = self;
-    return &[1]u8{0} ** 640 ** 480 ** 4;
+    return self.vi.getPixels();
 }
 
 fn read(core: *Cpu, address: u32) u32 {

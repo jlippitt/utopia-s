@@ -37,7 +37,7 @@ pub fn main() !void {
     defer renderer.deinit();
 
     const texture = try renderer.createTexture(
-        .packed_xrgb_8_8_8_8,
+        .packed_xbgr_8_8_8_8,
         .streaming,
         size.x,
         size.y,

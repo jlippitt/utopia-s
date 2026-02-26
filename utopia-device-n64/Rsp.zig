@@ -10,8 +10,8 @@ mem: *align(16) [mem_size]u8,
 status: Status = .{},
 pc: u12 = 0,
 
-pub fn init(allocator: std.mem.Allocator) !Self {
-    const mem = try allocator.alignedAlloc(u8, .@"16", mem_size);
+pub fn init(arena: *std.heap.ArenaAllocator) !Self {
+    const mem = try arena.allocator().alignedAlloc(u8, .@"16", mem_size);
 
     return .{
         .mem = mem[0..mem_size],
