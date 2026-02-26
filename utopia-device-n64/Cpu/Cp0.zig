@@ -3,6 +3,12 @@ const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 const Tlb = @import("./Cp0/Tlb.zig");
 
+pub const Interrupt = enum(u8) {
+    rcp = 0x04,
+    dd = 0x08,
+    timer = 0x80,
+};
+
 const Register = enum(u5) {
     // zig fmt: off
     Index,    Random,   EntryLo0,    EntryLo1,
@@ -54,6 +60,17 @@ pub fn fr(self: *const Self) bool {
 pub fn setLLAddr(self: *Self, value: u32) void {
     self.ll_addr = value;
     fw.log.trace("  LLAddr: {X:08}", .{self.ll_addr});
+}
+
+pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+    self.cause.ip &= ~@intFromEnum(interrupt);
+    fw.log.trace("  Cause: {any}", .{self.cause});
+}
+
+pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+    self.cause.ip |= @intFromEnum(interrupt);
+    fw.log.trace("  Cause: {any}", .{self.cause});
+    self.checkPendingInterrupts();
 }
 
 fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
@@ -132,6 +149,8 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
             if (self.status.rp) {
                 fw.log.warn("Unsupported: Low power mode", .{});
             }
+
+            self.checkPendingInterrupts();
         },
         .Cause => {
             fw.num.writeMasked(
@@ -142,6 +161,8 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
             );
 
             fw.log.trace("  Cause: {any}", .{self.cause});
+
+            self.checkPendingInterrupts();
         },
         .EPC => {
             self.epc = value;
@@ -203,6 +224,22 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
         .TagHi => {}, // Always zero
         else => fw.log.todo("CPU CP0 register write: {t} <= {X:016}", .{ reg, value }),
     }
+}
+
+fn checkPendingInterrupts(self: *Self) void {
+    if (!self.status.ie or self.status.exl or self.status.erl) {
+        return;
+    }
+
+    if ((self.cause.ip & self.status.im) == 0) {
+        return;
+    }
+
+    fw.log.todo("CPU interrupts", .{});
+}
+
+fn getCore(self: *Self) *Core {
+    return @alignCast(@fieldParentPtr("cp0", self));
 }
 
 pub fn cop0(comptime bus: Core.Bus, core: *Core, word: u32) void {
@@ -268,6 +305,7 @@ fn eret(core: *Core, word: u32) void {
 
     core.ll_bit = false;
     core.pipe_state = .except;
+    core.cp0.checkPendingInterrupts();
 }
 
 const Status = packed struct(u32) {

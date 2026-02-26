@@ -7,6 +7,8 @@ const memory = @import("./Cpu/memory.zig");
 const mul_div = @import("./Cpu/mul_div.zig");
 const shift = @import("./Cpu/shift.zig");
 
+pub const Interrupt = Cp0.Interrupt;
+
 const Self = @This();
 
 const cold_reset_vector = 0xbfc0_0000;
@@ -65,6 +67,16 @@ cp1: Cp1 = .init(),
 
 pub fn init() Self {
     return .{};
+}
+
+pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.trace("CPU Interrupt Cleared: {t}", .{interrupt});
+    self.cp0.clearInterrupt(interrupt);
+}
+
+pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.trace("CPU Interrupt Raised: {t}", .{interrupt});
+    self.cp0.raiseInterrupt(interrupt);
 }
 
 pub fn step(self: *Self, comptime bus: Bus) void {

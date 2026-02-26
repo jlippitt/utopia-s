@@ -1,9 +1,11 @@
 const fw = @import("framework");
+const Device = @import("./Device.zig");
 const register = @import("./register.zig");
 
 const Self = @This();
 
 mode: Mode = .{},
+interrupt: u32 = 0,
 mask: Mask = .{},
 
 pub fn init() Self {
@@ -14,8 +16,8 @@ pub fn read(self: *Self, address: u32) u32 {
     return switch (@as(u2, @truncate(address >> 2))) {
         0 => @bitCast(self.mode),
         1 => 0x0202_0102,
+        2 => self.interrupt,
         3 => @bitCast(self.mask),
-        else => fw.log.panic("Unmapped MI register read: {X:08}", .{address}),
     };
 }
 
@@ -63,12 +65,47 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     }
 }
 
+pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.debug("MI Interrupt Cleared: {t}", .{interrupt});
+    self.interrupt &= ~@intFromEnum(interrupt);
+    self.updateCpuState();
+}
+
+pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.debug("MI Interrupt Raised: {t}", .{interrupt});
+    self.interrupt |= ~@intFromEnum(interrupt);
+    self.updateCpuState();
+}
+
+fn updateCpuState(self: *Self) void {
+    const cpu = &self.getDevice().cpu;
+
+    if (self.interrupt & @as(u32, @bitCast(self.mask)) != 0) {
+        cpu.raiseInterrupt(.rcp);
+    } else {
+        cpu.clearInterrupt(.rcp);
+    }
+}
+
+fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("mi", self));
+}
+
 const Mode = packed struct(u32) {
     repeat_count: u7 = 0,
     repeat: bool = false,
     ebus: bool = false,
     upper: bool = false,
     __: u22 = 0,
+};
+
+const Interrupt = enum(u32) {
+    sp = 0x01,
+    si = 0x02,
+    ai = 0x04,
+    vi = 0x08,
+    pi = 0x10,
+    dp = 0x20,
 };
 
 const Mask = packed struct(u32) {

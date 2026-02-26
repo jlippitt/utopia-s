@@ -91,7 +91,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
             fw.num.writeMasked(u10, &self.v_intr, @truncate(value), @truncate(mask));
             fw.log.debug("VI_V_INTR: {d}", .{self.v_intr});
         },
-        4 => {}, // TODO: VI interrupts
+        4 => self.getDevice().mi.clearInterrupt(.vi),
         5 => {
             fw.num.writeMasked(u32, @ptrCast(&self.burst), value, mask);
             fw.log.debug("VI_BURST: {any}", .{self.burst});
@@ -155,7 +155,7 @@ pub fn handleNewLineEvent(self: *Self) bool {
     fw.log.trace("VI_V_CURRENT: {}", .{self.v_current});
 
     if (self.v_current == self.v_intr) {
-        // TODO: VI interrupts
+        self.getDevice().mi.raiseInterrupt(.vi);
     }
 
     self.getDevice().clock.schedule(.vi_new_line, self.cycles_per_line);
