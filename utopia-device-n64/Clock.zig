@@ -3,6 +3,7 @@ const fw = @import("framework");
 
 pub const EventType = enum {
     cpu_interrupt,
+    cpu_timer,
     vi_new_line,
 };
 
@@ -17,6 +18,10 @@ scheduled_events: [total_event_types]u64 = @splat(std.math.maxInt(u64)),
 
 pub fn init() Self {
     return .{};
+}
+
+pub fn getCycles(self: *const Self) u64 {
+    return self.cycles;
 }
 
 pub fn addCycles(self: *Self, cycles: u64) void {

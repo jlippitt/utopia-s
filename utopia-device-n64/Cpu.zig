@@ -52,9 +52,11 @@ pub const BranchParams = struct {
 };
 
 pub const Bus = struct {
+    getCycles: fn (self: *const Self) u64,
     read: fn (self: *Self, address: u32) u32,
     write: fn (self: *Self, address: u32, value: u32, mask: u32) void,
     scheduleInterrupt: fn (self: *Self) void,
+    scheduleTimer: fn (self: *Self, delta: u64) void,
 };
 
 pc: u32 = cold_reset_vector,
@@ -83,6 +85,10 @@ pub fn raiseInterrupt(self: *Self, comptime bus: Bus, interrupt: Interrupt) void
 
 pub fn handleInterruptEvent(self: *Self) void {
     self.except(.interrupt);
+}
+
+pub fn handleTimerEvent(self: *Self, comptime bus: Bus) void {
+    self.cp0.raiseInterrupt(bus, .timer);
 }
 
 pub fn step(self: *Self, comptime bus: Bus) void {

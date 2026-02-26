@@ -41,9 +41,11 @@ pub const Args = struct {
 };
 
 pub const CpuBus: Cpu.Bus = .{
+    .getCycles = getCycles,
     .read = read,
     .write = write,
     .scheduleInterrupt = scheduleInterrupt,
+    .scheduleTimer = scheduleTimer,
 };
 
 const Page = enum {
@@ -171,6 +173,7 @@ pub fn runFrame(self: *Self) void {
 
             switch (event) {
                 .cpu_interrupt => self.cpu.handleInterruptEvent(),
+                .cpu_timer => self.cpu.handleTimerEvent(CpuBus),
                 .vi_new_line => if (self.vi.handleNewLineEvent()) {
                     return;
                 },
@@ -185,6 +188,11 @@ pub fn getScreenSize(self: *const Self) fw.ScreenSize {
 
 pub fn getPixels(self: *const Self) []const u8 {
     return self.vi.getPixels();
+}
+
+fn getCycles(core: *const Cpu) u64 {
+    const self: *const Self = @alignCast(@fieldParentPtr("cpu", core));
+    return self.clock.getCycles();
 }
 
 fn read(core: *Cpu, address: u32) u32 {
@@ -252,4 +260,9 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
 fn scheduleInterrupt(core: *Cpu) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
     self.clock.reschedule(.cpu_interrupt, 0);
+}
+
+fn scheduleTimer(core: *Cpu, delta: u64) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
+    self.clock.reschedule(.cpu_timer, delta << 1);
 }

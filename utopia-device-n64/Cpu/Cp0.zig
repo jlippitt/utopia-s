@@ -45,7 +45,8 @@ pub const Self = @This();
 index: Tlb.Index = .{},
 entry_lo: [2]Tlb.EntryLo = @splat(.{}),
 page_mask: Tlb.PageMask = .{},
-count: u32 = 0,
+count_value: u32 = 0,
+count_updated: u64 = 0,
 entry_hi: Tlb.EntryHi = .{},
 compare: u32 = 0,
 status: Status = .{},
@@ -106,14 +107,12 @@ pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
 }
 
 fn get(self: *Self, comptime bus: Core.Bus, reg: Register) u64 {
-    _ = bus;
-
     return switch (reg) {
         .Index => @as(u32, @bitCast(self.index)),
         .EntryLo0 => @bitCast(self.entry_lo[0]),
         .EntryLo1 => @bitCast(self.entry_lo[1]),
         .PageMask => @bitCast(self.page_mask),
-        .Count => self.count,
+        .Count => self.getCurrentCount(bus),
         .EntryHi => @bitCast(self.entry_hi),
         .Compare => self.compare,
         .Status => @as(u32, @bitCast(self.status)),
@@ -149,8 +148,10 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
             fw.log.trace("  PageMask: {any}", .{self.page_mask});
         },
         .Count => {
-            self.count = @truncate(value);
-            fw.log.trace("  Count: {X:08}", .{self.count});
+            self.count_value = @truncate(value);
+            fw.log.trace("  Count: {X:08}", .{self.count_value});
+            self.count_updated = bus.getCycles(self.getCore());
+            self.updateTimerEvent(bus, self.count_value);
         },
         .EntryHi => {
             fw.num.writeMasked(u64, @ptrCast(&self.entry_hi), value, 0xc000_00ff_ffff_e0ff);
@@ -159,6 +160,8 @@ fn set(self: *Self, comptime bus: Core.Bus, reg: Register, value: u64) void {
         .Compare => {
             self.compare = @truncate(value);
             fw.log.trace("  Compare: {X:08}", .{self.compare});
+            self.clearInterrupt(bus, .timer);
+            self.updateTimerEvent(bus, self.getCurrentCount(bus));
         },
         .Status => {
             fw.num.writeMasked(
@@ -270,7 +273,22 @@ fn checkPendingInterrupts(self: *Self, comptime bus: Core.Bus) void {
     bus.scheduleInterrupt(self.getCore());
 }
 
+fn getCurrentCount(self: *const Self, comptime bus: Core.Bus) u32 {
+    const delta = (bus.getCycles(self.getCoreConst()) - self.count_updated) >> 1;
+    return self.count_value +% @as(u32, @truncate(delta));
+}
+
+fn updateTimerEvent(self: *Self, comptime bus: Core.Bus, count: u32) void {
+    const diff = self.compare -% count;
+    const delta = if (diff != 0) @as(u64, diff) else @as(u64, std.math.maxInt(u32)) + 1;
+    bus.scheduleTimer(self.getCore(), delta << 1);
+}
+
 fn getCore(self: *Self) *Core {
+    return @alignCast(@fieldParentPtr("cp0", self));
+}
+
+fn getCoreConst(self: *const Self) *const Core {
     return @alignCast(@fieldParentPtr("cp0", self));
 }
 
