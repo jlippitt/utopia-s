@@ -1,16 +1,18 @@
+const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../../Cpu.zig");
 const Cp1 = @import("../Cp1.zig");
 
-const RoundOp = enum {
+const ConvertOp = enum {
+    CVT,
     ROUND,
     TRUNC,
     CEIL,
     FLOOR,
 };
 
-pub fn round(
-    comptime op: RoundOp,
+pub fn cvt(
+    comptime op: ConvertOp,
     comptime dst_fmt: Cp1.Format,
     comptime src_fmt: Cp1.Format,
     core: *Core,
@@ -29,12 +31,17 @@ pub fn round(
 
     const value = core.cp1.get(src_fmt, args.fs);
 
-    core.cp1.set(dst_fmt, args.fd, @intFromFloat(switch (comptime op) {
-        .ROUND => roundEven(value),
-        .TRUNC => @trunc(value),
-        .CEIL => @ceil(value),
-        .FLOOR => @floor(value),
-    }));
+    core.cp1.set(
+        dst_fmt,
+        args.fd,
+        std.math.lossyCast(dst_fmt.Type(), switch (comptime op) {
+            .CVT => value,
+            .ROUND => roundEven(value),
+            .TRUNC => @trunc(value),
+            .CEIL => @ceil(value),
+            .FLOOR => @floor(value),
+        }),
+    );
 }
 
 fn roundEven(value: anytype) @TypeOf(value) {

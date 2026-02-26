@@ -140,23 +140,26 @@ fn floatOp(comptime fmt: Format, core: *Core, word: u32) void {
         0o05 => arithmetic.unary(.ABS, fmt, core, word),
         0o06 => arithmetic.unary(.MOV, fmt, core, word),
         0o07 => arithmetic.unary(.NEG, fmt, core, word),
-        0o10 => convert.round(.ROUND, .L, fmt, core, word),
-        0o11 => convert.round(.TRUNC, .L, fmt, core, word),
-        0o12 => convert.round(.CEIL, .L, fmt, core, word),
-        0o13 => convert.round(.FLOOR, .L, fmt, core, word),
-        0o14 => convert.round(.ROUND, .W, fmt, core, word),
-        0o15 => convert.round(.TRUNC, .W, fmt, core, word),
-        0o16 => convert.round(.CEIL, .W, fmt, core, word),
-        0o17 => convert.round(.FLOOR, .W, fmt, core, word),
+        0o10 => convert.cvt(.ROUND, .L, fmt, core, word),
+        0o11 => convert.cvt(.TRUNC, .L, fmt, core, word),
+        0o12 => convert.cvt(.CEIL, .L, fmt, core, word),
+        0o13 => convert.cvt(.FLOOR, .L, fmt, core, word),
+        0o14 => convert.cvt(.ROUND, .W, fmt, core, word),
+        0o15 => convert.cvt(.TRUNC, .W, fmt, core, word),
+        0o16 => convert.cvt(.CEIL, .W, fmt, core, word),
+        0o17 => convert.cvt(.FLOOR, .W, fmt, core, word),
+        0o40 => convert.cvt(.CVT, .S, fmt, core, word),
+        0o41 => convert.cvt(.CVT, .D, fmt, core, word),
+        0o44 => convert.cvt(.CVT, .W, fmt, core, word),
+        0o45 => convert.cvt(.CVT, .L, fmt, core, word),
         else => |funct| fw.log.todo("CPU COP1 float op: {o:02}", .{funct}),
     }
 }
 
 fn intOp(comptime fmt: Format, core: *Core, word: u32) void {
-    _ = fmt;
-    _ = core;
-
     switch (@as(u6, @truncate(word))) {
+        0o40 => convert.cvt(.CVT, .S, fmt, core, word),
+        0o41 => convert.cvt(.CVT, .D, fmt, core, word),
         else => |funct| fw.log.todo("CPU COP1 int op: {o:02}", .{funct}),
     }
 }
