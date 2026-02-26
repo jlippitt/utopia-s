@@ -9,11 +9,15 @@ pub const LoadOp = enum {
     LHU,
     LW,
     LWU,
+    LWL,
+    LWR,
     LD,
+    LDL,
+    LDR,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
-            .LB, .LBU => 0,
+            .LB, .LBU, .LWL, .LWR, .LDL, .LDR => 0,
             .LH, .LHU => 1,
             .LW, .LWU => 3,
             .LD => 7,
@@ -64,7 +68,39 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
         },
         .LW => fw.num.signExtend(u64, core.readWord(bus, paddr)),
         .LWU => fw.num.zeroExtend(u64, core.readWord(bus, paddr)),
+        .LWL => blk: {
+            const input = core.readWord(bus, paddr & ~@as(u32, 3));
+            const shift: u5 = @intCast((paddr & 3) * 8);
+            const old: u32 = @truncate(core.get(args.rt));
+            const new = input << shift;
+            const mask = @as(u32, std.math.maxInt(u32)) << shift;
+            break :blk fw.num.signExtend(u64, (old & ~mask) | (new & mask));
+        },
+        .LWR => blk: {
+            const input = core.readWord(bus, paddr & ~@as(u32, 3));
+            const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
+            const old: u32 = @truncate(core.get(args.rt));
+            const new = input >> shift;
+            const mask = @as(u32, std.math.maxInt(u32)) >> shift;
+            break :blk fw.num.signExtend(u64, (old & ~mask) | (new & mask));
+        },
         .LD => core.readDoubleWord(bus, paddr),
+        .LDL => blk: {
+            const input = core.readDoubleWord(bus, paddr & ~@as(u32, 7));
+            const shift: u6 = @intCast((paddr & 7) * 8);
+            const old = core.get(args.rt);
+            const new = input << shift;
+            const mask = @as(u64, std.math.maxInt(u64)) << shift;
+            break :blk (old & ~mask) | (new & mask);
+        },
+        .LDR => blk: {
+            const input = core.readDoubleWord(bus, paddr & ~@as(u32, 7));
+            const shift: u6 = @intCast((paddr & 7 ^ 7) * 8);
+            const old = core.get(args.rt);
+            const new = input >> shift;
+            const mask = @as(u64, std.math.maxInt(u64)) >> shift;
+            break :blk (old & ~mask) | (new & mask);
+        },
     });
 }
 
