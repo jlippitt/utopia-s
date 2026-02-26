@@ -205,6 +205,8 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o44 => memory.load(.LBU, bus, core, word),
         0o45 => memory.load(.LHU, bus, core, word),
         0o47 => memory.load(.LWU, bus, core, word),
+        0o50 => memory.store(.SB, bus, core, word),
+        0o51 => memory.store(.SH, bus, core, word),
         0o53 => memory.store(.SW, bus, core, word),
         0o57 => memory.cache(core, word),
         0o67 => memory.load(.LD, bus, core, word),

@@ -69,11 +69,15 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
 }
 
 pub const StoreOp = enum {
+    SB,
+    SH,
     SW,
     SD,
 
     fn alignMask(comptime op: @This()) u32 {
         return switch (comptime op) {
+            .SB => 0,
+            .SH => 1,
             .SW => 3,
             .SD => 7,
         };
@@ -103,6 +107,18 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
     const value = core.get(args.rt);
 
     switch (comptime op) {
+        .SB => {
+            const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
+            const output = @as(u32, @truncate(value)) << shift;
+            const mask = @as(u32, @truncate(std.math.maxInt(u8))) << shift;
+            core.writeWord(bus, paddr, output, mask);
+        },
+        .SH => {
+            const shift: u5 = @intCast((paddr & 2 ^ 2) * 8);
+            const output = @as(u32, @truncate(value)) << shift;
+            const mask = @as(u32, @truncate(std.math.maxInt(u16))) << shift;
+            core.writeWord(bus, paddr, output, mask);
+        },
         .SW => core.writeWord(bus, paddr, @truncate(value), std.math.maxInt(u32)),
         .SD => core.writeDoubleWord(bus, paddr, value, std.math.maxInt(u64)),
     }
