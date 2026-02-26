@@ -31,3 +31,31 @@ pub fn binary(comptime op: BinaryOp, comptime fmt: Cp1.Format, core: *Core, word
         .DIV => lhs / rhs,
     });
 }
+
+pub const UnaryOp = enum {
+    SQRT,
+    ABS,
+    MOV,
+    NEG,
+};
+
+pub fn unary(comptime op: UnaryOp, comptime fmt: Cp1.Format, core: *Core, word: u32) void {
+    const args: Cp1.RType = @bitCast(word);
+
+    fw.log.trace("{X:08}: {t}.{t} {t}, {t}", .{
+        core.pc,
+        op,
+        fmt,
+        args.fd,
+        args.fs,
+    });
+
+    const value = core.cp1.get(fmt, args.fs);
+
+    core.cp1.set(fmt, args.fd, switch (comptime op) {
+        .SQRT => @sqrt(value),
+        .ABS => @abs(value),
+        .MOV => value,
+        .NEG => -value,
+    });
+}

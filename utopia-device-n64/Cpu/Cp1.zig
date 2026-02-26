@@ -135,6 +135,10 @@ fn floatOp(comptime fmt: Format, core: *Core, word: u32) void {
         0o01 => arithmetic.binary(.SUB, fmt, core, word),
         0o02 => arithmetic.binary(.MUL, fmt, core, word),
         0o03 => arithmetic.binary(.DIV, fmt, core, word),
+        0o04 => arithmetic.unary(.SQRT, fmt, core, word),
+        0o05 => arithmetic.unary(.ABS, fmt, core, word),
+        0o06 => arithmetic.unary(.MOV, fmt, core, word),
+        0o07 => arithmetic.unary(.NEG, fmt, core, word),
         else => |funct| fw.log.todo("CPU COP1 float op: {o:02}", .{funct}),
     }
 }
