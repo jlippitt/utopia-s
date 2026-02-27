@@ -100,10 +100,10 @@ pub fn readRom(self: *const Self, address: u32) u32 {
     return fw.mem.readBe(u32, self.rom, index);
 }
 
-fn transferDma(self: *Self, direction: DmaDirection, raw_len: u24) void {
+fn transferDma(self: *Self, comptime direction: DmaDirection, raw_len: u24) void {
     const len = (raw_len + 1) & ~@as(u24, 1);
 
-    switch (direction) {
+    switch (comptime direction) {
         .read => {
             // TODO: PI DMA reads
             // Ignore for now

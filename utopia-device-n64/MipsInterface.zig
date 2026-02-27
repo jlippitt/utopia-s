@@ -65,6 +65,10 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     }
 }
 
+pub fn hasInterrupt(self: *const Self, interrupt: Interrupt) bool {
+    return (self.interrupt & @intFromEnum(interrupt)) != 0;
+}
+
 pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
     fw.log.debug("MI Interrupt Cleared: {t}", .{interrupt});
     self.interrupt &= ~@intFromEnum(interrupt);
