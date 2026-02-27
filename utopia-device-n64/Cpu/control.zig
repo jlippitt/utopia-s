@@ -152,6 +152,18 @@ pub const TrapOp = enum {
     }
 };
 
+pub fn syscall(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: SYSCALL", .{core.pc});
+    core.except(.syscall);
+}
+
+pub fn break_(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: BREAK", .{core.pc});
+    core.except(.breakpoint);
+}
+
 pub fn iTypeTrap(
     comptime op: TrapOp,
     comptime signedness: std.builtin.Signedness,

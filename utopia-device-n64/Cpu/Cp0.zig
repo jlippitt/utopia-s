@@ -35,12 +35,16 @@ pub const Interrupt = enum(u8) {
 
 const ExceptionType = enum(u5) {
     interrupt = 0,
+    syscall = 8,
+    breakpoint = 9,
     coprocessor_unusable = 11,
     trap = 13,
 };
 
 pub const Exception = union(ExceptionType) {
     interrupt: void,
+    syscall: void,
+    breakpoint: void,
     coprocessor_unusable: u2,
     trap: void,
 
