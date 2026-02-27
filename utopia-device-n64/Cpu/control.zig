@@ -123,3 +123,9 @@ pub fn branchBinary(
 
     core.branch(params, offset, taken);
 }
+
+pub fn sync(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: SYNC", .{core.pc});
+    // Does nothing on a VR4300
+}

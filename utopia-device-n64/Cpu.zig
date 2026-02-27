@@ -276,6 +276,7 @@ fn special(core: *Self, word: u32) void {
         0o07 => shift.variable(.SRA, core, word),
         0o10 => control.jr(core, word),
         0o11 => control.jalr(core, word),
+        0o17 => control.sync(core, word),
         0o20 => mul_div.mfhi(core, word),
         0o21 => mul_div.mthi(core, word),
         0o22 => mul_div.mflo(core, word),
