@@ -1,12 +1,17 @@
 const std = @import("std");
 const fw = @import("framework");
+const Device = @import("./Device.zig");
 const register = @import("register.zig");
 
 const mem_size = 8192;
+const bank_size = mem_size / 2;
 
 const Self = @This();
 
 mem: *align(16) [mem_size]u8,
+sp_addr: u13 = 0,
+dram_addr: u24 = 0,
+dma: Dma = .{},
 status: Status = .{},
 pc: u12 = 0,
 
@@ -48,6 +53,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     if ((address & 0x000f_ffff) == 0x0008_0000) {
         fw.num.writeMasked(u12, &self.pc, @truncate(value), @truncate(mask));
         fw.log.debug("RSP PC: {X:08}", .{self.pc});
+        return;
     }
 
     fw.log.panic("Unmapped RSP write: {X:08} <= {X:08}", .{ address, value });
@@ -55,6 +61,9 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 
 pub fn readRegister(self: *Self, index: u3) u32 {
     return switch (index) {
+        0 => self.sp_addr,
+        1 => self.dram_addr,
+        2, 3 => @bitCast(self.dma),
         4 => @bitCast(self.status),
         5 => @intFromBool(self.status.dma_full),
         6 => @intFromBool(self.status.dma_busy),
@@ -64,6 +73,50 @@ pub fn readRegister(self: *Self, index: u3) u32 {
 
 pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
     switch (index) {
+        0 => {
+            fw.num.writeMasked(
+                u13,
+                &self.sp_addr,
+                @truncate(value),
+                @truncate(mask & ~@as(u32, 7)),
+            );
+
+            fw.log.debug("SP_DMA_SPADDR: {X:04}", .{self.sp_addr});
+        },
+        1 => {
+            fw.num.writeMasked(
+                u24,
+                &self.dram_addr,
+                @truncate(value),
+                @truncate(mask & ~@as(u32, 7)),
+            );
+
+            fw.log.debug("SP_DMA_RAMADDR: {X:08}", .{self.dram_addr});
+        },
+        2 => {
+            fw.num.writeMasked(
+                u32,
+                @ptrCast(&self.dma),
+                @truncate(value),
+                @truncate(mask & 0xff8f_fff8),
+            );
+
+            fw.log.debug("SP_DMA_RDLEN: {any}", .{self.dma});
+
+            self.transferDma(.read);
+        },
+        3 => {
+            fw.num.writeMasked(
+                u32,
+                @ptrCast(&self.dma),
+                @truncate(value),
+                @truncate(mask & 0xff8f_fff8),
+            );
+
+            fw.log.debug("SP_DMA_WRLEN: {any}", .{self.dma});
+
+            self.transferDma(.write);
+        },
         4 => {
             const masked_value = value & mask;
 
@@ -94,6 +147,77 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
         else => fw.log.panic("Unmapped RSP register write: {} <= {X:08}", .{ index, value }),
     }
 }
+
+fn transferDma(self: *Self, comptime direction: DmaDirection) void {
+    const rdram = self.getDevice().rdram;
+    const sp_bank = self.mem[(self.sp_addr & 0x1000)..][0..bank_size];
+    const row_len = @as(u32, self.dma.len) + 8;
+
+    while (true) {
+        var sp_index: u12 = @truncate(self.sp_addr);
+        var dram_addr: u24 = self.dram_addr;
+
+        for (0..(row_len >> 3)) |_| {
+            switch (comptime direction) {
+                .read => {
+                    const value = if (dram_addr < rdram.len)
+                        fw.mem.readBe(u64, rdram, dram_addr)
+                    else
+                        0;
+
+                    fw.mem.writeBe(u64, sp_bank, sp_index, value);
+                },
+                .write => if (dram_addr < rdram.len) {
+                    const value = fw.mem.readBe(u64, sp_bank, sp_index);
+                    fw.mem.writeBe(u64, rdram, dram_addr, value);
+                },
+            }
+
+            sp_index +%= 8;
+            dram_addr +%= 8;
+        }
+
+        switch (comptime direction) {
+            .read => fw.log.debug("RSP DMA: {} bytes read from {X:08} to MEM:{X:04}", .{
+                row_len,
+                self.dram_addr,
+                self.sp_addr,
+            }),
+            .write => fw.log.debug("RSP DMA: {} bytes written from MEM:{X:04} to {X:08}", .{
+                row_len,
+                self.sp_addr,
+                self.dram_addr,
+            }),
+        }
+
+        self.sp_addr = (self.sp_addr & 0x1000) | sp_index;
+        self.dram_addr = dram_addr;
+
+        if (self.dma.count == 0) {
+            break;
+        }
+
+        self.dram_addr +%= self.dma.skip;
+        self.dma.count -= 1;
+    }
+
+    self.dma.len = 0xff8;
+}
+
+fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("rsp", self));
+}
+
+const DmaDirection = enum {
+    read,
+    write,
+};
+
+const Dma = packed struct(u32) {
+    len: u12 = 0,
+    count: u8 = 0,
+    skip: u12 = 0,
+};
 
 const Status = packed struct(u32) {
     halted: bool = true,
