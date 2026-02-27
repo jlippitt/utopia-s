@@ -178,10 +178,7 @@ fn set(self: *Self, reg: Register, value: u64) void {
             self.wired = @truncate(value);
             fw.log.trace("  Wired: {d}", .{self.wired});
         },
-        .BadVAddr => {
-            self.bad_vaddr = value;
-            fw.log.trace("  BadVAddr: {X:016}", .{self.bad_vaddr});
-        },
+        .BadVAddr => {}, // Read-only
         .Count => {
             self.count_value = @truncate(value);
             fw.log.trace("  Count: {X:08}", .{self.count_value});
@@ -349,7 +346,7 @@ pub fn cop0(core: *Core, word: u32) void {
         0o00 => mfc0(core, word),
         0o01 => dmfc0(core, word),
         0o04 => mtc0(core, word),
-        0o05 => mtc0(core, word),
+        0o05 => dmtc0(core, word),
         else => fw.log.todo("CPU COP0 rs: {o:02}", .{rs}),
     }
 }
