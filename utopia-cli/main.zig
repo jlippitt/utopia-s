@@ -2,6 +2,7 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const utopia = @import("utopia");
 const cli = @import("./cli.zig");
+const FpsCounter = @import("./FpsCounter.zig");
 const logger = @import("./logger.zig");
 
 pub const panic = std.debug.FullPanic(panicHandler);
@@ -23,6 +24,8 @@ pub fn main() !void {
     try sdl3.init(.everything);
     defer sdl3.quit(.everything);
 
+    const app_name = "Utopia-S";
+
     var device = try device_args.initDevice(allocator);
     defer device.deinit();
 
@@ -30,7 +33,7 @@ pub fn main() !void {
 
     const init_size = try getBestSize(src_size, null);
 
-    const window = try sdl3.video.Window.init("Utopia-S", init_size.x, init_size.y, .{});
+    const window = try sdl3.video.Window.init(app_name, init_size.x, init_size.y, .{});
     defer window.deinit();
 
     const renderer = try sdl3.render.Renderer.init(window, null);
@@ -48,6 +51,7 @@ pub fn main() !void {
 
     defer if (gamepad) |pad| pad.deinit();
 
+    var fps_counter = try FpsCounter.init();
     var controller_state: utopia.ControllerState = .{};
 
     outer: while (true) {
@@ -93,6 +97,12 @@ pub fn main() !void {
         try texture.update(null, device.getPixels().ptr, src_size.x * 4);
         try renderer.renderTexture(texture, null, null);
         try renderer.present();
+
+        const fps = fps_counter.update();
+
+        var buf: [64]u8 = undefined;
+        const title = try std.fmt.bufPrintZ(&buf, "{s} ({d:.2})", .{ app_name, fps });
+        try window.setTitle(title);
     }
 }
 
