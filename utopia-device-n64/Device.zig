@@ -126,6 +126,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
 
     var clock = Clock.init();
     const vi = try VideoInterface.init(&arena, &clock);
+    const ai = AudioInterface.init(&clock);
 
     const self = try arena.allocator().create(Self);
 
@@ -137,7 +138,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .rdp = .init(),
         .mi = .init(),
         .vi = vi,
-        .ai = .init(),
+        .ai = ai,
         .pi = .init(rom),
         .ri = .init(),
         .si = .init(pifdata, cic.getSeed()),
@@ -168,6 +169,7 @@ pub fn runFrame(self: *Self) void {
             switch (event) {
                 .cpu_interrupt => self.cpu.handleInterruptEvent(),
                 .cpu_timer => self.cpu.handleTimerEvent(),
+                .ai_sample => self.ai.handleSampleEvent(),
                 .vi_new_line => if (self.vi.handleNewLineEvent()) {
                     return;
                 },

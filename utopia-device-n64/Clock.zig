@@ -4,6 +4,7 @@ const fw = @import("framework");
 pub const EventType = enum {
     cpu_interrupt,
     cpu_timer,
+    ai_sample,
     vi_new_line,
 };
 

@@ -104,7 +104,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
             fw.num.writeMasked(u32, @ptrCast(&self.h_total), value, mask);
             fw.log.debug("H_TOTAL: {any}", .{self.h_total});
 
-            const cycles_per_line = cyclesPerLine(default_h_total);
+            const cycles_per_line = cyclesPerLine(self.h_total.h_total);
 
             if (cycles_per_line != self.cycles_per_line) {
                 self.cycles_per_line = cycles_per_line;
