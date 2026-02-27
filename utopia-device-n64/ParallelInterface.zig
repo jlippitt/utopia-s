@@ -21,7 +21,10 @@ pub fn read(self: *Self, address: u32) u32 {
         0 => self.dram_addr,
         1 => self.cart_addr,
         2, 3 => 0x7f,
-        4 => @bitCast(self.status),
+        4 => blk: {
+            self.status.interrupt = self.getDeviceConst().mi.hasInterrupt(.pi);
+            break :blk @bitCast(self.status);
+        },
         5 => self.bsd_dom1.lat,
         6 => self.bsd_dom1.pwd,
         7 => self.bsd_dom1.pgs,
@@ -52,7 +55,9 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         },
         2 => self.transferDma(.read, @truncate(value & mask)),
         3 => self.transferDma(.write, @truncate(value & mask)),
-        4 => {}, // TODO: PI interrupts
+        4 => if ((value & 0x02) != 0) {
+            self.getDevice().mi.clearInterrupt(.pi);
+        },
         5 => {
             fw.num.writeMasked(u8, &self.bsd_dom1.lat, @truncate(value), @truncate(mask));
             fw.log.trace("PI_BSD_DOM1_LAT: {}", .{self.bsd_dom1.lat});
@@ -135,10 +140,14 @@ fn transferDma(self: *Self, comptime direction: DmaDirection, raw_len: u24) void
     self.dram_addr +%= len;
     self.cart_addr +%= len;
 
-    // TODO: PI interrupts
+    self.getDevice().mi.raiseInterrupt(.pi);
 }
 
 fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("pi", self));
+}
+
+fn getDeviceConst(self: *Self) *const Device {
     return @alignCast(@fieldParentPtr("pi", self));
 }
 
