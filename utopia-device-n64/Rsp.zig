@@ -13,6 +13,7 @@ sp_addr: u13 = 0,
 dram_addr: u24 = 0,
 dma: Dma = .{},
 status: Status = .{},
+semaphore: bool = false,
 pc: u12 = 0,
 
 pub fn init(arena: *std.heap.ArenaAllocator) !Self {
@@ -67,7 +68,12 @@ pub fn readRegister(self: *Self, index: u3) u32 {
         4 => @bitCast(self.status),
         5 => @intFromBool(self.status.dma_full),
         6 => @intFromBool(self.status.dma_busy),
-        else => fw.log.panic("Unmapped RSP register read: {}", .{index}),
+        7 => blk: {
+            const value = @intFromBool(self.semaphore);
+            self.semaphore = true;
+            fw.log.debug("SP_SEMAPHORE: {}", .{self.semaphore});
+            break :blk value;
+        },
     };
 }
 
@@ -144,7 +150,11 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
 
             fw.log.debug("SP_STATUS: {any}", .{self.status});
         },
-        else => fw.log.panic("Unmapped RSP register write: {} <= {X:08}", .{ index, value }),
+        5, 6 => {}, // Read-only
+        7 => {
+            self.semaphore = false;
+            fw.log.debug("SP_SEMAPHORE: {}", .{self.semaphore});
+        },
     }
 }
 
