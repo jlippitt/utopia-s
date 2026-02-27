@@ -49,6 +49,13 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 
             fw.log.debug("MI_MODE: {any}", .{self.mode});
         },
+        1 => {}, // Read-only
+        2 => {
+            // n64-systemtest writes here as though trying to clear interrupt flags
+            // n64brew docs say it's read-only, though
+            // Either way, keep an eye on it
+            fw.log.warn("Write to MI_INTERRUPT: {X:08}", .{value});
+        },
         3 => {
             const masked_value = value & mask;
 
@@ -61,7 +68,6 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 
             fw.log.debug("MI_MASK: {any}", .{self.mask});
         },
-        else => fw.log.panic("Unmapped MI register write: {X:08} <= {X:08}", .{ address, value }),
     }
 }
 
