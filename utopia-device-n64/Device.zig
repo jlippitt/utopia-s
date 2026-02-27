@@ -40,14 +40,6 @@ pub const Args = struct {
     rom_path: []const u8,
 };
 
-pub const CpuBus: Cpu.Bus = .{
-    .getCycles = getCycles,
-    .read = read,
-    .write = write,
-    .scheduleInterrupt = scheduleInterrupt,
-    .scheduleTimer = scheduleTimer,
-};
-
 const Page = enum {
     rdram_registers,
     rsp,
@@ -101,6 +93,8 @@ pi: ParallelInterface,
 ri: RdramInterface,
 si: SerialInterface,
 arena: std.heap.ArenaAllocator,
+
+// utopia.Device methods
 
 pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.Device {
     var arena = std.heap.ArenaAllocator.init(allocator);
@@ -164,7 +158,7 @@ pub fn deinit(self: *Self) void {
 
 pub fn runFrame(self: *Self) void {
     while (true) {
-        self.cpu.step(CpuBus);
+        self.cpu.step();
 
         self.clock.addCycles(4);
 
@@ -173,7 +167,7 @@ pub fn runFrame(self: *Self) void {
 
             switch (event) {
                 .cpu_interrupt => self.cpu.handleInterruptEvent(),
-                .cpu_timer => self.cpu.handleTimerEvent(CpuBus),
+                .cpu_timer => self.cpu.handleTimerEvent(),
                 .vi_new_line => if (self.vi.handleNewLineEvent()) {
                     return;
                 },
@@ -190,14 +184,9 @@ pub fn getPixels(self: *const Self) []const u8 {
     return self.vi.getPixels();
 }
 
-fn getCycles(core: *const Cpu) u64 {
-    const self: *const Self = @alignCast(@fieldParentPtr("cpu", core));
-    return self.clock.getCycles();
-}
+// CPU methods
 
-fn read(core: *Cpu, address: u32) u32 {
-    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
-
+pub fn read(self: *Self, address: u32) u32 {
     if (address < rdram_size) {
         return fw.mem.readBe(u32, self.rdram, address & 0xffff_fffc);
     }
@@ -226,9 +215,7 @@ fn read(core: *Cpu, address: u32) u32 {
     };
 }
 
-fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
-    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
-
+pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     if (address < rdram_size) {
         fw.mem.writeMaskedBe(u32, self.rdram, address & 0xffff_fffc, value, mask);
         return;
@@ -255,14 +242,4 @@ fn write(core: *Cpu, address: u32, value: u32, mask: u32) void {
         .pifdata => self.si.writePif(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
-}
-
-fn scheduleInterrupt(core: *Cpu) void {
-    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
-    self.clock.reschedule(.cpu_interrupt, 0);
-}
-
-fn scheduleTimer(core: *Cpu, delta: u64) void {
-    const self: *Self = @alignCast(@fieldParentPtr("cpu", core));
-    self.clock.reschedule(.cpu_timer, delta << 1);
 }

@@ -27,7 +27,7 @@ pub const LoadOp = enum {
     }
 };
 
-pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
+pub fn load(comptime op: LoadOp, core: *Core, word: u32) void {
     const args: Core.IType = @bitCast(word);
     const offset = fw.num.signExtend(u32, args.imm);
 
@@ -49,29 +49,29 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
 
     core.set(args.rt, switch (comptime op) {
         .LB => blk: {
-            const input = core.readWord(bus, paddr);
+            const input = core.readWord(paddr);
             const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
             break :blk fw.num.signExtend(u64, @as(u8, @truncate(input >> shift)));
         },
         .LBU => blk: {
-            const input = core.readWord(bus, paddr);
+            const input = core.readWord(paddr);
             const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
             break :blk fw.num.zeroExtend(u64, @as(u8, @truncate(input >> shift)));
         },
         .LH => blk: {
-            const input = core.readWord(bus, paddr);
+            const input = core.readWord(paddr);
             const shift: u5 = @intCast((paddr & 2 ^ 2) * 8);
             break :blk fw.num.signExtend(u64, @as(u16, @truncate(input >> shift)));
         },
         .LHU => blk: {
-            const input = core.readWord(bus, paddr);
+            const input = core.readWord(paddr);
             const shift: u5 = @intCast((paddr & 2 ^ 2) * 8);
             break :blk fw.num.zeroExtend(u64, @as(u16, @truncate(input >> shift)));
         },
-        .LW => fw.num.signExtend(u64, core.readWord(bus, paddr)),
-        .LWU => fw.num.zeroExtend(u64, core.readWord(bus, paddr)),
+        .LW => fw.num.signExtend(u64, core.readWord(paddr)),
+        .LWU => fw.num.zeroExtend(u64, core.readWord(paddr)),
         .LWL => blk: {
-            const input = core.readWord(bus, paddr & ~@as(u32, 3));
+            const input = core.readWord(paddr & ~@as(u32, 3));
             const shift: u5 = @intCast((paddr & 3) * 8);
             const old: u32 = @truncate(core.get(args.rt));
             const new = input << shift;
@@ -79,16 +79,16 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
             break :blk fw.num.signExtend(u64, (old & ~mask) | (new & mask));
         },
         .LWR => blk: {
-            const input = core.readWord(bus, paddr & ~@as(u32, 3));
+            const input = core.readWord(paddr & ~@as(u32, 3));
             const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
             const old: u32 = @truncate(core.get(args.rt));
             const new = input >> shift;
             const mask = @as(u32, std.math.maxInt(u32)) >> shift;
             break :blk fw.num.signExtend(u64, (old & ~mask) | (new & mask));
         },
-        .LD => core.readDoubleWord(bus, paddr),
+        .LD => core.readDoubleWord(paddr),
         .LDL => blk: {
-            const input = core.readDoubleWord(bus, paddr & ~@as(u32, 7));
+            const input = core.readDoubleWord(paddr & ~@as(u32, 7));
             const shift: u6 = @intCast((paddr & 7) * 8);
             const old = core.get(args.rt);
             const new = input << shift;
@@ -96,7 +96,7 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
             break :blk (old & ~mask) | (new & mask);
         },
         .LDR => blk: {
-            const input = core.readDoubleWord(bus, paddr & ~@as(u32, 7));
+            const input = core.readDoubleWord(paddr & ~@as(u32, 7));
             const shift: u6 = @intCast((paddr & 7 ^ 7) * 8);
             const old = core.get(args.rt);
             const new = input >> shift;
@@ -106,12 +106,12 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
         .LL => blk: {
             core.cp0.setLLAddr(paddr >> 4);
             core.ll_bit = true;
-            break :blk fw.num.signExtend(u64, core.readWord(bus, paddr));
+            break :blk fw.num.signExtend(u64, core.readWord(paddr));
         },
         .LLD => blk: {
             core.cp0.setLLAddr(paddr >> 4);
             core.ll_bit = true;
-            break :blk core.readDoubleWord(bus, paddr);
+            break :blk core.readDoubleWord(paddr);
         },
     });
 }
@@ -138,7 +138,7 @@ pub const StoreOp = enum {
     }
 };
 
-pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
+pub fn store(comptime op: StoreOp, core: *Core, word: u32) void {
     const args: Core.IType = @bitCast(word);
     const offset = fw.num.signExtend(u32, args.imm);
 
@@ -165,50 +165,50 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
             const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
             const output = @as(u32, @truncate(value)) << shift;
             const mask = @as(u32, @truncate(std.math.maxInt(u8))) << shift;
-            core.writeWord(bus, paddr, output, mask);
+            core.writeWord(paddr, output, mask);
         },
         .SH => {
             const shift: u5 = @intCast((paddr & 2 ^ 2) * 8);
             const output = @as(u32, @truncate(value)) << shift;
             const mask = @as(u32, @truncate(std.math.maxInt(u16))) << shift;
-            core.writeWord(bus, paddr, output, mask);
+            core.writeWord(paddr, output, mask);
         },
-        .SW => core.writeWord(bus, paddr, @truncate(value), std.math.maxInt(u32)),
+        .SW => core.writeWord(paddr, @truncate(value), std.math.maxInt(u32)),
         .SWL => {
             const shift: u5 = @intCast((paddr & 3) * 8);
             const output = @as(u32, @truncate(value)) >> shift;
             const mask = @as(u32, std.math.maxInt(u32)) >> shift;
-            core.writeWord(bus, paddr & ~@as(u32, 3), output, mask);
+            core.writeWord(paddr & ~@as(u32, 3), output, mask);
         },
         .SWR => {
             const shift: u5 = @intCast((paddr & 3 ^ 3) * 8);
             const output = @as(u32, @truncate(value)) << shift;
             const mask = @as(u32, std.math.maxInt(u32)) << shift;
-            core.writeWord(bus, paddr & ~@as(u32, 3), output, mask);
+            core.writeWord(paddr & ~@as(u32, 3), output, mask);
         },
-        .SD => core.writeDoubleWord(bus, paddr, value, std.math.maxInt(u64)),
+        .SD => core.writeDoubleWord(paddr, value, std.math.maxInt(u64)),
         .SDL => {
             const shift: u6 = @intCast((paddr & 7) * 8);
             const output = value >> shift;
             const mask = @as(u64, std.math.maxInt(u64)) >> shift;
-            core.writeDoubleWord(bus, paddr & ~@as(u32, 7), output, mask);
+            core.writeDoubleWord(paddr & ~@as(u32, 7), output, mask);
         },
         .SDR => {
             const shift: u6 = @intCast((paddr & 7 ^ 7) * 8);
             const output = value << shift;
             const mask = @as(u64, std.math.maxInt(u64)) << shift;
-            core.writeDoubleWord(bus, paddr & ~@as(u32, 7), output, mask);
+            core.writeDoubleWord(paddr & ~@as(u32, 7), output, mask);
         },
         .SC => {
             if (core.ll_bit) {
-                core.writeWord(bus, paddr, @truncate(value), std.math.maxInt(u32));
+                core.writeWord(paddr, @truncate(value), std.math.maxInt(u32));
             }
 
             core.set(args.rt, @intFromBool(core.ll_bit));
         },
         .SCD => {
             if (core.ll_bit) {
-                core.writeDoubleWord(bus, paddr, value, std.math.maxInt(u64));
+                core.writeDoubleWord(paddr, value, std.math.maxInt(u64));
             }
 
             core.set(args.rt, @intFromBool(core.ll_bit));

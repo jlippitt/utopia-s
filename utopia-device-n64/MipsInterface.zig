@@ -81,9 +81,9 @@ fn updateCpuState(self: *Self) void {
     const cpu = &self.getDevice().cpu;
 
     if (self.interrupt & @as(u32, @bitCast(self.mask)) != 0) {
-        cpu.raiseInterrupt(Device.CpuBus, .rcp);
+        cpu.raiseInterrupt(.rcp);
     } else {
-        cpu.clearInterrupt(Device.CpuBus, .rcp);
+        cpu.clearInterrupt(.rcp);
     }
 }
 

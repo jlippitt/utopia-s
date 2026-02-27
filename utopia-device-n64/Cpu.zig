@@ -1,4 +1,5 @@
 const fw = @import("framework");
+const Device = @import("./Device.zig");
 const Cp0 = @import("./Cpu/Cp0.zig");
 const Cp1 = @import("./Cpu/Cp1.zig");
 const alu = @import("./Cpu/alu.zig");
@@ -51,14 +52,6 @@ pub const BranchParams = struct {
     likely: bool = false,
 };
 
-pub const Bus = struct {
-    getCycles: fn (self: *const Self) u64,
-    read: fn (self: *Self, address: u32) u32,
-    write: fn (self: *Self, address: u32, value: u32, mask: u32) void,
-    scheduleInterrupt: fn (self: *Self) void,
-    scheduleTimer: fn (self: *Self, delta: u64) void,
-};
-
 pc: u32 = cold_reset_vector,
 target_pc: u32 = 0,
 pipe_state: PipeState = .normal,
@@ -73,28 +66,29 @@ pub fn init() Self {
     return .{};
 }
 
-pub fn clearInterrupt(self: *Self, comptime bus: Bus, interrupt: Interrupt) void {
+pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
     fw.log.trace("CPU Interrupt Cleared: {t}", .{interrupt});
-    self.cp0.clearInterrupt(bus, interrupt);
+    self.cp0.clearInterrupt(interrupt);
 }
 
-pub fn raiseInterrupt(self: *Self, comptime bus: Bus, interrupt: Interrupt) void {
+pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
     fw.log.trace("CPU Interrupt Raised: {t}", .{interrupt});
-    self.cp0.raiseInterrupt(bus, interrupt);
+    self.cp0.raiseInterrupt(interrupt);
 }
 
 pub fn handleInterruptEvent(self: *Self) void {
     self.except(.interrupt);
 }
 
-pub fn handleTimerEvent(self: *Self, comptime bus: Bus) void {
-    self.cp0.raiseInterrupt(bus, .timer);
+pub fn handleTimerEvent(self: *Self) void {
+    self.cp0.raiseInterrupt(.timer);
 }
 
-pub fn step(self: *Self, comptime bus: Bus) void {
-    const word = bus.read(self, self.mapAddress(self.pc) orelse return);
+pub fn step(self: *Self) void {
+    const address = self.mapAddress(self.pc) orelse return;
+    const word = self.getDevice().read(address);
 
-    dispatch(bus, self, word);
+    dispatch(self, word);
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
@@ -136,26 +130,26 @@ pub fn mapAddress(self: *Self, vaddr: u32) ?u32 {
     fw.log.todo("TLB lookups", .{});
 }
 
-pub fn readWord(self: *Self, comptime bus: Bus, paddr: u32) u32 {
-    const value = bus.read(self, paddr);
+pub fn readWord(self: *Self, paddr: u32) u32 {
+    const value = self.getDevice().read(paddr);
     fw.log.trace("  [{X:08} => {X:08}]", .{ paddr, value });
     return value;
 }
 
-pub fn readDoubleWord(self: *Self, comptime bus: Bus, paddr: u32) u64 {
-    const hi = self.readWord(bus, paddr);
-    const lo = self.readWord(bus, paddr +% 4);
+pub fn readDoubleWord(self: *Self, paddr: u32) u64 {
+    const hi = self.readWord(paddr);
+    const lo = self.readWord(paddr +% 4);
     return @as(u64, hi) << 32 | lo;
 }
 
-pub fn writeWord(self: *Self, comptime bus: Bus, paddr: u32, value: u32, mask: u32) void {
+pub fn writeWord(self: *Self, paddr: u32, value: u32, mask: u32) void {
     fw.log.trace("  [{X:08} <= {X:08}]", .{ paddr, value });
-    return bus.write(self, paddr, value, mask);
+    return self.getDevice().write(paddr, value, mask);
 }
 
-pub fn writeDoubleWord(self: *Self, comptime bus: Bus, paddr: u32, value: u64, mask: u64) void {
-    self.writeWord(bus, paddr, @truncate(value >> 32), @truncate(mask >> 32));
-    self.writeWord(bus, paddr +% 4, @truncate(value), @truncate(mask));
+pub fn writeDoubleWord(self: *Self, paddr: u32, value: u64, mask: u64) void {
+    self.writeWord(paddr, @truncate(value >> 32), @truncate(mask >> 32));
+    self.writeWord(paddr +% 4, @truncate(value), @truncate(mask));
 }
 
 pub fn jump(self: *Self, target: u32) void {
@@ -206,7 +200,15 @@ pub fn except(self: *Self, exception: Exception) void {
     self.pipe_state = .except;
 }
 
-fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
+pub fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("cpu", self));
+}
+
+pub fn getDeviceConst(self: *const Self) *const Device {
+    return @alignCast(@fieldParentPtr("cpu", self));
+}
+
+fn dispatch(core: *Self, word: u32) void {
     switch (@as(u6, @truncate(word >> 26))) {
         0o00 => special(core, word),
         0o01 => regImm(core, word),
@@ -224,7 +226,7 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o15 => alu.iTypeLogic(.OR, core, word),
         0o16 => alu.iTypeLogic(.XOR, core, word),
         0o17 => alu.lui(core, word),
-        0o20 => Cp0.cop0(bus, core, word),
+        0o20 => Cp0.cop0(core, word),
         0o21 => Cp1.cop1(core, word),
         0o24 => control.branchBinary(.BEQ, .{ .likely = true }, core, word),
         0o25 => control.branchBinary(.BNE, .{ .likely = true }, core, word),
@@ -232,34 +234,34 @@ fn dispatch(comptime bus: Bus, core: *Self, word: u32) void {
         0o27 => control.branchUnary(.BGTZ, .{ .likely = true }, core, word),
         0o30 => alu.iTypeArithmetic(.DADD, .signed, core, word),
         0o31 => alu.iTypeArithmetic(.DADD, .unsigned, core, word),
-        0o32 => memory.load(.LDL, bus, core, word),
-        0o33 => memory.load(.LDR, bus, core, word),
-        0o40 => memory.load(.LB, bus, core, word),
-        0o41 => memory.load(.LH, bus, core, word),
-        0o42 => memory.load(.LWL, bus, core, word),
-        0o43 => memory.load(.LW, bus, core, word),
-        0o44 => memory.load(.LBU, bus, core, word),
-        0o45 => memory.load(.LHU, bus, core, word),
-        0o46 => memory.load(.LWR, bus, core, word),
-        0o47 => memory.load(.LWU, bus, core, word),
-        0o50 => memory.store(.SB, bus, core, word),
-        0o51 => memory.store(.SH, bus, core, word),
-        0o52 => memory.store(.SWL, bus, core, word),
-        0o53 => memory.store(.SW, bus, core, word),
-        0o54 => memory.store(.SDL, bus, core, word),
-        0o55 => memory.store(.SDR, bus, core, word),
-        0o56 => memory.store(.SWR, bus, core, word),
+        0o32 => memory.load(.LDL, core, word),
+        0o33 => memory.load(.LDR, core, word),
+        0o40 => memory.load(.LB, core, word),
+        0o41 => memory.load(.LH, core, word),
+        0o42 => memory.load(.LWL, core, word),
+        0o43 => memory.load(.LW, core, word),
+        0o44 => memory.load(.LBU, core, word),
+        0o45 => memory.load(.LHU, core, word),
+        0o46 => memory.load(.LWR, core, word),
+        0o47 => memory.load(.LWU, core, word),
+        0o50 => memory.store(.SB, core, word),
+        0o51 => memory.store(.SH, core, word),
+        0o52 => memory.store(.SWL, core, word),
+        0o53 => memory.store(.SW, core, word),
+        0o54 => memory.store(.SDL, core, word),
+        0o55 => memory.store(.SDR, core, word),
+        0o56 => memory.store(.SWR, core, word),
         0o57 => memory.cache(core, word),
-        0o60 => memory.load(.LL, bus, core, word),
-        0o61 => Cp1.load(.LWC1, bus, core, word),
-        0o64 => memory.load(.LLD, bus, core, word),
-        0o65 => Cp1.load(.LDC1, bus, core, word),
-        0o67 => memory.load(.LD, bus, core, word),
-        0o70 => memory.store(.SC, bus, core, word),
-        0o71 => Cp1.store(.SWC1, bus, core, word),
-        0o74 => memory.store(.SCD, bus, core, word),
-        0o75 => Cp1.store(.SDC1, bus, core, word),
-        0o77 => memory.store(.SD, bus, core, word),
+        0o60 => memory.load(.LL, core, word),
+        0o61 => Cp1.load(.LWC1, core, word),
+        0o64 => memory.load(.LLD, core, word),
+        0o65 => Cp1.load(.LDC1, core, word),
+        0o67 => memory.load(.LD, core, word),
+        0o70 => memory.store(.SC, core, word),
+        0o71 => Cp1.store(.SWC1, core, word),
+        0o74 => memory.store(.SCD, core, word),
+        0o75 => Cp1.store(.SDC1, core, word),
+        0o77 => memory.store(.SD, core, word),
         else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
     }
 }

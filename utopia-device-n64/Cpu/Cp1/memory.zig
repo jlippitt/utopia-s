@@ -15,7 +15,7 @@ pub const LoadOp = enum {
     }
 };
 
-pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
+pub fn load(comptime op: LoadOp, core: *Core, word: u32) void {
     const args: Cp1.IType = @bitCast(word);
     const offset = fw.num.signExtend(u32, args.imm);
 
@@ -36,8 +36,8 @@ pub fn load(comptime op: LoadOp, comptime bus: Core.Bus, core: *Core, word: u32)
     }
 
     switch (comptime op) {
-        .LWC1 => core.cp1.set(.W, args.ft, @bitCast(core.readWord(bus, paddr))),
-        .LDC1 => core.cp1.set(.L, args.ft, @bitCast(core.readDoubleWord(bus, paddr))),
+        .LWC1 => core.cp1.set(.W, args.ft, @bitCast(core.readWord(paddr))),
+        .LDC1 => core.cp1.set(.L, args.ft, @bitCast(core.readDoubleWord(paddr))),
     }
 }
 
@@ -53,7 +53,7 @@ pub const StoreOp = enum {
     }
 };
 
-pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u32) void {
+pub fn store(comptime op: StoreOp, core: *Core, word: u32) void {
     const args: Cp1.IType = @bitCast(word);
     const offset = fw.num.signExtend(u32, args.imm);
 
@@ -75,13 +75,11 @@ pub fn store(comptime op: StoreOp, comptime bus: Core.Bus, core: *Core, word: u3
 
     switch (comptime op) {
         .SWC1 => core.writeWord(
-            bus,
             paddr,
             @bitCast(core.cp1.get(.W, args.ft)),
             std.math.maxInt(u32),
         ),
         .SDC1 => core.writeDoubleWord(
-            bus,
             paddr,
             @bitCast(core.cp1.get(.L, args.ft)),
             std.math.maxInt(u64),
