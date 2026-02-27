@@ -5,6 +5,7 @@ const fw = @import("framework");
 const pif_size = 0x800;
 const pif_ram_begin = 0x7c0;
 const pif_ram_size = pif_size - pif_ram_begin;
+const cmd_byte = 0x7ff;
 
 const Self = @This();
 
@@ -12,10 +13,11 @@ pifdata: *align(4) [pif_size]u8,
 pif_rom_locked: bool = false,
 dram_addr: u24 = 0,
 status: Status = .{},
+joybus_program: [64]u8 = @splat(0),
 
 pub fn init(pifdata: []align(4) u8, cic_seed: u32) Self {
     // Command byte should be zero at reset
-    pifdata[0x7ff] = 0;
+    pifdata[cmd_byte] = 0;
 
     // CIC seed should be present at reset
     fw.mem.writeBe(u32, pifdata, 0x7e4, cic_seed);
@@ -98,7 +100,7 @@ fn transferDma(self: *Self, comptime direction: DmaDirection, pif_addr: u11) voi
         });
     }
 
-    if (pif_addr != 0x7c0) {
+    if (pif_addr != pif_ram_begin) {
         fw.log.unimplemented("SI DMA with non-PIF RAM address: {X:03}", .{
             pif_addr,
         });
@@ -106,7 +108,7 @@ fn transferDma(self: *Self, comptime direction: DmaDirection, pif_addr: u11) voi
 
     switch (comptime direction) {
         .read => {
-            fw.log.todo("Execute joybus program", .{});
+            self.executeJoybusProgram();
 
             const rdram = self.getDevice().rdram;
 
@@ -147,7 +149,7 @@ fn getDeviceConst(self: *Self) *const Device {
 }
 
 fn processPifCommand(self: *Self) void {
-    const cmd = self.pifdata[0x7ff];
+    const cmd = self.pifdata[cmd_byte];
 
     if ((cmd & 0x7f) == 0) {
         return;
@@ -156,7 +158,8 @@ fn processPifCommand(self: *Self) void {
     var result: u8 = 0;
 
     if ((cmd & 0x01) != 0) {
-        fw.log.todo("Joybus queries", .{});
+        @memcpy(&self.joybus_program, self.pifdata[pif_ram_begin..]);
+        fw.log.trace("Joybus configured", .{});
     }
 
     if ((cmd & 0x02) != 0) {
@@ -173,7 +176,147 @@ fn processPifCommand(self: *Self) void {
         result |= 0x80;
     }
 
-    self.pifdata[0x7ff] = result;
+    self.pifdata[cmd_byte] = result;
+}
+
+fn executeJoybusProgram(self: *Self) void {
+    fw.log.debug("PIF Joybus Input: {any}", .{self.joybus_program});
+
+    const pif_ram = self.pifdata[pif_ram_begin..][0..pif_ram_size];
+
+    var channel: u32 = 0;
+    var index: u32 = 0;
+
+    while (index < (pif_ram_size - 1)) {
+        const send_len: u32 = self.joybus_program[index];
+        index += 1;
+
+        if (send_len == 0xfe) {
+            break;
+        }
+
+        if ((send_len & 0xc0) != 0) {
+            continue;
+        }
+
+        if (send_len == 0) {
+            channel += 1;
+            continue;
+        }
+
+        const recv_len: u32 = self.joybus_program[index];
+        index += 1;
+
+        if (recv_len == 0xfe) {
+            break;
+        }
+
+        if ((index + send_len) > pif_ram_size) {
+            fw.log.warn("Joybus send length too large", .{});
+            break;
+        }
+
+        const send_data = self.joybus_program[index..][0..send_len];
+        index += send_len;
+
+        if ((index + recv_len) > pif_ram_size) {
+            fw.log.warn("Joybus receive length too large", .{});
+            break;
+        }
+
+        const recv_data = self.queryJoybus(channel, pif_ram[index..], send_data) catch {
+            fw.log.warn("Joybus output too large", .{});
+            break;
+        };
+
+        if (recv_data.len == 0) {
+            pif_ram[index - 2] |= 0x80;
+        } else {
+            if (recv_data.len != recv_len) {
+                fw.log.warn("Joybus output does not match expected length: {} (expected {})", .{
+                    recv_data.len,
+                    recv_len,
+                });
+            }
+
+            index += recv_len;
+        }
+
+        channel += 1;
+    }
+
+    fw.log.debug("PIF Joybus Input: {any}", .{pif_ram});
+}
+
+fn queryJoybus(
+    self: *Self,
+    channel: u32,
+    recv_buf: []u8,
+    send_data: []const u8,
+) error{OutOfMemory}![]const u8 {
+    _ = self;
+
+    var recv_data = std.ArrayListUnmanaged(u8).initBuffer(recv_buf);
+
+    switch (send_data[0]) {
+        0x00, 0xff => {
+            fw.log.debug("Joybus Query: Info ({})", .{channel});
+
+            switch (channel) {
+                0 => {
+                    // TODO: Controller pak
+                    try recv_data.appendSliceBounded(&.{ 0x05, 0x00, 0x02 });
+                },
+                1, 2, 3 => {}, // TODO: Multiple controller support
+                4 => fw.log.todo("EEPROM", .{}),
+                else => fw.log.panic("Invalid joybus channel: {}", .{channel}),
+            }
+        },
+        0x01 => {
+            fw.log.debug("Joybus Query: Controller State ({})", .{channel});
+
+            switch (channel) {
+                0 => {
+                    // TODO: Controller state
+                    try recv_data.appendSliceBounded(&.{ 0, 0, 0, 0 });
+                },
+                1, 2, 3 => {}, // TODO: Multiple controller support
+                else => fw.log.panic("Invalid joybus channel: {}", .{channel}),
+            }
+        },
+        0x03 => {
+            fw.log.debug("Joybus Query: Write Controller Accessor ({})", .{channel});
+
+            if (channel >= 4) {
+                fw.log.panic("Invalid joybus channel: {}", .{channel});
+            }
+
+            try recv_data.appendBounded(crc8(send_data[3..35]));
+        },
+        else => |cmd| fw.log.unimplemented("Joybus command: {X:02}", .{cmd}),
+    }
+
+    return recv_data.items;
+}
+
+fn crc8(data: []const u8) u8 {
+    var result: u8 = 0;
+
+    for (data, 0..) |byte, index| {
+        for (0..8) |bit| {
+            const xor_tap: u8 = if ((result & 0x80) != 0) 0x85 else 0;
+
+            result <<= 1;
+
+            if (index < data.len and (byte & (@as(u8, 0x80) >> @intCast(bit))) != 0) {
+                result |= 1;
+            }
+
+            result ^= xor_tap;
+        }
+    }
+
+    return result;
 }
 
 const Status = packed struct(u32) {
