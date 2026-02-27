@@ -13,6 +13,7 @@ pifdata: *align(4) [pif_size]u8,
 pif_rom_locked: bool = false,
 dram_addr: u24 = 0,
 status: Status = .{},
+controller_state: [4]u8 = @splat(0),
 joybus_program: [64]u8 = @splat(0),
 
 pub fn init(pifdata: []align(4) u8, cic_seed: u32) Self {
@@ -89,6 +90,36 @@ pub fn writePif(self: *Self, address: u32, value: u32, mask: u32) void {
     self.processPifCommand();
 
     self.getDevice().mi.raiseInterrupt(.si);
+}
+
+pub fn updateControllerState(self: *Self, new_state: *const fw.ControllerState) void {
+    const axis = &new_state.axis;
+    const button = &new_state.button;
+    const state = &self.controller_state;
+
+    state[0] = 0;
+    state[0] |= if (button.south) 0x80 else 0; // A
+    state[0] |= if (button.west) 0x40 else 0; // A
+    state[0] |= if (button.left_shoulder) 0x20 else 0; // Z
+    state[0] |= if (button.start) 0x10 else 0; // Start
+    state[0] |= if (button.dpad_up) 0x08 else 0; // D-Pad Up
+    state[0] |= if (button.dpad_down) 0x04 else 0; // D-Pad Down
+    state[0] |= if (button.dpad_left) 0x02 else 0; // D-Pad Left
+    state[0] |= if (button.dpad_right) 0x01 else 0; // D-Pad Right
+
+    state[1] = 0;
+    state[1] |= if (axis.left_trigger >= 0.5) 0x20 else 0; // L
+    state[1] |= if (axis.right_trigger >= 0.5 or button.right_shoulder) 0x10 else 0; // R
+    state[1] |= if (axis.right_y <= -0.75) 0x08 else 0; // C Up
+    state[1] |= if (axis.right_y >= 0.75 or button.east) 0x04 else 0; // C Down
+    state[1] |= if (axis.right_x <= -0.75 or button.north) 0x02 else 0; // C Left
+    state[1] |= if (axis.right_x >= 0.75) 0x01 else 0; // C Right
+
+    const left_x = axis.left_x * (83.0 - @abs(axis.left_y) * 17.0);
+    const left_y = axis.left_y * (83.0 - @abs(axis.left_x) * 17.0);
+
+    state[2] = @bitCast(@as(i8, @intFromFloat(left_x)));
+    state[3] = @bitCast(@as(i8, @intFromFloat(-left_y)));
 }
 
 fn transferDma(self: *Self, comptime direction: DmaDirection, pif_addr: u11) void {
@@ -254,8 +285,6 @@ fn queryJoybus(
     recv_buf: []u8,
     send_data: []const u8,
 ) error{OutOfMemory}![]const u8 {
-    _ = self;
-
     var recv_data = std.ArrayListUnmanaged(u8).initBuffer(recv_buf);
 
     switch (send_data[0]) {
@@ -276,10 +305,7 @@ fn queryJoybus(
             fw.log.debug("Joybus Query: Controller State ({})", .{channel});
 
             switch (channel) {
-                0 => {
-                    // TODO: Controller state
-                    try recv_data.appendSliceBounded(&.{ 0, 0, 0, 0 });
-                },
+                0 => try recv_data.appendSliceBounded(&self.controller_state),
                 1, 2, 3 => {}, // TODO: Multiple controller support
                 else => fw.log.panic("Invalid joybus channel: {}", .{channel}),
             }

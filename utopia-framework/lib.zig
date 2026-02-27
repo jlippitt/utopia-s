@@ -27,12 +27,59 @@ pub const ScreenSize = struct {
     y: u32,
 };
 
+pub const ControllerState = struct {
+    axis: AxisState = .{},
+    button: ButtonState = .{},
+};
+
+/// These match SDL axis names
+pub const AxisState = struct {
+    left_x: f32 = 0.0,
+    left_y: f32 = 0.0,
+    right_x: f32 = 0.0,
+    right_y: f32 = 0.0,
+    left_trigger: f32 = 0.0,
+    right_trigger: f32 = 0.0,
+};
+
+/// These match SDL button names
+pub const ButtonState = struct {
+    south: bool = false,
+    east: bool = false,
+    west: bool = false,
+    north: bool = false,
+    select: bool = false,
+    back: bool = false,
+    guide: bool = false,
+    start: bool = false,
+    left_stick: bool = false,
+    right_stick: bool = false,
+    left_shoulder: bool = false,
+    right_shoulder: bool = false,
+    dpad_up: bool = false,
+    dpad_down: bool = false,
+    dpad_left: bool = false,
+    dpad_right: bool = false,
+    misc1: bool = false,
+    right_paddle1: bool = false,
+    left_paddle1: bool = false,
+    right_paddle2: bool = false,
+    left_paddle2: bool = false,
+    touchpad: bool = false,
+    misc2: bool = false,
+    misc3: bool = false,
+    misc4: bool = false,
+    misc5: bool = false,
+    misc6: bool = false,
+};
+
 pub fn Interface(comptime Self: type) type {
     return struct {
         deinit: *const fn (self: *Self) void,
         runFrame: *const fn (self: *Self) void,
         getScreenSize: *const fn (self: *const Self) ScreenSize,
         getPixels: *const fn (self: *const Self) []const u8,
+        updateControllerState: *const fn (self: *Self, state: *const ControllerState) void,
     };
 }
 
@@ -69,11 +116,17 @@ pub const Device = struct {
                 return @call(.always_inline, iface.getPixels, .{self});
             }
 
+            fn updateControllerStateImpl(ptr: *anyopaque, state: *const ControllerState) void {
+                const self: *Inner = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.updateControllerState, .{ self, state });
+            }
+
             const vtable = Interface(anyopaque){
                 .deinit = deinitImpl,
                 .runFrame = runFrameImpl,
                 .getScreenSize = getScreenSizeImpl,
                 .getPixels = getPixelsImpl,
+                .updateControllerState = updateControllerStateImpl,
             };
         };
 
@@ -97,5 +150,9 @@ pub const Device = struct {
 
     pub fn getPixels(self: Self) []const u8 {
         return self.vtable.getPixels(self.ptr);
+    }
+
+    pub fn updateControllerState(self: *Self, state: *const ControllerState) void {
+        return self.vtable.updateControllerState(self.ptr, state);
     }
 };

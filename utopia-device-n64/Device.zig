@@ -150,6 +150,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .runFrame = runFrame,
         .getScreenSize = getScreenSize,
         .getPixels = getPixels,
+        .updateControllerState = updateControllerState,
     });
 }
 
@@ -184,6 +185,10 @@ pub fn getScreenSize(self: *const Self) fw.ScreenSize {
 
 pub fn getPixels(self: *const Self) []const u8 {
     return self.vi.getPixels();
+}
+
+pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
+    self.si.updateControllerState(state);
 }
 
 // CPU methods

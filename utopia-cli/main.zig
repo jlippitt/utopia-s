@@ -39,6 +39,17 @@ pub fn main() !void {
     var texture = try resizeWindow(window, renderer, src_size);
     defer texture.deinit();
 
+    const gamepad_ids = try sdl3.gamepad.getGamepads();
+
+    const gamepad: ?sdl3.gamepad.Gamepad = if (gamepad_ids.len > 0)
+        try sdl3.gamepad.Gamepad.init(gamepad_ids[0])
+    else
+        null;
+
+    defer if (gamepad) |pad| pad.deinit();
+
+    var controller_state: utopia.ControllerState = .{};
+
     outer: while (true) {
         while (sdl3.events.poll()) |event| {
             switch (event) {
@@ -53,10 +64,22 @@ pub fn main() !void {
                         else => {},
                     }
                 },
+                .gamepad_button_down => |button| switch (button.button) {
+                    inline else => |field| @field(controller_state.button, @tagName(field)) = true,
+                },
+                .gamepad_button_up => |button| switch (button.button) {
+                    inline else => |field| @field(controller_state.button, @tagName(field)) = false,
+                },
+                .gamepad_axis_motion => |axis| switch (axis.axis) {
+                    inline else => |field| @field(controller_state.axis, @tagName(field)) =
+                        @as(f32, @floatFromInt(axis.value)) /
+                        (std.math.maxInt(@TypeOf(axis.value)) + 1),
+                },
                 else => {},
             }
         }
 
+        device.updateControllerState(&controller_state);
         device.runFrame();
 
         const new_size = device.getScreenSize();
