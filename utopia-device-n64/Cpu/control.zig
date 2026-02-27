@@ -1,3 +1,4 @@
+const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Cpu.zig");
 
@@ -122,6 +123,76 @@ pub fn branchBinary(
     };
 
     core.branch(params, offset, taken);
+}
+
+pub const TrapOp = enum {
+    TGE,
+    TLT,
+    TEQ,
+    TNE,
+
+    fn apply(
+        comptime op: @This(),
+        comptime signedness: std.builtin.Signedness,
+        lhs: u64,
+        rhs: u64,
+    ) bool {
+        return switch (comptime op) {
+            .TGE => switch (comptime signedness) {
+                .signed => @as(i64, @bitCast(lhs)) >= @as(i64, @bitCast(rhs)),
+                .unsigned => lhs >= rhs,
+            },
+            .TLT => switch (comptime signedness) {
+                .signed => @as(i64, @bitCast(lhs)) < @as(i64, @bitCast(rhs)),
+                .unsigned => lhs < rhs,
+            },
+            .TEQ => lhs == rhs,
+            .TNE => lhs != rhs,
+        };
+    }
+};
+
+pub fn iTypeTrap(
+    comptime op: TrapOp,
+    comptime signedness: std.builtin.Signedness,
+    core: *Core,
+    word: u32,
+) void {
+    const args: Core.IType = @bitCast(word);
+    const offset = fw.num.signExtend(u64, args.imm);
+
+    fw.log.trace("{X:08}: {t}I{s} {t}, {}", .{
+        core.pc,
+        op,
+        if (signedness == .unsigned) "U" else "",
+        args.rs,
+        @as(i64, @bitCast(offset)),
+    });
+
+    if (op.apply(signedness, core.get(args.rs), offset)) {
+        fw.log.todo("CPU trap exceptions", .{});
+    }
+}
+
+pub fn rTypeTrap(
+    comptime op: TrapOp,
+    comptime signedness: std.builtin.Signedness,
+    core: *Core,
+    word: u32,
+) void {
+    const args: Core.IType = @bitCast(word);
+
+    fw.log.trace("{X:08}: {t}{s} {t}, {t}", .{
+        core.pc,
+        op,
+        if (signedness == .unsigned) "U" else "",
+        args.rs,
+        args.rt,
+    });
+
+    if (op.apply(signedness, core.get(args.rs), core.get(args.rt))) {
+        fw.log.todo("CPU trap exceptions", .{});
+    }
 }
 
 pub fn sync(core: *Core, word: u32) void {
