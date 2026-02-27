@@ -101,7 +101,7 @@ pub fn main() !void {
         const fps = fps_counter.update();
 
         var buf: [64]u8 = undefined;
-        const title = try std.fmt.bufPrintZ(&buf, "{s} ({d:.2})", .{ app_name, fps });
+        const title = try std.fmt.bufPrintZ(&buf, "{s} (FPS: {d:.2})", .{ app_name, fps });
         try window.setTitle(title);
     }
 }
