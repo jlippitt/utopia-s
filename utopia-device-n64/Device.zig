@@ -19,6 +19,7 @@ pub const video_dac_rate = 1_000_000.0 * (18.0 * 227.5 / 286.0) * 17.0 / 5.0;
 
 const max_rom_size = 1024 * 1024 * 1024; // 1GiB
 const rdram_size = 8 * 1024 * 1024; // 8MiB
+const systest_output_size = 512;
 
 pub const Args = struct {
     pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
@@ -92,6 +93,7 @@ ai: AudioInterface,
 pi: ParallelInterface,
 ri: RdramInterface,
 si: SerialInterface,
+systest_output: *[systest_output_size]u8,
 arena: std.heap.ArenaAllocator,
 
 // utopia.Device methods
@@ -124,6 +126,8 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         fw.mem.writeBe(u32, rdram, address, rdram_size);
     }
 
+    const systest_output = try arena.allocator().alloc(u8, systest_output_size);
+
     var clock = Clock.init();
     const vi = try VideoInterface.init(&arena, &clock);
     const ai = AudioInterface.init(&clock);
@@ -142,6 +146,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .pi = .init(rom),
         .ri = .init(),
         .si = .init(pifdata, cic.getSeed()),
+        .systest_output = systest_output[0..systest_output_size],
         .arena = arena,
     };
 
@@ -246,6 +251,20 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         .serial_interface => self.si.write(address, value, mask),
         .dd_registers => {}, // TODO
         .dd_ipl_rom => {}, // TODO
+        .cartridge_rom => switch (address) {
+            // Console output for n64-systemtest
+            0x13ff_0020...0x13ff_021f => fw.mem.writeMaskedBe(
+                u32,
+                self.systest_output,
+                address - 0x13ff_0020,
+                value,
+                mask,
+            ),
+            0x13ff_0014 => {
+                _ = std.fs.File.stderr().write(self.systest_output[0..(value & mask)]) catch {};
+            },
+            else => fw.log.warn("Write to cartridge ROM: {X:08} <= {X:08}", .{ address, value }),
+        },
         .pifdata => self.si.writePif(address, value, mask),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
