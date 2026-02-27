@@ -142,11 +142,15 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
                 self.status.broke = false;
             }
 
+            switch (@as(u2, @truncate(masked_value >> 3))) {
+                1 => self.getDevice().mi.clearInterrupt(.sp),
+                2 => self.getDevice().mi.raiseInterrupt(.sp),
+                else => {},
+            }
+
             if (!self.status.halted) {
                 fw.log.todo("RSP core", .{});
             }
-
-            // TODO: RSP interrupts
 
             fw.log.debug("SP_STATUS: {any}", .{self.status});
         },
