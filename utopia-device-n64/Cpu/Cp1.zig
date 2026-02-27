@@ -268,7 +268,7 @@ fn ctc1(core: *Core, word: u32) void {
     switch (args.fs) {
         .Revision => {}, // Not writable
         .Status => {
-            core.cp1.csr = @bitCast(value);
+            fw.num.writeMasked(u32, @ptrCast(&core.cp1.csr), value, 0x0183_ffff);
             fw.log.trace("  CSR: {any}", .{core.cp1.csr});
         },
         else => fw.log.unimplemented("Read from CPU CP1 {t}", .{args.fs}),
