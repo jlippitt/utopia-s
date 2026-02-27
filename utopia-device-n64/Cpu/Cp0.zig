@@ -35,18 +35,31 @@ pub const Interrupt = enum(u8) {
 
 const ExceptionType = enum(u5) {
     interrupt = 0,
+    coprocessor_unusable = 11,
+    trap = 13,
 };
 
 pub const Exception = union(ExceptionType) {
     interrupt: void,
+    coprocessor_unusable: u2,
+    trap: void,
+
+    fn ce(self: @This()) u2 {
+        return switch (self) {
+            .coprocessor_unusable => |index| index,
+            else => 0,
+        };
+    }
 };
 
 pub const Self = @This();
 
 index: Tlb.Index = .{},
 entry_lo: [2]Tlb.EntryLo = @splat(.{}),
+context: Context = .{},
 page_mask: Tlb.PageMask = .{},
 wired: u6 = 0,
+bad_vaddr: u64 = 0,
 count_value: u32 = 0,
 count_updated: u64 = 0,
 entry_hi: Tlb.EntryHi = .{},
@@ -58,6 +71,7 @@ config: Config = .{},
 ll_addr: u32 = 0,
 watch_lo: WatchLo = .{},
 watch_hi: WatchHi = .{},
+x_context: XContext = .{},
 error_epc: u64 = 0,
 tag_lo: TagLo = .{},
 tlb: Tlb = .init(),
@@ -98,7 +112,7 @@ pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
 
     self.cause.bd = delay;
     self.cause.exc_code = exception;
-    self.cause.ce = 0;
+    self.cause.ce = exception.ce();
     fw.log.trace("  Cause: {any}", .{self.cause});
 
     self.epc = fw.num.signExtend(u64, if (delay) pc -% 4 else pc);
@@ -113,7 +127,9 @@ fn get(self: *Self, reg: Register) u64 {
         .EntryLo0 => @bitCast(self.entry_lo[0]),
         .EntryLo1 => @bitCast(self.entry_lo[1]),
         .PageMask => @bitCast(self.page_mask),
+        .Context => @bitCast(self.context),
         .Wired => self.wired,
+        .BadVAddr => self.bad_vaddr,
         .Count => self.getCurrentCount(),
         .EntryHi => @bitCast(self.entry_hi),
         .Compare => self.compare,
@@ -124,6 +140,7 @@ fn get(self: *Self, reg: Register) u64 {
         .LLAddr => self.ll_addr,
         .WatchLo => @as(u32, @bitCast(self.watch_lo)),
         .WatchHi => @as(u32, @bitCast(self.watch_hi)),
+        .XContext => @bitCast(self.x_context),
         .TagLo => @as(u32, @bitCast(self.tag_lo)),
         .TagHi => 0,
         .ErrorEPC => self.error_epc,
@@ -149,9 +166,17 @@ fn set(self: *Self, reg: Register, value: u64) void {
             fw.num.writeMasked(u64, @ptrCast(&self.page_mask), value, 0x0000_0000_01ff_e000);
             fw.log.trace("  PageMask: {any}", .{self.page_mask});
         },
+        .Context => {
+            fw.num.writeMasked(u64, @ptrCast(&self.context), value, 0xffff_ffff_ff80_0000);
+            fw.log.trace("  Context: {any}", .{self.context});
+        },
         .Wired => {
             self.wired = @truncate(value);
             fw.log.trace("  Wired: {d}", .{self.wired});
+        },
+        .BadVAddr => {
+            self.bad_vaddr = value;
+            fw.log.trace("  BadVAddr: {X:016}", .{self.bad_vaddr});
         },
         .Count => {
             self.count_value = @truncate(value);
@@ -247,6 +272,10 @@ fn set(self: *Self, reg: Register, value: u64) void {
             );
 
             fw.log.trace("  WatchHi: {any}", .{self.watch_hi});
+        },
+        .XContext => {
+            fw.num.writeMasked(u64, @ptrCast(&self.x_context), value, 0xffff_fffe_0000_0000);
+            fw.log.trace("  XContext: {any}", .{self.x_context});
         },
         .TagLo => {
             fw.num.writeMasked(
@@ -367,6 +396,12 @@ fn eret(core: *Core, word: u32) void {
     core.cp0.checkPendingInterrupts();
 }
 
+const Context = packed struct(u64) {
+    __: u4 = 0,
+    bad_vpn2: u19 = 0,
+    pte_base: u41 = 0,
+};
+
 const Status = packed struct(u32) {
     ie: bool = false,
     exl: bool = false,
@@ -426,6 +461,13 @@ const WatchLo = packed struct(u32) {
 const WatchHi = packed struct(u32) {
     paddr1: u4 = 0,
     __: u28 = 0,
+};
+
+const XContext = packed struct(u64) {
+    __: u4 = 0,
+    bad_vpn2: u27 = 0,
+    region: u2 = 0,
+    pte_base: u31 = 0,
 };
 
 const TagLo = packed struct(u32) {

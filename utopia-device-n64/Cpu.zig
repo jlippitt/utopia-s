@@ -228,6 +228,7 @@ fn dispatch(core: *Self, word: u32) void {
         0o17 => alu.lui(core, word),
         0o20 => Cp0.cop0(core, word),
         0o21 => Cp1.cop1(core, word),
+        0o22 => core.except(.{ .coprocessor_unusable = 2 }),
         0o24 => control.branchBinary(.BEQ, .{ .likely = true }, core, word),
         0o25 => control.branchBinary(.BNE, .{ .likely = true }, core, word),
         0o26 => control.branchUnary(.BLEZ, .{ .likely = true }, core, word),

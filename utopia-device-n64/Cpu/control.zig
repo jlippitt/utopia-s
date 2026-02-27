@@ -170,7 +170,7 @@ pub fn iTypeTrap(
     });
 
     if (op.apply(signedness, core.get(args.rs), offset)) {
-        fw.log.todo("CPU trap exceptions", .{});
+        core.except(.trap);
     }
 }
 
@@ -191,7 +191,7 @@ pub fn rTypeTrap(
     });
 
     if (op.apply(signedness, core.get(args.rs), core.get(args.rt))) {
-        fw.log.todo("CPU trap exceptions", .{});
+        core.except(.trap);
     }
 }
 
