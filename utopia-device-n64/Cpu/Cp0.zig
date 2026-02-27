@@ -46,6 +46,7 @@ pub const Self = @This();
 index: Tlb.Index = .{},
 entry_lo: [2]Tlb.EntryLo = @splat(.{}),
 page_mask: Tlb.PageMask = .{},
+wired: u6 = 0,
 count_value: u32 = 0,
 count_updated: u64 = 0,
 entry_hi: Tlb.EntryHi = .{},
@@ -112,6 +113,7 @@ fn get(self: *Self, reg: Register) u64 {
         .EntryLo0 => @bitCast(self.entry_lo[0]),
         .EntryLo1 => @bitCast(self.entry_lo[1]),
         .PageMask => @bitCast(self.page_mask),
+        .Wired => self.wired,
         .Count => self.getCurrentCount(),
         .EntryHi => @bitCast(self.entry_hi),
         .Compare => self.compare,
@@ -146,6 +148,10 @@ fn set(self: *Self, reg: Register, value: u64) void {
         .PageMask => {
             fw.num.writeMasked(u64, @ptrCast(&self.page_mask), value, 0x0000_0000_01ff_e000);
             fw.log.trace("  PageMask: {any}", .{self.page_mask});
+        },
+        .Wired => {
+            self.wired = @truncate(value);
+            fw.log.trace("  Wired: {d}", .{self.wired});
         },
         .Count => {
             self.count_value = @truncate(value);
