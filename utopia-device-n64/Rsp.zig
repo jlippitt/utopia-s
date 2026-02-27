@@ -52,7 +52,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     }
 
     if ((address & 0x000f_ffff) == 0x0008_0000) {
-        fw.num.writeMasked(u12, &self.pc, @truncate(value), @truncate(mask));
+        fw.num.writeMasked(u12, &self.pc, @truncate(value), @truncate(mask & 0xffc));
         fw.log.debug("RSP PC: {X:08}", .{self.pc});
         return;
     }
