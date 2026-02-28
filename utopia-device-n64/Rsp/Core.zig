@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Rsp = @import("../Rsp.zig");
+const Cp2 = @import("./Cp2.zig");
 const alu = @import("./alu.zig");
 const control = @import("./control.zig");
 const cp0 = @import("./cp0.zig");
@@ -50,6 +51,7 @@ pc: u12 = 0,
 target_pc: u12 = 0,
 pipe_state: PipeState = .normal,
 regs: [32]u32 = @splat(0),
+cp2: Cp2 = .init(),
 
 pub fn init() Self {
     return .{};
@@ -177,6 +179,7 @@ fn dispatch(core: *Self, word: u32) void {
         0o16 => alu.iTypeLogic(.XOR, core, word),
         0o17 => alu.lui(core, word),
         0o20 => cp0.cop0(core, word),
+        0o22 => Cp2.cop2(core, word),
         0o40 => memory.load(.LB, core, word),
         0o41 => memory.load(.LH, core, word),
         0o43 => memory.load(.LW, core, word),
@@ -186,6 +189,8 @@ fn dispatch(core: *Self, word: u32) void {
         0o50 => memory.store(.SB, core, word),
         0o51 => memory.store(.SH, core, word),
         0o53 => memory.store(.SW, core, word),
+        0o62 => Cp2.lwc2(core, word),
+        0o72 => Cp2.swc2(core, word),
         else => |opcode| fw.log.todo("RSP opcode: {o:02}", .{opcode}),
     }
 }
