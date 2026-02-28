@@ -126,7 +126,7 @@ fn mtc2(core: *Core, word: u32) void {
 fn cfc2(core: *Core, word: u32) void {
     const args: MType(ControlRegister) = @bitCast(word);
 
-    fw.log.trace("{X:08}: CFC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
+    fw.log.trace("{X:08}: CFC2 {t}, {t}", .{ core.pc, args.rt, args.vs });
 
     const result: u16 = switch (@intFromEnum(args.vs) & 3) {
         0 => blk: {
@@ -148,7 +148,7 @@ fn cfc2(core: *Core, word: u32) void {
 fn ctc2(core: *Core, word: u32) void {
     const args: MType(ControlRegister) = @bitCast(word);
 
-    fw.log.trace("{X:08}: CTC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
+    fw.log.trace("{X:08}: CTC2 {t}, {t}", .{ core.pc, args.rt, args.vs });
 
     const value = core.get(args.rt);
 
