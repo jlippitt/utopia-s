@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Core = @import("./Core.zig");
+const compute = @import("./Cp2/compute.zig");
 const memory = @import("./Cp2/memory.zig");
 
 const Self = @This();
@@ -35,6 +36,7 @@ fn MType(comptime T: type) type {
 }
 
 regs: [32]@Vector(8, u16) = @splat(@splat(0)),
+acc: @Vector(8, u48) = @splat(0),
 carry: @Vector(8, bool) = @splat(false),
 not_equal: @Vector(8, bool) = @splat(false),
 compare: @Vector(8, bool) = @splat(false),
@@ -69,11 +71,45 @@ pub fn setEl(self: *Self, comptime T: type, reg: Register, el: u4, value: T) voi
     self.set(reg, @bitCast(result));
 }
 
+pub fn broadcast(self: *const Self, reg: Register, el: u4) @Vector(8, u16) {
+    const mask: [16]@Vector(8, i32) = .{
+        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
+        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
+        .{ 1, 1, 3, 3, 5, 5, 7, 7 },
+        .{ 0, 0, 2, 2, 4, 4, 6, 6 },
+        .{ 3, 3, 3, 3, 7, 7, 7, 7 },
+        .{ 2, 2, 2, 2, 6, 6, 6, 6 },
+        .{ 1, 1, 1, 1, 5, 5, 5, 5 },
+        .{ 0, 0, 0, 0, 4, 4, 4, 4 },
+        @splat(7),
+        @splat(6),
+        @splat(5),
+        @splat(4),
+        @splat(3),
+        @splat(2),
+        @splat(1),
+        @splat(0),
+    };
+
+    const value = self.get(reg);
+
+    return switch (el) {
+        inline else => |index| @shuffle(u16, value, undefined, mask[index]),
+    };
+}
+
 pub fn cop2(core: *Core, word: u32) void {
     const rs: u5 = @truncate(word >> 21);
 
     if (rs >= 0o20) {
+        @branchHint(.likely);
+
         return switch (@as(u6, @truncate(word))) {
+            0o00 => compute.compute(.VMULF, core, word),
+            0o01 => compute.compute(.VMULU, core, word),
+            0o10 => compute.compute(.VMACF, core, word),
+            0o11 => compute.compute(.VMACU, core, word),
+            0o35 => compute.vsar(core, word),
             else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
         };
     }
@@ -113,20 +149,20 @@ pub fn swc2(core: *Core, word: u32) void {
 
 fn mfc2(core: *Core, word: u32) void {
     const args: MType(Register) = @bitCast(word);
-    fw.log.trace("{X:08}: MFC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
+    fw.log.trace("{X:03}: MFC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
     core.set(args.rt, fw.num.signExtend(u32, core.cp2.getEl(u16, args.vs, args.el)));
 }
 
 fn mtc2(core: *Core, word: u32) void {
     const args: MType(Register) = @bitCast(word);
-    fw.log.trace("{X:08}: MTC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
+    fw.log.trace("{X:03}: MTC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
     core.cp2.setEl(u16, args.vs, args.el, @truncate(core.get(args.rt)));
 }
 
 fn cfc2(core: *Core, word: u32) void {
     const args: MType(ControlRegister) = @bitCast(word);
 
-    fw.log.trace("{X:08}: CFC2 {t}, {t}", .{ core.pc, args.rt, args.vs });
+    fw.log.trace("{X:03}: CFC2 {t}, {t}", .{ core.pc, args.rt, args.vs });
 
     const result: u16 = switch (@intFromEnum(args.vs) & 3) {
         0 => blk: {
@@ -148,7 +184,7 @@ fn cfc2(core: *Core, word: u32) void {
 fn ctc2(core: *Core, word: u32) void {
     const args: MType(ControlRegister) = @bitCast(word);
 
-    fw.log.trace("{X:08}: CTC2 {t}, {t}", .{ core.pc, args.rt, args.vs });
+    fw.log.trace("{X:03}: CTC2 {t}, {t}", .{ core.pc, args.rt, args.vs });
 
     const value = core.get(args.rt);
 

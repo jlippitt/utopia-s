@@ -4,13 +4,30 @@ pub fn truncate(
     comptime Dst: type,
     value: anytype,
 ) Dst {
-    const Src = @TypeOf(value);
-    const dst_bits = @typeInfo(Dst).int.bits;
-    const src_bits = @typeInfo(Src).int.bits;
-    const src_signedness = @typeInfo(Src).int.signedness;
-    comptime std.debug.assert(dst_bits <= src_bits);
-    const truncated: std.meta.Int(src_signedness, dst_bits) = @truncate(value);
-    return @bitCast(truncated);
+    return switch (@typeInfo(Dst)) {
+        .int => |int| blk: {
+            const Src = @TypeOf(value);
+            const dst_bits = int.bits;
+            const src_bits = @typeInfo(Src).int.bits;
+            const signedness = @typeInfo(Src).int.signedness;
+            comptime std.debug.assert(dst_bits <= src_bits);
+            const truncated: std.meta.Int(signedness, dst_bits) = @truncate(value);
+            break :blk @bitCast(truncated);
+        },
+        .vector => |vector| blk: {
+            const len = vector.len;
+            const DstInt = vector.child;
+            const Src = @TypeOf(value);
+            const SrcInt = @typeInfo(Src).vector.child;
+            const dst_bits = @typeInfo(DstInt).int.bits;
+            const src_bits = @typeInfo(SrcInt).int.bits;
+            const signedness = @typeInfo(SrcInt).int.signedness;
+            comptime std.debug.assert(dst_bits <= src_bits);
+            const truncated: @Vector(len, std.meta.Int(signedness, dst_bits)) = @truncate(value);
+            break :blk @bitCast(truncated);
+        },
+        else => @compileError("Type not supported by 'truncate'"),
+    };
 }
 
 pub fn extend(
@@ -18,13 +35,30 @@ pub fn extend(
     comptime Dst: type,
     value: anytype,
 ) Dst {
-    const Src = @TypeOf(value);
-    const dst_bits = @typeInfo(Dst).int.bits;
-    const src_bits = @typeInfo(Src).int.bits;
-    comptime std.debug.assert(dst_bits >= src_bits);
-    const sign_corrected: std.meta.Int(signedness, src_bits) = @bitCast(value);
-    const sign_extended: std.meta.Int(signedness, dst_bits) = sign_corrected;
-    return @bitCast(sign_extended);
+    return switch (@typeInfo(Dst)) {
+        .int => |int| blk: {
+            const Src = @TypeOf(value);
+            const dst_bits = int.bits;
+            const src_bits = @typeInfo(Src).int.bits;
+            comptime std.debug.assert(dst_bits >= src_bits);
+            const corrected: std.meta.Int(signedness, src_bits) = @bitCast(value);
+            const extended: std.meta.Int(signedness, dst_bits) = corrected;
+            break :blk @bitCast(extended);
+        },
+        .vector => |vector| blk: {
+            const len = vector.len;
+            const DstInt = vector.child;
+            const Src = @TypeOf(value);
+            const SrcInt = @typeInfo(Src).vector.child;
+            const dst_bits = @typeInfo(DstInt).int.bits;
+            const src_bits = @typeInfo(SrcInt).int.bits;
+            comptime std.debug.assert(dst_bits >= src_bits);
+            const corrected: @Vector(len, std.meta.Int(signedness, src_bits)) = @bitCast(value);
+            const extended: @Vector(len, std.meta.Int(signedness, dst_bits)) = corrected;
+            break :blk @bitCast(extended);
+        },
+        else => @compileError("Type not supported by 'extend'"),
+    };
 }
 
 pub fn signExtend(comptime T: type, value: anytype) T {
