@@ -71,6 +71,11 @@ pub fn setEl(self: *Self, comptime T: type, reg: Register, el: u4, value: T) voi
     self.set(reg, @bitCast(result));
 }
 
+pub fn setAccLow(self: *Self, value: @Vector(8, u16)) void {
+    self.acc &= ~@as(@Vector(8, u48), @splat(0xffff));
+    self.acc |= value;
+}
+
 pub fn broadcast(self: *const Self, reg: Register, el: u4) @Vector(8, u16) {
     const mask: [16]@Vector(8, i32) = .{
         .{ 0, 1, 2, 3, 4, 5, 6, 7 },
@@ -119,6 +124,7 @@ pub fn cop2(core: *Core, word: u32) void {
             0o17 => compute.compute(.VMADH, core, word),
             0o20 => compute.compute(.VADD, core, word),
             0o21 => compute.compute(.VSUB, core, word),
+            0o23 => compute.compute(.VABS, core, word),
             0o24 => compute.compute(.VADDC, core, word),
             0o25 => compute.compute(.VSUBC, core, word),
             0o35 => compute.vsar(core, word),

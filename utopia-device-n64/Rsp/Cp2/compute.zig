@@ -4,6 +4,8 @@ const Core = @import("../Core.zig");
 const Cp2 = @import("../Cp2.zig");
 
 const zero: @Vector(8, u16) = @splat(0);
+const i16_max: @Vector(8, u16) = @splat(0x7fff);
+const i16_min: @Vector(8, u16) = @splat(0x8000);
 const v_false: @Vector(8, bool) = @splat(false);
 
 const Args = packed struct(u32) {
@@ -31,6 +33,7 @@ pub const ComputeOp = enum {
     VMADH,
     VADD,
     VSUB,
+    VABS,
     VADDC,
     VSUBC,
 };
@@ -153,7 +156,7 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
                 fw.num.signExtend(@Vector(8, i32), rhs) +%
                 @as(@Vector(8, i32), @intFromBool(core.cp2.carry));
 
-            core.cp2.acc = fw.num.truncate(@Vector(8, u16), result);
+            core.cp2.setAccLow(fw.num.truncate(@Vector(8, u16), result));
 
             core.cp2.carry = v_false;
             core.cp2.not_equal = v_false;
@@ -165,17 +168,26 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
                 fw.num.signExtend(@Vector(8, i32), rhs) -%
                 @as(@Vector(8, i32), @intFromBool(core.cp2.carry));
 
-            core.cp2.acc = fw.num.truncate(@Vector(8, u16), result);
+            core.cp2.setAccLow(fw.num.truncate(@Vector(8, u16), result));
 
             core.cp2.carry = v_false;
             core.cp2.not_equal = v_false;
 
             break :blk fw.num.truncate(@Vector(8, u16), clampResult(result));
         },
+        .VABS => blk: {
+            const pos = @select(u16, lhs > zero, rhs, zero);
+            const neg = -%rhs;
+            const neg_clamped = @select(u16, rhs == i16_min, i16_max, neg);
+
+            core.cp2.setAccLow(@select(u16, lhs < i16_min, pos, neg));
+
+            break :blk @select(u16, lhs < i16_min, pos, neg_clamped);
+        },
         .VADDC => blk: {
             const result, const overflow = @addWithOverflow(lhs, rhs);
 
-            core.cp2.acc = result;
+            core.cp2.setAccLow(result);
 
             core.cp2.carry = overflow != zero;
             core.cp2.not_equal = v_false;
@@ -185,7 +197,7 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
         .VSUBC => blk: {
             const result, const overflow = @subWithOverflow(lhs, rhs);
 
-            core.cp2.acc = result;
+            core.cp2.setAccLow(result);
 
             core.cp2.carry = overflow != zero;
             core.cp2.not_equal = result != zero;
