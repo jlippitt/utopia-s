@@ -128,6 +128,12 @@ pub fn cop2(core: *Core, word: u32) void {
             0o24 => compute.compute(.VADDC, core, word),
             0o25 => compute.compute(.VSUBC, core, word),
             0o35 => compute.vsar(core, word),
+            0o50 => compute.compute(.VAND, core, word),
+            0o51 => compute.compute(.VNAND, core, word),
+            0o52 => compute.compute(.VOR, core, word),
+            0o53 => compute.compute(.VNOR, core, word),
+            0o54 => compute.compute(.VXOR, core, word),
+            0o55 => compute.compute(.VNXOR, core, word),
             else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
         };
     }

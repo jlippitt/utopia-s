@@ -36,6 +36,12 @@ pub const ComputeOp = enum {
     VABS,
     VADDC,
     VSUBC,
+    VAND,
+    VNAND,
+    VOR,
+    VNOR,
+    VXOR,
+    VNXOR,
 };
 
 pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
@@ -202,6 +208,36 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
             core.cp2.carry = overflow != zero;
             core.cp2.not_equal = result != zero;
 
+            break :blk result;
+        },
+        .VAND => blk: {
+            const result = lhs & rhs;
+            core.cp2.setAccLow(result);
+            break :blk result;
+        },
+        .VNAND => blk: {
+            const result = ~(lhs & rhs);
+            core.cp2.setAccLow(result);
+            break :blk result;
+        },
+        .VOR => blk: {
+            const result = lhs | rhs;
+            core.cp2.setAccLow(result);
+            break :blk result;
+        },
+        .VNOR => blk: {
+            const result = ~(lhs | rhs);
+            core.cp2.setAccLow(result);
+            break :blk result;
+        },
+        .VXOR => blk: {
+            const result = lhs ^ rhs;
+            core.cp2.setAccLow(result);
+            break :blk result;
+        },
+        .VNXOR => blk: {
+            const result = ~(lhs ^ rhs);
+            core.cp2.setAccLow(result);
             break :blk result;
         },
     });
