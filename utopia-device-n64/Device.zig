@@ -166,6 +166,7 @@ pub fn deinit(self: *Self) void {
 pub fn runFrame(self: *Self) void {
     while (true) {
         self.cpu.step();
+        self.rsp.step();
 
         self.clock.addCycles(4);
 

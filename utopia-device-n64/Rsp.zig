@@ -1,20 +1,21 @@
 const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
-const register = @import("register.zig");
+const register = @import("./register.zig");
+const Core = @import("./Rsp/Core.zig");
 
 const mem_size = 8192;
 const bank_size = mem_size / 2;
 
 const Self = @This();
 
+core: Core = .init(),
 mem: *align(16) [mem_size]u8,
 sp_addr: u13 = 0,
 dram_addr: u24 = 0,
 dma: Dma = .{},
 status: Status = .{},
 semaphore: bool = false,
-pc: u12 = 0,
 
 pub fn init(arena: *std.heap.ArenaAllocator) !Self {
     const mem = try arena.allocator().alignedAlloc(u8, .@"16", mem_size);
@@ -22,6 +23,17 @@ pub fn init(arena: *std.heap.ArenaAllocator) !Self {
     return .{
         .mem = mem[0..mem_size],
     };
+}
+
+// Device-accessible methods
+
+pub fn step(self: *Self) void {
+    if (self.status.halted) {
+        return;
+    }
+
+    self.core.step();
+    self.status.halted = self.status.halted or self.status.sstep;
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -34,7 +46,7 @@ pub fn read(self: *Self, address: u32) u32 {
     }
 
     if ((address & 0x000f_ffff) == 0x0008_0000) {
-        return self.pc;
+        return self.core.readPc();
     }
 
     fw.log.panic("Unmapped RSP read: {X:08}", .{address});
@@ -52,8 +64,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     }
 
     if ((address & 0x000f_ffff) == 0x0008_0000) {
-        fw.num.writeMasked(u12, &self.pc, @truncate(value), @truncate(mask & 0xffc));
-        fw.log.debug("RSP PC: {X:08}", .{self.pc});
+        self.core.writePc(@truncate(value), @truncate(mask));
         return;
     }
 
@@ -148,10 +159,6 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
                 else => {},
             }
 
-            if (!self.status.halted) {
-                fw.log.todo("RSP core", .{});
-            }
-
             fw.log.debug("SP_STATUS: {any}", .{self.status});
         },
         5, 6 => {}, // Read-only
@@ -161,6 +168,53 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
         },
     }
 }
+
+// Core-visible methods
+
+pub fn readInstruction(self: *const Self, address: u12) u32 {
+    return fw.mem.readBe(u32, self.mem, @as(u13, 0x1000) | address);
+}
+
+pub fn readData(self: *const Self, comptime T: type, address: u12) T {
+    if (address <= (bank_size - @sizeOf(T))) {
+        @branchHint(.likely);
+        return fw.mem.readBe(T, self.mem, address);
+    }
+
+    var result: T = fw.mem.readBe(u8, self.mem, address);
+
+    for (1..@sizeOf(T)) |byte| {
+        result <<= 8;
+        result |= fw.mem.readBe(u8, self.mem, address +% byte);
+    }
+
+    return result;
+}
+
+pub fn writeData(self: *const Self, comptime T: type, address: u12, value: T) void {
+    if (address <= (bank_size - @sizeOf(T))) {
+        @branchHint(.likely);
+        return fw.mem.writeBe(T, self.mem, address, value);
+    }
+
+    var write_value = value;
+
+    for (0..@sizeOf(T)) |byte| {
+        write_value = std.math.rotl(T, write_value, 8);
+        fw.mem.writeBe(u8, self.mem, address +% byte, @truncate(write_value));
+    }
+}
+
+pub fn break_(self: *Self) void {
+    self.status.broke = true;
+    self.status.halted = true;
+
+    if (self.status.intbreak) {
+        self.getDevice().mi.raiseInterrupt(.sp);
+    }
+}
+
+// Private methods
 
 fn transferDma(self: *Self, comptime direction: DmaDirection) void {
     const rdram = self.getDevice().rdram;
