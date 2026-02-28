@@ -107,8 +107,16 @@ pub fn cop2(core: *Core, word: u32) void {
         return switch (@as(u6, @truncate(word))) {
             0o00 => compute.compute(.VMULF, core, word),
             0o01 => compute.compute(.VMULU, core, word),
+            0o04 => compute.compute(.VMUDL, core, word),
+            0o05 => compute.compute(.VMUDM, core, word),
+            0o06 => compute.compute(.VMUDN, core, word),
+            0o07 => compute.compute(.VMUDH, core, word),
             0o10 => compute.compute(.VMACF, core, word),
             0o11 => compute.compute(.VMACU, core, word),
+            0o14 => compute.compute(.VMADL, core, word),
+            0o15 => compute.compute(.VMADM, core, word),
+            0o16 => compute.compute(.VMADN, core, word),
+            0o17 => compute.compute(.VMADH, core, word),
             0o35 => compute.vsar(core, word),
             else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
         };

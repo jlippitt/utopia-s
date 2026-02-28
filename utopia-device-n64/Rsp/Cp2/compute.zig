@@ -6,8 +6,8 @@ const Cp2 = @import("../Cp2.zig");
 const Args = packed struct(u32) {
     funct: u6,
     vd: Cp2.Register,
-    vt: Cp2.Register,
     vs: Cp2.Register,
+    vt: Cp2.Register,
     el: u4,
     __: u1,
     opcode: u6,
@@ -16,8 +16,16 @@ const Args = packed struct(u32) {
 pub const ComputeOp = enum {
     VMULF,
     VMULU,
+    VMUDL,
+    VMUDM,
+    VMUDN,
+    VMUDH,
     VMACF,
     VMACU,
+    VMADL,
+    VMADM,
+    VMADN,
+    VMADH,
 };
 
 pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
@@ -53,6 +61,38 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
 
             break :blk @truncate(clampUnsigned(core.cp2.acc) >> @splat(16));
         },
+        .VMUDL => blk: {
+            const result = @as(@Vector(8, u32), lhs) *
+                @as(@Vector(8, u32), rhs);
+
+            core.cp2.acc = result >> @splat(16);
+
+            break :blk @truncate(core.cp2.acc);
+        },
+        .VMUDM => blk: {
+            const result = fw.num.signExtend(@Vector(8, i32), lhs) *
+                fw.num.zeroExtend(@Vector(8, i32), rhs);
+
+            core.cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
+
+            break :blk @truncate(core.cp2.acc >> @splat(16));
+        },
+        .VMUDN => blk: {
+            const result = fw.num.zeroExtend(@Vector(8, i32), lhs) *
+                fw.num.signExtend(@Vector(8, i32), rhs);
+
+            core.cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
+
+            break :blk @truncate(core.cp2.acc);
+        },
+        .VMUDH => blk: {
+            const result = fw.num.signExtend(@Vector(8, i32), lhs) *
+                fw.num.signExtend(@Vector(8, i32), rhs);
+
+            core.cp2.acc = fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
+
+            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+        },
         .VMACF => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
@@ -68,6 +108,38 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
             core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
 
             break :blk @truncate(clampUnsigned(core.cp2.acc) >> @splat(16));
+        },
+        .VMADL => blk: {
+            const result = @as(@Vector(8, u32), lhs) *
+                @as(@Vector(8, u32), rhs);
+
+            core.cp2.acc +%= result >> @splat(16);
+
+            break :blk @truncate(clampSigned(core.cp2.acc));
+        },
+        .VMADM => blk: {
+            const result = fw.num.signExtend(@Vector(8, i32), lhs) *
+                fw.num.zeroExtend(@Vector(8, i32), rhs);
+
+            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
+
+            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+        },
+        .VMADN => blk: {
+            const result = fw.num.zeroExtend(@Vector(8, i32), lhs) *
+                fw.num.signExtend(@Vector(8, i32), rhs);
+
+            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
+
+            break :blk @truncate(clampSigned(core.cp2.acc));
+        },
+        .VMADH => blk: {
+            const result = fw.num.signExtend(@Vector(8, i32), lhs) *
+                fw.num.signExtend(@Vector(8, i32), rhs);
+
+            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
+
+            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
         },
     });
 }
