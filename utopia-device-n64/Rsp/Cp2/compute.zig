@@ -3,6 +3,9 @@ const fw = @import("framework");
 const Core = @import("../Core.zig");
 const Cp2 = @import("../Cp2.zig");
 
+const zero: @Vector(8, u16) = @splat(0);
+const v_false: @Vector(8, bool) = @splat(false);
+
 const Args = packed struct(u32) {
     funct: u6,
     vd: Cp2.Register,
@@ -26,6 +29,10 @@ pub const ComputeOp = enum {
     VMADM,
     VMADN,
     VMADH,
+    VADD,
+    VSUB,
+    VADDC,
+    VSUBC,
 };
 
 pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
@@ -141,6 +148,50 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
 
             break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
         },
+        .VADD => blk: {
+            const result = fw.num.signExtend(@Vector(8, i32), lhs) +%
+                fw.num.signExtend(@Vector(8, i32), rhs) +%
+                @as(@Vector(8, i32), @intFromBool(core.cp2.carry));
+
+            core.cp2.acc = fw.num.truncate(@Vector(8, u16), result);
+
+            core.cp2.carry = v_false;
+            core.cp2.not_equal = v_false;
+
+            break :blk fw.num.truncate(@Vector(8, u16), clampResult(result));
+        },
+        .VSUB => blk: {
+            const result = fw.num.signExtend(@Vector(8, i32), lhs) -%
+                fw.num.signExtend(@Vector(8, i32), rhs) -%
+                @as(@Vector(8, i32), @intFromBool(core.cp2.carry));
+
+            core.cp2.acc = fw.num.truncate(@Vector(8, u16), result);
+
+            core.cp2.carry = v_false;
+            core.cp2.not_equal = v_false;
+
+            break :blk fw.num.truncate(@Vector(8, u16), clampResult(result));
+        },
+        .VADDC => blk: {
+            const result, const overflow = @addWithOverflow(lhs, rhs);
+
+            core.cp2.acc = result;
+
+            core.cp2.carry = overflow != zero;
+            core.cp2.not_equal = v_false;
+
+            break :blk result;
+        },
+        .VSUBC => blk: {
+            const result, const overflow = @subWithOverflow(lhs, rhs);
+
+            core.cp2.acc = result;
+
+            core.cp2.carry = overflow != zero;
+            core.cp2.not_equal = result != zero;
+
+            break :blk result;
+        },
     });
 }
 
@@ -179,4 +230,12 @@ fn clampUnsigned(acc: @Vector(8, u48)) @Vector(8, u48) {
         clipped,
         @as(@Vector(8, u48), @splat(0)),
     );
+}
+
+fn clampResult(value: @Vector(8, i32)) @Vector(8, i32) {
+    return @bitCast(std.math.clamp(
+        value,
+        @as(@Vector(8, i32), @splat(std.math.minInt(i16))),
+        @as(@Vector(8, i32), @splat(std.math.maxInt(i16))),
+    ));
 }

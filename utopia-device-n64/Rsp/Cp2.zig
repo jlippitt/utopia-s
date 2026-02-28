@@ -117,6 +117,10 @@ pub fn cop2(core: *Core, word: u32) void {
             0o15 => compute.compute(.VMADM, core, word),
             0o16 => compute.compute(.VMADN, core, word),
             0o17 => compute.compute(.VMADH, core, word),
+            0o20 => compute.compute(.VADD, core, word),
+            0o21 => compute.compute(.VSUB, core, word),
+            0o24 => compute.compute(.VADDC, core, word),
+            0o25 => compute.compute(.VSUBC, core, word),
             0o35 => compute.vsar(core, word),
             else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
         };
@@ -176,14 +180,14 @@ fn cfc2(core: *Core, word: u32) void {
         0 => blk: {
             const carry: u8 = @bitCast(core.cp2.carry);
             const not_equal: u8 = @bitCast(core.cp2.not_equal);
-            break :blk (@as(u16, not_equal) << 8) | carry;
+            break :blk (@as(u16, @bitReverse(not_equal)) << 8) | @bitReverse(carry);
         },
         1 => blk: {
             const compare: u8 = @bitCast(core.cp2.compare);
             const clip_compare: u8 = @bitCast(core.cp2.clip_compare);
-            break :blk (@as(u16, clip_compare) << 8) | compare;
+            break :blk (@as(u16, @bitReverse(clip_compare)) << 8) | @bitReverse(compare);
         },
-        else => @as(u8, @bitCast(core.cp2.compare_ext)),
+        else => @bitReverse(@as(u8, @bitCast(core.cp2.compare_ext))),
     };
 
     core.set(args.rt, fw.num.signExtend(u32, result));
@@ -198,13 +202,13 @@ fn ctc2(core: *Core, word: u32) void {
 
     switch (@intFromEnum(args.vs) & 3) {
         0 => {
-            core.cp2.carry = @bitCast(@as(u8, @truncate(value)));
-            core.cp2.not_equal = @bitCast(@as(u8, @truncate(value >> 8)));
+            core.cp2.carry = @bitCast(@bitReverse(@as(u8, @truncate(value))));
+            core.cp2.not_equal = @bitCast(@bitReverse(@as(u8, @truncate(value >> 8))));
         },
         1 => {
-            core.cp2.compare = @bitCast(@as(u8, @truncate(value)));
-            core.cp2.clip_compare = @bitCast(@as(u8, @truncate(value >> 8)));
+            core.cp2.compare = @bitCast(@bitReverse(@as(u8, @truncate(value))));
+            core.cp2.clip_compare = @bitCast(@bitReverse(@as(u8, @truncate(value >> 8))));
         },
-        else => core.cp2.compare_ext = @bitCast(@as(u8, @truncate(value))),
+        else => core.cp2.compare_ext = @bitCast(@bitReverse(@as(u8, @truncate(value)))),
     }
 }
