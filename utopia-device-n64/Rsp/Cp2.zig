@@ -14,6 +14,15 @@ pub const Register = enum(u5) {
 };
 // zig fmt: on
 
+const MType = packed struct(u32) {
+    __: u7,
+    el: u4,
+    vs: Register,
+    rt: Core.Register,
+    rs: u5,
+    opcode: u6,
+};
+
 regs: [32]@Vector(8, u16) = @splat(@splat(0)),
 
 pub fn init() Self {
@@ -45,8 +54,6 @@ pub fn setEl(self: *Self, comptime T: type, reg: Register, el: u4, value: T) voi
 }
 
 pub fn cop2(core: *Core, word: u32) void {
-    _ = core;
-
     const rs: u5 = @truncate(word >> 21);
 
     if (rs >= 0o20) {
@@ -56,10 +63,8 @@ pub fn cop2(core: *Core, word: u32) void {
     }
 
     switch (rs) {
-        // 0o00 => mfc2(core, word),
-        // 0o01 => dmfc2(core, word),
-        // 0o04 => mtc2(core, word),
-        // 0o05 => dmtc2(core, word),
+        0o00 => mfc2(core, word),
+        0o04 => mtc2(core, word),
         else => fw.log.todo("RSP COP2 rs: {o:02}", .{rs}),
     }
 }
@@ -86,4 +91,16 @@ pub fn swc2(core: *Core, word: u32) void {
         // 0o05 => memory.store(.RV, core, word),
         else => |rd| fw.log.todo("RSP SWC2 rd: {o:02}", .{rd}),
     }
+}
+
+fn mfc2(core: *Core, word: u32) void {
+    const args: MType = @bitCast(word);
+    fw.log.trace("{X:08}: MFC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
+    core.set(args.rt, fw.num.signExtend(u32, core.cp2.getEl(u16, args.vs, args.el)));
+}
+
+fn mtc2(core: *Core, word: u32) void {
+    const args: MType = @bitCast(word);
+    fw.log.trace("{X:08}: MTC2 {t}, {t}[E:{d}]", .{ core.pc, args.rt, args.vs, args.el });
+    core.cp2.setEl(u16, args.vs, args.el, @truncate(core.get(args.rt)));
 }

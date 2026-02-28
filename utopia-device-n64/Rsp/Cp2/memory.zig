@@ -35,10 +35,11 @@ pub fn load(comptime op: MemoryOp, core: *Core, word: u32) void {
 
     const offset = fw.num.signExtend(u12, args.imm) << op.shift();
 
-    fw.log.trace("{X:03}: L{t} {t}, {d}({t})", .{
+    fw.log.trace("{X:03}: L{t} {t}[E:{d}], {d}({t})", .{
         core.pc,
         op,
         args.vt,
+        args.el,
         @as(i12, @bitCast(offset)),
         args.rs,
     });
@@ -65,10 +66,11 @@ pub fn store(comptime op: MemoryOp, core: *Core, word: u32) void {
     const args: Args = @bitCast(word);
     const offset = fw.num.signExtend(u12, args.imm) << op.shift();
 
-    fw.log.trace("{X:03}: S{t} {t}, {d}({t})", .{
+    fw.log.trace("{X:03}: S{t} {t}[E:{d}], {d}({t})", .{
         core.pc,
         op,
         args.vt,
+        args.el,
         @as(i12, @bitCast(offset)),
         args.rs,
     });
