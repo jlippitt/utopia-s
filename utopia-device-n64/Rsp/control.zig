@@ -25,13 +25,13 @@ pub fn j(comptime params: JumpParams, core: *Core, word: u32) void {
 pub fn jr(core: *Core, word: u32) void {
     const args: Core.RType = @bitCast(word);
     fw.log.trace("{X:03}: JR {t}", .{ core.pc, args.rs });
-    core.jump(@truncate(core.get(args.rs)));
+    core.jump(@truncate(core.get(args.rs) & 0xffc));
 }
 
 pub fn jalr(core: *Core, word: u32) void {
     const args: Core.RType = @bitCast(word);
     fw.log.trace("{X:03}: JALR {t}, {t}", .{ core.pc, args.rd, args.rs });
-    const target: u12 = @truncate(core.get(args.rs));
+    const target: u12 = @truncate(core.get(args.rs) & 0xffc);
     core.link(args.rd);
     core.jump(target);
 }
