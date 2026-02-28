@@ -185,7 +185,7 @@ pub fn readData(self: *const Self, comptime T: type, address: u12) T {
 
     for (1..@sizeOf(T)) |byte| {
         result <<= 8;
-        result |= fw.mem.readBe(u8, self.mem, address +% byte);
+        result |= fw.mem.readBe(u8, self.mem, address +% @as(u12, @truncate(byte)));
     }
 
     return result;
@@ -201,7 +201,7 @@ pub fn writeData(self: *const Self, comptime T: type, address: u12, value: T) vo
 
     for (0..@sizeOf(T)) |byte| {
         write_value = std.math.rotl(T, write_value, 8);
-        fw.mem.writeBe(u8, self.mem, address +% byte, @truncate(write_value));
+        fw.mem.writeBe(u8, self.mem, address +% @as(u12, @truncate(byte)), @truncate(write_value));
     }
 }
 
