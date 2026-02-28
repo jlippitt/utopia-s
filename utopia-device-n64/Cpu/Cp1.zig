@@ -61,7 +61,7 @@ pub const IType = packed struct(u32) {
 
 pub fn MType(comptime T: type) type {
     return packed struct(u32) {
-        _: u11,
+        __: u11,
         fs: T,
         rt: Core.Register,
         rs: u5,

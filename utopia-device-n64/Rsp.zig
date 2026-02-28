@@ -205,6 +205,31 @@ pub fn writeData(self: *const Self, comptime T: type, address: u12, value: T) vo
     }
 }
 
+pub fn readCp0Register(self: *Self, reg: Core.Cp0Register) u32 {
+    if (@intFromEnum(reg) >= @intFromEnum(Core.Cp0Register.DPC_START)) {
+        return self.getDevice().rdp.readRegister(@truncate(@intFromEnum(reg)));
+    }
+
+    return self.readRegister(@truncate(@intFromEnum(reg)));
+}
+
+pub fn writeCp0Register(self: *Self, reg: Core.Cp0Register, value: u32) void {
+    if (@intFromEnum(reg) >= @intFromEnum(Core.Cp0Register.DPC_START)) {
+        self.getDevice().rdp.writeRegister(
+            @truncate(@intFromEnum(reg)),
+            value,
+            std.math.maxInt(u32),
+        );
+        return;
+    }
+
+    self.writeRegister(
+        @truncate(@intFromEnum(reg)),
+        value,
+        std.math.maxInt(u32),
+    );
+}
+
 pub fn break_(self: *Self) void {
     self.status.broke = true;
     self.status.halted = true;

@@ -20,7 +20,7 @@ const Register = enum(u5) {
 };
 
 const MType = packed struct(u32) {
-    _: u11,
+    __: u11,
     rd: Register,
     rt: Core.Register,
     rs: u5,

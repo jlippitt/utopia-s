@@ -3,6 +3,7 @@ const fw = @import("framework");
 const Rsp = @import("../Rsp.zig");
 const alu = @import("./alu.zig");
 const control = @import("./control.zig");
+const cp0 = @import("./cp0.zig");
 const memory = @import("./memory.zig");
 const shift = @import("./shift.zig");
 
@@ -16,6 +17,8 @@ pub const Register = enum(u5) {
     T8,   T9, K0, K1, GP, SP, FP, RA,
 };
 // zig fmt: on
+
+pub const Cp0Register = cp0.Register;
 
 pub const PipeState = enum {
     normal,
@@ -173,6 +176,7 @@ fn dispatch(core: *Self, word: u32) void {
         0o15 => alu.iTypeLogic(.OR, core, word),
         0o16 => alu.iTypeLogic(.XOR, core, word),
         0o17 => alu.lui(core, word),
+        0o20 => cp0.cop0(core, word),
         0o40 => memory.load(.LB, core, word),
         0o41 => memory.load(.LH, core, word),
         0o43 => memory.load(.LW, core, word),
