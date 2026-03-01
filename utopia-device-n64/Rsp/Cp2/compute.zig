@@ -68,7 +68,7 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
     const cp2 = &core.cp2;
 
     const lhs = cp2.get(args.vs);
-    const rhs = broadcast(cp2.get(args.vt), args.el);
+    const rhs = cp2.broadcast(args.vt, args.el);
 
     cp2.set(args.vd, switch (comptime op) {
         .VMULF => blk: {
@@ -398,31 +398,6 @@ fn select(
     cp2.clip_compare = v_false;
 
     return result;
-}
-
-fn broadcast(value: @Vector(8, u16), el: u4) @Vector(8, u16) {
-    const mask: [16]@Vector(8, i32) = .{
-        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
-        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
-        .{ 1, 1, 3, 3, 5, 5, 7, 7 },
-        .{ 0, 0, 2, 2, 4, 4, 6, 6 },
-        .{ 3, 3, 3, 3, 7, 7, 7, 7 },
-        .{ 2, 2, 2, 2, 6, 6, 6, 6 },
-        .{ 1, 1, 1, 1, 5, 5, 5, 5 },
-        .{ 0, 0, 0, 0, 4, 4, 4, 4 },
-        @splat(7),
-        @splat(6),
-        @splat(5),
-        @splat(4),
-        @splat(3),
-        @splat(2),
-        @splat(1),
-        @splat(0),
-    };
-
-    return switch (el) {
-        inline else => |index| @shuffle(u16, value, undefined, mask[index]),
-    };
 }
 
 fn clampSigned(acc: @Vector(8, u48)) @Vector(8, u48) {

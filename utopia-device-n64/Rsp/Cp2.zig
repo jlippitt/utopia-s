@@ -3,6 +3,7 @@ const fw = @import("framework");
 const Core = @import("./Core.zig");
 const compute = @import("./Cp2/compute.zig");
 const memory = @import("./Cp2/memory.zig");
+const single_lane = @import("./Cp2/single_lane.zig");
 
 const Self = @This();
 
@@ -56,6 +57,16 @@ pub fn set(self: *Self, reg: Register, value: @Vector(8, u16)) void {
     fw.log.trace("  {t}: {any}", .{ reg, value });
 }
 
+pub fn getLane(self: *const Self, reg: Register, index: usize) u16 {
+    return self.get(reg)[index ^ 7];
+}
+
+pub fn setLane(self: *Self, reg: Register, index: usize, value: u16) void {
+    var result = self.get(reg);
+    result[index ^ 7] = value;
+    self.set(reg, result);
+}
+
 pub fn getEl(self: *const Self, comptime T: type, reg: Register, el: u4) T {
     const bits = comptime @typeInfo(T).int.bits;
     const shift = @as(i32, 128) - (@as(i32, @intCast(el)) * 8) - bits;
@@ -74,6 +85,33 @@ pub fn setEl(self: *Self, comptime T: type, reg: Register, el: u4, value: T) voi
 pub fn setAccLow(self: *Self, value: @Vector(8, u16)) void {
     self.acc &= ~@as(@Vector(8, u48), @splat(0xffff));
     self.acc |= value;
+}
+
+pub fn broadcast(self: *Self, reg: Register, el: u4) @Vector(8, u16) {
+    const mask: [16]@Vector(8, i32) = .{
+        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
+        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
+        .{ 1, 1, 3, 3, 5, 5, 7, 7 },
+        .{ 0, 0, 2, 2, 4, 4, 6, 6 },
+        .{ 3, 3, 3, 3, 7, 7, 7, 7 },
+        .{ 2, 2, 2, 2, 6, 6, 6, 6 },
+        .{ 1, 1, 1, 1, 5, 5, 5, 5 },
+        .{ 0, 0, 0, 0, 4, 4, 4, 4 },
+        @splat(7),
+        @splat(6),
+        @splat(5),
+        @splat(4),
+        @splat(3),
+        @splat(2),
+        @splat(1),
+        @splat(0),
+    };
+
+    const value = self.get(reg);
+
+    return switch (el) {
+        inline else => |index| @shuffle(u16, value, undefined, mask[index]),
+    };
 }
 
 pub fn cop2(core: *Core, word: u32) void {
@@ -115,6 +153,7 @@ pub fn cop2(core: *Core, word: u32) void {
             0o53 => compute.compute(.VNOR, core, word),
             0o54 => compute.compute(.VXOR, core, word),
             0o55 => compute.compute(.VNXOR, core, word),
+            0o63 => single_lane.vmov(core, word),
             else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
         };
     }
