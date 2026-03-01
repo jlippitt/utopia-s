@@ -6,6 +6,7 @@ const Cp2 = @import("../Cp2.zig");
 const zero: @Vector(8, u16) = @splat(0);
 const i16_max: @Vector(8, u16) = @splat(0x7fff);
 const i16_min: @Vector(8, u16) = @splat(0x8000);
+const u16_max: @Vector(8, u16) = @splat(0xffff);
 const v_false: @Vector(8, bool) = @splat(false);
 const v_true: @Vector(8, bool) = @splat(true);
 
@@ -47,6 +48,10 @@ pub const ComputeOp = enum {
     VNE,
     VGE,
     VLT,
+    VCL,
+    VCH,
+    VCR,
+    VMRG,
 };
 
 pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
@@ -63,7 +68,7 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
     const cp2 = &core.cp2;
 
     const lhs = cp2.get(args.vs);
-    const rhs = cp2.broadcast(args.vt, args.el);
+    const rhs = broadcast(cp2.get(args.vt), args.el);
 
     cp2.set(args.vd, switch (comptime op) {
         .VMULF => blk: {
@@ -267,6 +272,100 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
             const condition = @select(bool, fw.num.signed(lhs) < fw.num.signed(rhs), v_true, le);
             break :blk select(cp2, condition, lhs, rhs);
         },
+        .VCL => blk: {
+            const cmp_result = @as(@Vector(8, u32), lhs) + @as(@Vector(8, u32), rhs);
+            const limit: @Vector(8, u32) = @splat(0x0001_0000);
+
+            const ext = @select(bool, cp2.compare_ext, cmp_result <= limit, cmp_result == zero);
+            const compare = @select(bool, cp2.not_equal, cp2.compare, ext);
+            cp2.compare = @select(bool, cp2.carry, compare, cp2.compare);
+
+            const clip_compare = @select(bool, cp2.not_equal, cp2.clip_compare, lhs >= rhs);
+            cp2.clip_compare = @select(bool, cp2.carry, cp2.clip_compare, clip_compare);
+
+            const lt_result = @select(u16, cp2.compare, -%rhs, lhs);
+            const ge_result = @select(u16, cp2.clip_compare, rhs, lhs);
+            const result = @select(u16, cp2.carry, lt_result, ge_result);
+
+            cp2.setAccLow(result);
+
+            cp2.carry = v_false;
+            cp2.not_equal = v_false;
+            cp2.compare_ext = v_false;
+
+            break :blk result;
+        },
+        .VCH => blk: {
+            cp2.carry = fw.num.signed(lhs ^ rhs) < fw.num.signed(zero);
+
+            const cmp_value = @select(u16, cp2.carry, lhs +% rhs, lhs -% rhs);
+
+            cp2.not_equal = @select(bool, cmp_value != zero, lhs != ~rhs, v_false);
+
+            cp2.compare = @select(
+                bool,
+                cp2.carry,
+                fw.num.signed(cmp_value) <= fw.num.signed(zero),
+                fw.num.signed(rhs) < fw.num.signed(zero),
+            );
+
+            cp2.clip_compare = @select(
+                bool,
+                cp2.carry,
+                fw.num.signed(rhs) < fw.num.signed(zero),
+                fw.num.signed(cmp_value) >= fw.num.signed(zero),
+            );
+
+            cp2.compare_ext = @select(bool, cp2.carry, cmp_value == u16_max, v_false);
+
+            const lt_result = @select(u16, cp2.compare, -%rhs, lhs);
+            const ge_result = @select(u16, cp2.clip_compare, rhs, lhs);
+            const result = @select(u16, cp2.carry, lt_result, ge_result);
+
+            cp2.setAccLow(result);
+
+            break :blk result;
+        },
+        .VCR => blk: {
+            const carry = fw.num.signed(lhs ^ rhs) < fw.num.signed(zero);
+            const cmp_value = @select(u16, carry, lhs +% rhs, lhs -% rhs);
+
+            cp2.clip_compare = @select(
+                bool,
+                carry,
+                fw.num.signed(rhs) < fw.num.signed(zero),
+                fw.num.signed(cmp_value) >= fw.num.signed(zero),
+            );
+
+            cp2.compare = @select(
+                bool,
+                carry,
+                fw.num.signed(cmp_value) < fw.num.signed(zero),
+                fw.num.signed(rhs) < fw.num.signed(zero),
+            );
+
+            const lt_result = @select(u16, cp2.compare, ~rhs, lhs);
+            const ge_result = @select(u16, cp2.clip_compare, rhs, lhs);
+            const result = @select(u16, carry, lt_result, ge_result);
+
+            cp2.setAccLow(result);
+
+            cp2.carry = v_false;
+            cp2.not_equal = v_false;
+            cp2.compare_ext = v_false;
+
+            break :blk result;
+        },
+        .VMRG => blk: {
+            const result = @select(u16, cp2.compare, lhs, rhs);
+
+            cp2.setAccLow(result);
+
+            cp2.carry = v_false;
+            cp2.not_equal = v_false;
+
+            break :blk result;
+        },
     });
 }
 
@@ -299,6 +398,31 @@ fn select(
     cp2.clip_compare = v_false;
 
     return result;
+}
+
+fn broadcast(value: @Vector(8, u16), el: u4) @Vector(8, u16) {
+    const mask: [16]@Vector(8, i32) = .{
+        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
+        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
+        .{ 1, 1, 3, 3, 5, 5, 7, 7 },
+        .{ 0, 0, 2, 2, 4, 4, 6, 6 },
+        .{ 3, 3, 3, 3, 7, 7, 7, 7 },
+        .{ 2, 2, 2, 2, 6, 6, 6, 6 },
+        .{ 1, 1, 1, 1, 5, 5, 5, 5 },
+        .{ 0, 0, 0, 0, 4, 4, 4, 4 },
+        @splat(7),
+        @splat(6),
+        @splat(5),
+        @splat(4),
+        @splat(3),
+        @splat(2),
+        @splat(1),
+        @splat(0),
+    };
+
+    return switch (el) {
+        inline else => |index| @shuffle(u16, value, undefined, mask[index]),
+    };
 }
 
 fn clampSigned(acc: @Vector(8, u48)) @Vector(8, u48) {

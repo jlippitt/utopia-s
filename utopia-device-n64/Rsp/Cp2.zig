@@ -76,33 +76,6 @@ pub fn setAccLow(self: *Self, value: @Vector(8, u16)) void {
     self.acc |= value;
 }
 
-pub fn broadcast(self: *const Self, reg: Register, el: u4) @Vector(8, u16) {
-    const mask: [16]@Vector(8, i32) = .{
-        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
-        .{ 0, 1, 2, 3, 4, 5, 6, 7 },
-        .{ 1, 1, 3, 3, 5, 5, 7, 7 },
-        .{ 0, 0, 2, 2, 4, 4, 6, 6 },
-        .{ 3, 3, 3, 3, 7, 7, 7, 7 },
-        .{ 2, 2, 2, 2, 6, 6, 6, 6 },
-        .{ 1, 1, 1, 1, 5, 5, 5, 5 },
-        .{ 0, 0, 0, 0, 4, 4, 4, 4 },
-        @splat(7),
-        @splat(6),
-        @splat(5),
-        @splat(4),
-        @splat(3),
-        @splat(2),
-        @splat(1),
-        @splat(0),
-    };
-
-    const value = self.get(reg);
-
-    return switch (el) {
-        inline else => |index| @shuffle(u16, value, undefined, mask[index]),
-    };
-}
-
 pub fn cop2(core: *Core, word: u32) void {
     const rs: u5 = @truncate(word >> 21);
 
@@ -132,6 +105,10 @@ pub fn cop2(core: *Core, word: u32) void {
             0o41 => compute.compute(.VEQ, core, word),
             0o42 => compute.compute(.VNE, core, word),
             0o43 => compute.compute(.VGE, core, word),
+            0o44 => compute.compute(.VCL, core, word),
+            0o45 => compute.compute(.VCH, core, word),
+            0o46 => compute.compute(.VCR, core, word),
+            0o47 => compute.compute(.VMRG, core, word),
             0o50 => compute.compute(.VAND, core, word),
             0o51 => compute.compute(.VNAND, core, word),
             0o52 => compute.compute(.VOR, core, word),
