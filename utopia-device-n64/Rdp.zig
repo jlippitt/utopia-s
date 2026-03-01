@@ -103,6 +103,9 @@ pub fn downloadImageData(self: *Self) void {
 }
 
 pub fn syncFull(self: *Self) void {
+    fw.log.pushContext("main");
+    defer fw.log.popContext();
+
     self.status.pipe_busy = false;
     self.status.gclk = false;
     self.getDevice().mi.raiseInterrupt(.dp);
