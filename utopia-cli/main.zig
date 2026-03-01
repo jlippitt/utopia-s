@@ -10,13 +10,18 @@ pub const panic = std.debug.FullPanic(panicHandler);
 pub const utopia_logger: utopia.log.Interface = .{
     .enabled = logger.enabled,
     .record = logger.record,
+    .pushContext = logger.pushContext,
+    .popContext = logger.popContext,
 };
 
 pub fn main() !void {
-    try logger.init();
+    const allocator = std.heap.c_allocator;
+
+    logger.init(allocator) catch |err| {
+        std.debug.panic("Failed to initialize logger: {t}", .{err});
+    };
     defer logger.deinit();
 
-    const allocator = std.heap.c_allocator;
     const app_args, const device_args = try cli.parse(allocator) orelse return;
 
     _ = app_args;

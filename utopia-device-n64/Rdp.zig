@@ -88,14 +88,19 @@ fn transferDma(self: *Self) void {
 
     fw.log.debug("Processing RDP commands..", .{});
 
-    if (self.status.xbus) {
-        fw.log.todo("RDP XBus DMA", .{});
-    } else {
-        const rdram = self.getDeviceConst().rdram;
+    {
+        fw.log.pushContext("rdp");
+        defer fw.log.popContext();
 
-        while (self.dma_active.start != self.dma_active.end) {
-            self.core.step(fw.mem.readBe(u64, rdram, self.dma_active.start));
-            self.dma_active.start +%= 8;
+        if (self.status.xbus) {
+            fw.log.todo("RDP XBus DMA", .{});
+        } else {
+            const rdram = self.getDeviceConst().rdram;
+
+            while (self.dma_active.start != self.dma_active.end) {
+                self.core.step(fw.mem.readBe(u64, rdram, self.dma_active.start));
+                self.dma_active.start +%= 8;
+            }
         }
     }
 

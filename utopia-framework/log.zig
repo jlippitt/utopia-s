@@ -12,14 +12,11 @@ pub const Level = enum {
 pub const Interface = struct {
     enabled: *const fn (comptime level: Level) bool,
     record: *const fn (comptime level: Level, comptime fmt: []const u8, args: anytype) void,
+    pushContext: *const fn (name: []const u8) void,
+    popContext: *const fn () void,
 };
 
 const null_logger = struct {
-    const interface: Interface = .{
-        .enabled = enabled,
-        .record = record,
-    };
-
     fn enabled(comptime level: Level) bool {
         _ = level;
         return false;
@@ -30,12 +27,23 @@ const null_logger = struct {
         _ = fmt;
         _ = args;
     }
+
+    fn pushContext(name: []const u8) void {
+        _ = name;
+    }
+
+    fn popContext() void {}
 };
 
 const logger: Interface = if (@hasDecl(root, "utopia_logger"))
     root.utopia_logger
 else
-    null_logger.interface;
+    .{
+        .enabled = null_logger.enabled,
+        .record = null_logger.record,
+        .pushContext = null_logger.pushContext,
+        .popContext = null_logger.popContext,
+    };
 
 pub fn log(comptime level: Level, comptime fmt: []const u8, args: anytype) void {
     if (!comptime logger.enabled(level)) {
@@ -75,4 +83,12 @@ pub fn todo(comptime fmt: []const u8, args: anytype) noreturn {
 
 pub fn unimplemented(comptime fmt: []const u8, args: anytype) noreturn {
     panic("Unimplemented: " ++ fmt, args);
+}
+
+pub fn pushContext(name: []const u8) void {
+    logger.pushContext(name);
+}
+
+pub fn popContext() void {
+    logger.popContext();
 }
