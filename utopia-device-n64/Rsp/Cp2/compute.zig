@@ -7,6 +7,7 @@ const zero: @Vector(8, u16) = @splat(0);
 const i16_max: @Vector(8, u16) = @splat(0x7fff);
 const i16_min: @Vector(8, u16) = @splat(0x8000);
 const v_false: @Vector(8, bool) = @splat(false);
+const v_true: @Vector(8, bool) = @splat(true);
 
 const Args = packed struct(u32) {
     funct: u6,
@@ -42,6 +43,10 @@ pub const ComputeOp = enum {
     VNOR,
     VXOR,
     VNXOR,
+    VEQ,
+    VNE,
+    VGE,
+    VLT,
 };
 
 pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
@@ -55,129 +60,131 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
         args.el,
     });
 
-    const lhs = core.cp2.get(args.vs);
-    const rhs = core.cp2.broadcast(args.vt, args.el);
+    const cp2 = &core.cp2;
 
-    core.cp2.set(args.vd, switch (comptime op) {
+    const lhs = cp2.get(args.vs);
+    const rhs = cp2.broadcast(args.vt, args.el);
+
+    cp2.set(args.vd, switch (comptime op) {
         .VMULF => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc = @splat(0x8000);
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc = @splat(0x8000);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
 
-            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
         .VMULU => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc = @splat(0x8000);
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc = @splat(0x8000);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
 
-            break :blk @truncate(clampUnsigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampUnsigned(cp2.acc) >> @splat(16));
         },
         .VMUDL => blk: {
             const result = @as(@Vector(8, u32), lhs) *
                 @as(@Vector(8, u32), rhs);
 
-            core.cp2.acc = result >> @splat(16);
+            cp2.acc = result >> @splat(16);
 
-            break :blk @truncate(core.cp2.acc);
+            break :blk @truncate(cp2.acc);
         },
         .VMUDM => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.zeroExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
 
-            break :blk @truncate(core.cp2.acc >> @splat(16));
+            break :blk @truncate(cp2.acc >> @splat(16));
         },
         .VMUDN => blk: {
             const result = fw.num.zeroExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
 
-            break :blk @truncate(core.cp2.acc);
+            break :blk @truncate(cp2.acc);
         },
         .VMUDH => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc = fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
+            cp2.acc = fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
 
-            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
         .VMACF => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
 
-            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
         .VMACU => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
 
-            break :blk @truncate(clampUnsigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampUnsigned(cp2.acc) >> @splat(16));
         },
         .VMADL => blk: {
             const result = @as(@Vector(8, u32), lhs) *
                 @as(@Vector(8, u32), rhs);
 
-            core.cp2.acc +%= result >> @splat(16);
+            cp2.acc +%= result >> @splat(16);
 
-            break :blk @truncate(clampSigned(core.cp2.acc));
+            break :blk @truncate(clampSigned(cp2.acc));
         },
         .VMADM => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.zeroExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
 
-            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
         .VMADN => blk: {
             const result = fw.num.zeroExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
 
-            break :blk @truncate(clampSigned(core.cp2.acc));
+            break :blk @truncate(clampSigned(cp2.acc));
         },
         .VMADH => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            core.cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
 
-            break :blk @truncate(clampSigned(core.cp2.acc) >> @splat(16));
+            break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
         .VADD => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) +%
                 fw.num.signExtend(@Vector(8, i32), rhs) +%
-                @as(@Vector(8, i32), @intFromBool(core.cp2.carry));
+                @as(@Vector(8, i32), @intFromBool(cp2.carry));
 
-            core.cp2.setAccLow(fw.num.truncate(@Vector(8, u16), result));
+            cp2.setAccLow(fw.num.truncate(@Vector(8, u16), result));
 
-            core.cp2.carry = v_false;
-            core.cp2.not_equal = v_false;
+            cp2.carry = v_false;
+            cp2.not_equal = v_false;
 
             break :blk fw.num.truncate(@Vector(8, u16), clampResult(result));
         },
         .VSUB => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) -%
                 fw.num.signExtend(@Vector(8, i32), rhs) -%
-                @as(@Vector(8, i32), @intFromBool(core.cp2.carry));
+                @as(@Vector(8, i32), @intFromBool(cp2.carry));
 
-            core.cp2.setAccLow(fw.num.truncate(@Vector(8, u16), result));
+            cp2.setAccLow(fw.num.truncate(@Vector(8, u16), result));
 
-            core.cp2.carry = v_false;
-            core.cp2.not_equal = v_false;
+            cp2.carry = v_false;
+            cp2.not_equal = v_false;
 
             break :blk fw.num.truncate(@Vector(8, u16), clampResult(result));
         },
@@ -186,59 +193,79 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
             const neg = -%rhs;
             const neg_clamped = @select(u16, rhs == i16_min, i16_max, neg);
 
-            core.cp2.setAccLow(@select(u16, lhs < i16_min, pos, neg));
+            cp2.setAccLow(@select(u16, lhs < i16_min, pos, neg));
 
             break :blk @select(u16, lhs < i16_min, pos, neg_clamped);
         },
         .VADDC => blk: {
             const result, const overflow = @addWithOverflow(lhs, rhs);
 
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
 
-            core.cp2.carry = overflow != zero;
-            core.cp2.not_equal = v_false;
+            cp2.carry = overflow != zero;
+            cp2.not_equal = v_false;
 
             break :blk result;
         },
         .VSUBC => blk: {
             const result, const overflow = @subWithOverflow(lhs, rhs);
 
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
 
-            core.cp2.carry = overflow != zero;
-            core.cp2.not_equal = result != zero;
+            cp2.carry = overflow != zero;
+            cp2.not_equal = result != zero;
 
             break :blk result;
         },
         .VAND => blk: {
             const result = lhs & rhs;
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
             break :blk result;
         },
         .VNAND => blk: {
             const result = ~(lhs & rhs);
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
             break :blk result;
         },
         .VOR => blk: {
             const result = lhs | rhs;
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
             break :blk result;
         },
         .VNOR => blk: {
             const result = ~(lhs | rhs);
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
             break :blk result;
         },
         .VXOR => blk: {
             const result = lhs ^ rhs;
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
             break :blk result;
         },
         .VNXOR => blk: {
             const result = ~(lhs ^ rhs);
-            core.cp2.setAccLow(result);
+            cp2.setAccLow(result);
             break :blk result;
+        },
+        .VEQ => blk: {
+            const condition = @select(bool, lhs == rhs, cp2.not_equal == v_false, v_false);
+            break :blk select(cp2, condition, lhs, rhs);
+        },
+        .VNE => blk: {
+            const condition = @select(bool, lhs == rhs, cp2.not_equal, v_true);
+            break :blk select(cp2, condition, lhs, rhs);
+        },
+        .VGE => blk: {
+            const flags = @select(bool, cp2.carry, !cp2.not_equal, v_true);
+            const le = @select(bool, lhs == rhs, flags, v_false);
+            const condition = @select(bool, fw.num.signed(lhs) > fw.num.signed(rhs), v_true, le);
+            break :blk select(cp2, condition, lhs, rhs);
+        },
+        .VLT => blk: {
+            const flags = @select(bool, cp2.carry, cp2.not_equal, v_false);
+            const le = @select(bool, lhs == rhs, flags, v_false);
+            const condition = @select(bool, fw.num.signed(lhs) < fw.num.signed(rhs), v_true, le);
+            break :blk select(cp2, condition, lhs, rhs);
         },
     });
 }
@@ -254,6 +281,24 @@ pub fn vsar(core: *Core, word: u32) void {
         10 => @truncate(core.cp2.acc),
         else => @splat(0),
     });
+}
+
+fn select(
+    cp2: *Cp2,
+    condition: @Vector(8, bool),
+    lhs: @Vector(8, u16),
+    rhs: @Vector(8, u16),
+) @Vector(8, u16) {
+    const result = @select(u16, condition, lhs, rhs);
+
+    cp2.setAccLow(result);
+
+    cp2.carry = v_false;
+    cp2.not_equal = v_false;
+    cp2.compare = condition;
+    cp2.clip_compare = v_false;
+
+    return result;
 }
 
 fn clampSigned(acc: @Vector(8, u48)) @Vector(8, u48) {

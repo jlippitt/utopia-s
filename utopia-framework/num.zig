@@ -1,10 +1,39 @@
 const std = @import("std");
 
+pub fn WithSignedness(comptime signedness: std.builtin.Signedness, comptime T: type) type {
+    return switch (@typeInfo(T)) {
+        .int => |int| std.meta.Int(.signed, int.bits),
+        .vector => |vector| blk: {
+            const len = vector.len;
+            const Int = @typeInfo(T).vector.child;
+            const bits = @typeInfo(Int).int.bits;
+            break :blk @Vector(len, std.meta.Int(signedness, bits));
+        },
+        else => @compileError("Type not supported by 'WithSignedness'"),
+    };
+}
+
+pub fn Signed(comptime T: type) type {
+    return WithSignedness(.signed, T);
+}
+
+pub fn Unsigned(comptime T: type) type {
+    return WithSignedness(.unsigned, T);
+}
+
+pub fn signed(value: anytype) Signed(@TypeOf(value)) {
+    return @bitCast(value);
+}
+
+pub fn unsigned(value: anytype) Unsigned(@TypeOf(value)) {
+    return @bitCast(value);
+}
+
 pub fn truncate(
-    comptime Dst: type,
+    comptime T: type,
     value: anytype,
-) Dst {
-    return switch (@typeInfo(Dst)) {
+) T {
+    return switch (@typeInfo(T)) {
         .int => |int| blk: {
             const Src = @TypeOf(value);
             const dst_bits = int.bits;
@@ -32,10 +61,10 @@ pub fn truncate(
 
 pub fn extend(
     comptime signedness: std.builtin.Signedness,
-    comptime Dst: type,
+    comptime T: type,
     value: anytype,
-) Dst {
-    return switch (@typeInfo(Dst)) {
+) T {
+    return switch (@typeInfo(T)) {
         .int => |int| blk: {
             const Src = @TypeOf(value);
             const dst_bits = int.bits;
