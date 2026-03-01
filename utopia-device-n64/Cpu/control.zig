@@ -75,7 +75,7 @@ pub fn branchUnary(
         if (params.link) "AL" else "",
         if (params.likely) "L" else "",
         args.rs,
-        @as(i32, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     const value: i64 = @bitCast(core.get(args.rs));
@@ -111,7 +111,7 @@ pub fn branchBinary(
         if (params.likely) "L" else "",
         args.rs,
         args.rt,
-        @as(i32, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     const lhs = core.get(args.rs);
@@ -139,11 +139,11 @@ pub const TrapOp = enum {
     ) bool {
         return switch (comptime op) {
             .TGE => switch (comptime signedness) {
-                .signed => @as(i64, @bitCast(lhs)) >= @as(i64, @bitCast(rhs)),
+                .signed => fw.num.signed(lhs) >= fw.num.signed(rhs),
                 .unsigned => lhs >= rhs,
             },
             .TLT => switch (comptime signedness) {
-                .signed => @as(i64, @bitCast(lhs)) < @as(i64, @bitCast(rhs)),
+                .signed => fw.num.signed(lhs) < fw.num.signed(rhs),
                 .unsigned => lhs < rhs,
             },
             .TEQ => lhs == rhs,
@@ -178,7 +178,7 @@ pub fn iTypeTrap(
         op,
         if (signedness == .unsigned) "U" else "",
         args.rs,
-        @as(i64, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     if (op.apply(signedness, core.get(args.rs), offset)) {

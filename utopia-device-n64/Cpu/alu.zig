@@ -61,7 +61,7 @@ pub const ArithmeticOp = enum {
                     try std.math.sub(i32, fw.num.truncate(i32, lhs), fw.num.truncate(i32, rhs)),
                 ),
                 .DSUB => @bitCast(try std.math.sub(i64, @bitCast(lhs), @bitCast(rhs))),
-                .SLT => @intFromBool(@as(i64, @bitCast(lhs)) < @as(i64, @bitCast(rhs))),
+                .SLT => @intFromBool(fw.num.signed(lhs) < fw.num.signed(rhs)),
             },
             .unsigned => switch (comptime op) {
                 .ADD => fw.num.signExtend(
@@ -95,7 +95,7 @@ pub fn iTypeArithmetic(
         if (signedness == .unsigned) "U" else "",
         args.rt,
         args.rs,
-        @as(i64, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     core.set(args.rt, op.apply(signedness, core.get(args.rs), offset) catch {

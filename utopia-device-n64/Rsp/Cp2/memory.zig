@@ -40,7 +40,7 @@ pub fn load(comptime op: MemoryOp, core: *Core, word: u32) void {
         op,
         args.vt,
         args.el,
-        @as(i12, @bitCast(offset)),
+        fw.num.signed(offset),
         args.rs,
     });
 
@@ -71,7 +71,7 @@ pub fn store(comptime op: MemoryOp, core: *Core, word: u32) void {
         op,
         args.vt,
         args.el,
-        @as(i12, @bitCast(offset)),
+        fw.num.signed(offset),
         args.rs,
     });
 

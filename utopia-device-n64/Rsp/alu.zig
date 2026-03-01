@@ -51,7 +51,7 @@ pub const ArithmeticOp = enum {
             .ADD => lhs +% rhs,
             .SUB => lhs -% rhs,
             .SLT => switch (comptime signedness) {
-                .signed => @intFromBool(@as(i32, @bitCast(lhs)) < @as(i32, @bitCast(rhs))),
+                .signed => @intFromBool(fw.num.signed(lhs) < fw.num.signed(rhs)),
                 .unsigned => @intFromBool(lhs < rhs),
             },
         };
@@ -73,7 +73,7 @@ pub fn iTypeArithmetic(
         if (signedness == .unsigned) "U" else "",
         args.rt,
         args.rs,
-        @as(i32, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     core.set(args.rt, op.apply(signedness, core.get(args.rs), offset));

@@ -10,7 +10,7 @@ pub const ShiftOp = enum {
         return switch (comptime op) {
             .SLL => value << shift,
             .SRL => value >> shift,
-            .SRA => @bitCast(@as(i32, @bitCast(value)) >> shift),
+            .SRA => @bitCast(fw.num.signed(value) >> shift),
         };
     }
 };

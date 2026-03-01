@@ -57,7 +57,7 @@ pub fn branchUnary(
         op,
         if (params.link) "AL" else "",
         args.rs,
-        @as(i12, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     const value: i32 = @bitCast(core.get(args.rs));
@@ -92,7 +92,7 @@ pub fn branchBinary(
         if (params.link) "AL" else "",
         args.rs,
         args.rt,
-        @as(i12, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     const lhs = core.get(args.rs);

@@ -75,7 +75,7 @@ pub fn branch(
         op,
         if (params.link) "AL" else "",
         if (params.likely) "L" else "",
-        @as(i32, @bitCast(offset)),
+        fw.num.signed(offset),
     });
 
     const taken = switch (comptime op) {

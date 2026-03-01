@@ -15,11 +15,11 @@ pub const ShiftOp = enum {
             .SRL => fw.num.signExtend(u64, @as(u32, @truncate(value)) >> @truncate(shift)),
             .SRA => fw.num.signExtend(
                 u64,
-                @as(i32, @truncate(@as(i64, @bitCast(value)) >> @as(u5, @truncate(shift)))),
+                @as(i32, @truncate(fw.num.signed(value) >> @as(u5, @truncate(shift)))),
             ),
             .DSLL => value << shift,
             .DSRL => value >> shift,
-            .DSRA => @bitCast(@as(i64, @bitCast(value)) >> shift),
+            .DSRA => @bitCast(fw.num.signed(value) >> shift),
         };
     }
 };

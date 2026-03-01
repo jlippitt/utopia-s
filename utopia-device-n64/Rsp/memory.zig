@@ -19,7 +19,7 @@ pub fn load(comptime op: LoadOp, core: *Core, word: u32) void {
         core.pc,
         op,
         args.rt,
-        @as(i12, @bitCast(offset)),
+        fw.num.signed(offset),
         args.rs,
     });
 
@@ -48,7 +48,7 @@ pub fn store(comptime op: StoreOp, core: *Core, word: u32) void {
         core.pc,
         op,
         args.rt,
-        @as(i12, @bitCast(offset)),
+        fw.num.signed(offset),
         args.rs,
     });
 
