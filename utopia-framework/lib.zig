@@ -20,6 +20,7 @@ pub const DeviceError = std.mem.Allocator.Error ||
     std.fs.File.ReadError ||
     error{
         ArgError,
+        SdlError,
     };
 
 pub const ScreenSize = struct {

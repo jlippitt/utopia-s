@@ -45,7 +45,9 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
                 fw.log.unimplemented("MI Upper Mode", .{});
             }
 
-            // TODO: RDP interrupts
+            if ((masked_value & 0x0800) != 0) {
+                self.clearInterrupt(.dp);
+            }
 
             fw.log.debug("MI_MODE: {any}", .{self.mode});
         },

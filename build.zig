@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .imports = &.{
             .{ .name = "framework", .module = utopia_framework },
+            .{ .name = "sdl3", .module = sdl3.module("sdl3") },
         },
     });
 

@@ -148,6 +148,7 @@ pub fn handleNewLineEvent(self: *Self) bool {
     if (self.v_current >= self.v_total) {
         const serrate: u10 = @intFromBool(self.ctrl.serrate);
         self.v_current = self.v_current & serrate ^ serrate;
+        self.getDevice().rdp.downloadImageData();
         self.render();
         frame_complete = true;
     }

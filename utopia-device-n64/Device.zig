@@ -139,7 +139,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
         .clock = clock,
         .rdram = rdram[0..rdram_size],
         .rsp = try .init(&arena),
-        .rdp = .init(),
+        .rdp = try .init(&arena),
         .mi = .init(),
         .vi = vi,
         .ai = ai,
@@ -160,6 +160,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.D
 }
 
 pub fn deinit(self: *Self) void {
+    self.rdp.deinit();
     self.arena.deinit();
 }
 
