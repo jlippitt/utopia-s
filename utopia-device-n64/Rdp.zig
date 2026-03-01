@@ -1,11 +1,19 @@
 const fw = @import("framework");
+const Device = @import("./Device.zig");
+const Core = @import("./Rdp/Core.zig");
 
 const Self = @This();
 
+dma_regs: Dma = .{},
+dma_active: Dma = .{},
+dma_pending: Dma = .{},
 status: Status = .{},
+core: Core = .{},
 
 pub fn init() Self {
-    return .{};
+    return .{
+        .core = .init(),
+    };
 }
 
 pub fn readCommand(self: *Self, address: u32) u32 {
@@ -24,12 +32,80 @@ pub fn readRegister(self: *Self, index: u3) u32 {
 }
 
 pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
-    _ = self;
-    _ = mask;
-
     switch (index) {
+        0 => {
+            if (self.status.start_pending) {
+                fw.log.todo("DPC_START write while starting pending flag is set", .{});
+            }
+
+            fw.num.writeMasked(
+                u24,
+                &self.dma_regs.start,
+                @truncate(value),
+                @truncate(mask & ~@as(u32, 7)),
+            );
+
+            fw.log.debug("DPC_START: {X:08}", .{self.dma_regs.start});
+            self.status.start_pending = true;
+        },
+        1 => {
+            fw.num.writeMasked(
+                u24,
+                &self.dma_regs.end,
+                @truncate(value),
+                @truncate(mask & ~@as(u32, 7)),
+            );
+
+            fw.log.debug("DPC_END: {X:08}", .{self.dma_regs.end});
+
+            if (self.status.start_pending) {
+                if (self.dma_active.start == self.dma_active.end) {
+                    self.status.start_pending = false;
+                    self.dma_active = self.dma_regs;
+                    fw.log.debug("RDP DMA Active: {any}", .{self.dma_active});
+                } else {
+                    fw.log.todo("RDP DMA queue", .{});
+                }
+            } else {
+                fw.log.todo("DPC_END update while start pending flag is not set", .{});
+            }
+
+            if (self.dma_active.start != self.dma_active.end and !self.status.freeze) {
+                self.transferDma();
+            }
+        },
         else => fw.log.panic("Unmapped RDP register write: {} <= {X:08}", .{ index, value }),
     }
+}
+
+fn transferDma(self: *Self) void {
+    if (self.status.flush) {
+        fw.log.unimplemented("RDP flush flag", .{});
+    }
+
+    self.status.pipe_busy = true;
+    self.status.gclk = true;
+
+    fw.log.debug("Processing RDP commands..", .{});
+
+    if (self.status.xbus) {
+        fw.log.todo("RDP XBus DMA", .{});
+    } else {
+        const rdram = self.getDeviceConst().rdram;
+
+        while (self.dma_active.start != self.dma_active.end) {
+            self.core.step(fw.mem.readBe(u64, rdram, self.dma_active.start));
+            self.dma_active.start +%= 8;
+        }
+    }
+
+    // TODO: RDP DMA queue
+
+    fw.log.debug("RDP DMA complete", .{});
+}
+
+fn getDeviceConst(self: *const Self) *const Device {
+    return @alignCast(@fieldParentPtr("rdp", self));
 }
 
 const Status = packed struct(u32) {
@@ -45,4 +121,9 @@ const Status = packed struct(u32) {
     end_pending: bool = false,
     start_pending: bool = false,
     __: u21 = 0,
+};
+
+const Dma = struct {
+    start: u24 = 0,
+    end: u24 = 0,
 };
