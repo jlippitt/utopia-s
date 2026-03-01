@@ -73,13 +73,13 @@ pub fn setLane(self: *Self, reg: Register, index: usize, value: u16) void {
 
 pub fn getEl(self: *const Self, comptime T: type, reg: Register, el: u4) T {
     const bits = comptime @typeInfo(T).int.bits;
-    const shift = @as(i32, 128) - (@as(i32, @intCast(el)) * 8) - bits;
+    const shift = 128 - (@as(i32, @intCast(el)) * 8) - bits;
     return @truncate(std.math.rotr(u128, @bitCast(self.get(reg)), shift));
 }
 
 pub fn setEl(self: *Self, comptime T: type, reg: Register, el: u4, value: T) void {
     const bits = comptime @typeInfo(T).int.bits;
-    const shift = @as(i32, 128) - (@as(i32, @intCast(el)) * 8) - bits;
+    const shift = 128 - (@as(i32, @intCast(el)) * 8) - bits;
     var result: u128 = @bitCast(self.get(reg));
     result &= ~std.math.shl(u128, @as(u128, std.math.maxInt(T)), shift);
     result |= std.math.shl(u128, value, shift);
@@ -184,6 +184,7 @@ pub fn lwc2(core: *Core, word: u32) void {
         0o02 => memory.load(.LV, core, word),
         0o03 => memory.load(.DV, core, word),
         0o04 => memory.load(.QV, core, word),
+        0o05 => memory.load(.RV, core, word),
         // 0o05 => memory.load(.RV, core, word),
         else => |rd| fw.log.todo("RSP LWC2 rd: {o:02}", .{rd}),
     }
@@ -196,7 +197,7 @@ pub fn swc2(core: *Core, word: u32) void {
         0o02 => memory.store(.LV, core, word),
         0o03 => memory.store(.DV, core, word),
         0o04 => memory.store(.QV, core, word),
-        // 0o05 => memory.store(.RV, core, word),
+        0o05 => memory.store(.RV, core, word),
         else => |rd| fw.log.todo("RSP SWC2 rd: {o:02}", .{rd}),
     }
 }

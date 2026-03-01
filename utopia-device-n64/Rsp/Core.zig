@@ -107,9 +107,34 @@ pub fn readData(self: *Self, comptime T: type, address: u12) T {
     return value;
 }
 
+pub fn readDataAligned(self: *Self, comptime T: type, address: u12) T {
+    std.debug.assert((address & (@sizeOf(T) - 1)) == 0);
+    const value = self.getRspConst().readDataAligned(T, address);
+    fw.log.trace("  [{X:03} => {s}]", .{ address, formatHex(value) });
+    return value;
+}
+
 pub fn writeData(self: *Self, comptime T: type, address: u12, value: T) void {
     fw.log.trace("  [{X:03} <= {s}]", .{ address, formatHex(value) });
     return self.getRsp().writeData(T, address, value);
+}
+
+pub fn writeDataAligned(self: *Self, comptime T: type, address: u12, value: T) void {
+    std.debug.assert((address & (@sizeOf(T) - 1)) == 0);
+    fw.log.trace("  [{X:03} <= {s}]", .{ address, formatHex(value) });
+    return self.getRsp().writeDataAligned(T, address, value);
+}
+
+pub fn writeDataAlignedMasked(
+    self: *Self,
+    comptime T: type,
+    address: u12,
+    value: T,
+    mask: T,
+) void {
+    std.debug.assert((address & (@sizeOf(T) - 1)) == 0);
+    fw.log.trace("  [{X:03} <= {s}]", .{ address, formatHex(value) });
+    return self.getRsp().writeDataAlignedMasked(T, address, value, mask);
 }
 
 pub fn jump(self: *Self, target: u12) void {

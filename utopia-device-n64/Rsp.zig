@@ -192,6 +192,10 @@ pub fn readData(self: *const Self, comptime T: type, address: u12) T {
     return result;
 }
 
+pub fn readDataAligned(self: *const Self, comptime T: type, address: u12) T {
+    return fw.mem.readBe(T, self.mem, address);
+}
+
 pub fn writeData(self: *const Self, comptime T: type, address: u12, value: T) void {
     if (address <= (bank_size - @sizeOf(T))) {
         @branchHint(.likely);
@@ -204,6 +208,20 @@ pub fn writeData(self: *const Self, comptime T: type, address: u12, value: T) vo
         write_value = std.math.rotl(T, write_value, 8);
         fw.mem.writeBe(u8, self.mem, address +% @as(u12, @truncate(byte)), @truncate(write_value));
     }
+}
+
+pub fn writeDataAligned(self: *const Self, comptime T: type, address: u12, value: T) void {
+    fw.mem.writeBe(T, self.mem, address, value);
+}
+
+pub fn writeDataAlignedMasked(
+    self: *const Self,
+    comptime T: type,
+    address: u12,
+    value: T,
+    mask: T,
+) void {
+    fw.mem.writeMaskedBe(T, self.mem, address, value, mask);
 }
 
 pub fn readCp0Register(self: *Self, reg: Core.Cp0Register) u32 {

@@ -18,6 +18,7 @@ pub const MemoryOp = enum {
     LV,
     DV,
     QV,
+    RV,
 
     fn shift(comptime op: @This()) comptime_int {
         return switch (comptime op) {
@@ -25,7 +26,7 @@ pub const MemoryOp = enum {
             .SV => 1,
             .LV => 2,
             .DV => 3,
-            .QV => 4,
+            .QV, .RV => 4,
         };
     }
 };
@@ -54,10 +55,30 @@ pub fn load(comptime op: MemoryOp, core: *Core, word: u32) void {
         .QV => blk: {
             if (args.el == 0 and (address & 15) == 0) {
                 @branchHint(.likely);
-                break :blk core.cp2.set(args.vt, @bitCast(core.readData(u128, address)));
+                core.cp2.set(args.vt, @bitCast(core.readDataAligned(u128, address)));
+                break :blk;
             }
 
-            fw.log.todo("Misaligned LQV", .{});
+            const value = core.readDataAligned(u128, address & ~@as(u12, 15));
+            const size = 8 + (15 - (address & 15)) * 8;
+            const shift = 128 - (@as(i32, size) + @as(i32, args.el) * 8);
+            const mask = @as(u128, std.math.maxInt(u128)) >> @intCast(128 - size);
+
+            var result: u128 = @bitCast(core.cp2.get(args.vt));
+            result &= ~std.math.shl(u128, mask, shift);
+            result |= std.math.shl(u128, value & mask, shift);
+            core.cp2.set(args.vt, @bitCast(result));
+        },
+        .RV => {
+            const value = core.readDataAligned(u128, address & ~@as(u12, 15));
+            const size = (15 - (address & 15 ^ 15)) * 8;
+            const shift = 128 - @as(i32, size) + @as(i32, args.el) * 8;
+            const mask = std.math.maxInt(u128);
+
+            var result: u128 = @bitCast(core.cp2.get(args.vt));
+            result &= ~std.math.shr(u128, mask, shift);
+            result |= std.math.shr(u128, value, shift);
+            core.cp2.set(args.vt, @bitCast(result));
         },
     }
 }
@@ -85,10 +106,32 @@ pub fn store(comptime op: MemoryOp, core: *Core, word: u32) void {
         .QV => blk: {
             if (args.el == 0 and (address & 15) == 0) {
                 @branchHint(.likely);
-                break :blk core.writeData(u128, address, @bitCast(core.cp2.get(args.vt)));
+                core.writeDataAligned(u128, address, @bitCast(core.cp2.get(args.vt)));
+                break :blk;
             }
 
-            fw.log.todo("Misaligned SQV", .{});
+            const shift: u7 = @intCast((address & 15) * 8);
+            const value = core.cp2.getEl(u128, args.vt, args.el);
+            const mask: u128 = std.math.maxInt(u128);
+
+            core.writeDataAlignedMasked(
+                u128,
+                address & ~@as(u12, 15),
+                value >> shift,
+                mask >> shift,
+            );
+        },
+        .RV => {
+            const shift: i32 = 128 - (address & 15) * 8;
+            const value = core.cp2.getEl(u128, args.vt, args.el);
+            const mask: u128 = std.math.maxInt(u128);
+
+            core.writeDataAlignedMasked(
+                u128,
+                address & ~@as(u12, 15),
+                std.math.shl(u128, value, shift),
+                std.math.shl(u128, mask, shift),
+            );
         },
     }
 }
