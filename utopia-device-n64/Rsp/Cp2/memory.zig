@@ -21,6 +21,7 @@ pub const MemoryOp = enum {
     RV,
     PV,
     UV,
+    TV,
 
     fn shift(comptime op: @This()) comptime_int {
         return switch (comptime op) {
@@ -28,7 +29,7 @@ pub const MemoryOp = enum {
             .SV => 1,
             .LV => 2,
             .DV, .PV, .UV => 3,
-            .QV, .RV => 4,
+            .QV, .RV, .TV => 4,
         };
     }
 };
@@ -84,6 +85,28 @@ pub fn load(comptime op: MemoryOp, core: *Core, word: u32) void {
         },
         .PV => loadPacked(.signed, core, address, args.vt, args.el),
         .UV => loadPacked(.unsigned, core, address, args.vt, args.el),
+        .TV => {
+            const start = address & ~@as(u12, 7);
+            const base_offset = @as(u4, @intCast(address & 8)) +% args.el;
+
+            var index: u4 = 0;
+
+            while (true) {
+                const reg_index = (@intFromEnum(args.vt) & ~@as(u5, 7)) +%
+                    (((index +% args.el) >> 1) & 7);
+
+                inline for (0..2) |_| {
+                    const byte_address = start +% (base_offset +% index);
+                    const byte_value = core.readData(u8, byte_address);
+                    core.cp2.setEl(u8, @enumFromInt(reg_index), index, byte_value);
+                    index +%= 1;
+                }
+
+                if (index == 0) {
+                    break;
+                }
+            }
+        },
     }
 }
 
@@ -139,6 +162,28 @@ pub fn store(comptime op: MemoryOp, core: *Core, word: u32) void {
         },
         .PV => storePacked(.signed, core, address, args.vt, args.el),
         .UV => storePacked(.unsigned, core, address, args.vt, args.el),
+        .TV => {
+            const start = address & ~@as(u12, 7);
+            const el = args.el & ~@as(u4, 1);
+            const base_offset = @as(u4, @intCast(address & 7)) -% el;
+
+            var index: u4 = 0;
+
+            while (true) {
+                const reg_index = (@intFromEnum(args.vt) & ~@as(u5, 7)) +% (index >> 1);
+
+                inline for (0..2) |_| {
+                    const byte_value = core.cp2.getEl(u8, @enumFromInt(reg_index), index -% el);
+                    const byte_address = start +% (base_offset +% index);
+                    core.writeData(u8, byte_address, byte_value);
+                    index +%= 1;
+                }
+
+                if (index == 0) {
+                    break;
+                }
+            }
+        },
     }
 }
 
@@ -155,7 +200,7 @@ fn loadPacked(
     };
 
     const start = address & ~@as(u12, 7);
-    const base_offset = (@as(u4, @truncate(address)) & 7) -% el;
+    const base_offset = @as(u4, @intCast(address & 7)) -% el;
 
     for (0..8) |index| {
         const byte_address = start +% (base_offset +% @as(u4, @intCast(index)));
