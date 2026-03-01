@@ -9,7 +9,7 @@ const bank_size = mem_size / 2;
 
 const Self = @This();
 
-core: Core = .init(),
+core: Core,
 mem: *align(16) [mem_size]u8,
 sp_addr: u13 = 0,
 dram_addr: u24 = 0,
@@ -21,6 +21,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) !Self {
     const mem = try arena.allocator().alignedAlloc(u8, .@"16", mem_size);
 
     return .{
+        .core = .init(),
         .mem = mem[0..mem_size],
     };
 }

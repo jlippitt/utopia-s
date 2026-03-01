@@ -2,7 +2,7 @@ const std = @import("std");
 
 pub fn WithSignedness(comptime signedness: std.builtin.Signedness, comptime T: type) type {
     return switch (@typeInfo(T)) {
-        .int => |int| std.meta.Int(.signed, int.bits),
+        .int => |int| std.meta.Int(signedness, int.bits),
         .vector => |vector| blk: {
             const len = vector.len;
             const Int = @typeInfo(T).vector.child;

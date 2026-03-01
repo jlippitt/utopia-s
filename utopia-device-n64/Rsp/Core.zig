@@ -51,10 +51,12 @@ pc: u12 = 0,
 target_pc: u12 = 0,
 pipe_state: PipeState = .normal,
 regs: [32]u32 = @splat(0),
-cp2: Cp2 = .init(),
+cp2: Cp2,
 
 pub fn init() Self {
-    return .{};
+    return .{
+        .cp2 = Cp2.init(),
+    };
 }
 
 pub fn readPc(self: *const Self) u12 {

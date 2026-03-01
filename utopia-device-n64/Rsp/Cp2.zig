@@ -43,8 +43,12 @@ not_equal: @Vector(8, bool) = @splat(false),
 compare: @Vector(8, bool) = @splat(false),
 clip_compare: @Vector(8, bool) = @splat(false),
 compare_ext: @Vector(8, bool) = @splat(false),
+rcp_in: u32 = 0,
+rcp_out: u32 = 0,
+rcp_high: bool = false,
 
 pub fn init() Self {
+    single_lane.initInvSqrtTable();
     return .{};
 }
 
@@ -153,7 +157,13 @@ pub fn cop2(core: *Core, word: u32) void {
             0o53 => compute.compute(.VNOR, core, word),
             0o54 => compute.compute(.VXOR, core, word),
             0o55 => compute.compute(.VNXOR, core, word),
+            0o60 => single_lane.reciprocal(.VRCP, core, word),
+            0o61 => single_lane.reciprocal(.VRCPL, core, word),
+            0o62 => single_lane.reciprocal(.VRCPH, core, word),
             0o63 => single_lane.vmov(core, word),
+            0o64 => single_lane.reciprocal(.VRSQ, core, word),
+            0o65 => single_lane.reciprocal(.VRSQL, core, word),
+            0o66 => single_lane.reciprocal(.VRSQH, core, word),
             else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
         };
     }
