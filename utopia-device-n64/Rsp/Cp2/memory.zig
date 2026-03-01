@@ -19,13 +19,15 @@ pub const MemoryOp = enum {
     DV,
     QV,
     RV,
+    PV,
+    UV,
 
     fn shift(comptime op: @This()) comptime_int {
         return switch (comptime op) {
             .BV => 0,
             .SV => 1,
             .LV => 2,
-            .DV => 3,
+            .DV, .PV, .UV => 3,
             .QV, .RV => 4,
         };
     }
@@ -80,6 +82,8 @@ pub fn load(comptime op: MemoryOp, core: *Core, word: u32) void {
             result |= std.math.shr(u128, value, shift);
             core.cp2.set(args.vt, @bitCast(result));
         },
+        .PV => loadPacked(.signed, core, address, args.vt, args.el),
+        .UV => loadPacked(.unsigned, core, address, args.vt, args.el),
     }
 }
 
@@ -133,5 +137,53 @@ pub fn store(comptime op: MemoryOp, core: *Core, word: u32) void {
                 std.math.shl(u128, mask, shift),
             );
         },
+        .PV => storePacked(.signed, core, address, args.vt, args.el),
+        .UV => storePacked(.unsigned, core, address, args.vt, args.el),
+    }
+}
+
+fn loadPacked(
+    comptime signedness: std.builtin.Signedness,
+    core: *Core,
+    address: u12,
+    vt: Cp2.Register,
+    el: u4,
+) void {
+    const shift: u4 = switch (comptime signedness) {
+        .signed => 8,
+        .unsigned => 7,
+    };
+
+    const start = address & ~@as(u12, 7);
+    const base_offset = (@as(u4, @truncate(address)) & 7) -% el;
+
+    for (0..8) |index| {
+        const byte_address = start +% (base_offset +% @as(u4, @intCast(index)));
+        const byte_value = core.readData(u8, byte_address);
+        core.cp2.setLane(vt, index, @as(u16, byte_value) << shift);
+    }
+}
+
+fn storePacked(
+    comptime signedness: std.builtin.Signedness,
+    core: *Core,
+    address: u12,
+    vt: Cp2.Register,
+    el: u4,
+) void {
+    const shift_lo: u4, const shift_hi: u4 = switch (comptime signedness) {
+        .signed => .{ 8, 7 },
+        .unsigned => .{ 7, 8 },
+    };
+
+    for (0..8) |index| {
+        const byte_offset = @as(u4, @intCast(index)) +% el;
+
+        const byte_value: u8 = @truncate(if (byte_offset < 8)
+            core.cp2.getLane(vt, byte_offset) >> shift_lo
+        else
+            core.cp2.getLane(vt, byte_offset & 7) >> shift_hi);
+
+        core.writeData(u8, address +% @as(u12, @intCast(index)), byte_value);
     }
 }

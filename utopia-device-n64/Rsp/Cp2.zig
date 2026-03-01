@@ -185,7 +185,8 @@ pub fn lwc2(core: *Core, word: u32) void {
         0o03 => memory.load(.DV, core, word),
         0o04 => memory.load(.QV, core, word),
         0o05 => memory.load(.RV, core, word),
-        // 0o05 => memory.load(.RV, core, word),
+        0o06 => memory.load(.PV, core, word),
+        0o07 => memory.load(.UV, core, word),
         else => |rd| fw.log.todo("RSP LWC2 rd: {o:02}", .{rd}),
     }
 }
@@ -198,6 +199,8 @@ pub fn swc2(core: *Core, word: u32) void {
         0o03 => memory.store(.DV, core, word),
         0o04 => memory.store(.QV, core, word),
         0o05 => memory.store(.RV, core, word),
+        0o06 => memory.store(.PV, core, word),
+        0o07 => memory.store(.UV, core, word),
         else => |rd| fw.log.todo("RSP SWC2 rd: {o:02}", .{rd}),
     }
 }
