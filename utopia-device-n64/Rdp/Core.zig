@@ -43,6 +43,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .entry_point = "main",
         .format = format_flags,
         .stage = .fragment,
+        .num_uniform_buffers = 1,
     });
     defer gpu.releaseShader(fragment_shader);
 
@@ -148,6 +149,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
             .z_buffer = true,
         }, self) orelse return,
         0x29 => try command.syncFull(self),
+        0x2f => command.setOtherModes(self, word),
         0x36 => try command.drawRectangle(.fill, self) orelse return,
         0x37 => command.setFillColor(self, word),
         0x2d => command.setScissor(self, word),
@@ -201,9 +203,14 @@ pub fn render(self: *Self) RenderError!void {
             .offset = 0,
         }});
 
+        const display_groups = self.display_list.getDisplayGroups();
+
+        fw.log.debug("Display Groups: {any}", .{display_groups});
+
         var index_offset: u32 = 0;
 
-        for (self.display_list.getDisplayGroups()) |display_group| {
+        for (display_groups) |display_group| {
+            command_buffer.pushFragmentUniformData(0, std.mem.asBytes(&display_group.frag_state));
             render_pass.drawIndexedPrimitives(display_group.len, 1, index_offset, 0, 0);
             index_offset += display_group.len;
         }

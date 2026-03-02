@@ -11,8 +11,21 @@ const vertex_buffer_size = @sizeOf(Core.Vertex) * max_buffer_len;
 pub const triangle_size = 3;
 pub const rectangle_size = 6;
 
+pub const CycleType = enum(u32) {
+    one_cycle,
+    two_cycle,
+    copy,
+    fill,
+};
+
+const FragmentState = extern struct {
+    fill_color: [4]f32 = @splat(0.0),
+    cycle_type: CycleType = .one_cycle,
+};
+
 pub const DisplayGroup = struct {
     len: u32,
+    frag_state: FragmentState,
 };
 
 const Self = @This();
@@ -24,6 +37,8 @@ index_buffer: sdl3.gpu.Buffer,
 vertex_buffer: sdl3.gpu.Buffer,
 index_upload_buffer: sdl3.gpu.TransferBuffer,
 vertex_upload_buffer: sdl3.gpu.TransferBuffer,
+frag_state: FragmentState = .{},
+frag_state_changed: bool = false,
 
 pub fn init(
     arena: *std.heap.ArenaAllocator,
@@ -87,6 +102,10 @@ pub fn getVertexBuffer(self: *const Self) sdl3.gpu.Buffer {
     return self.vertex_buffer;
 }
 
+pub fn getCycleType(self: *Self) CycleType {
+    return self.frag_state.cycle_type;
+}
+
 pub fn clear(self: *Self) void {
     self.display_groups.clearRetainingCapacity();
     self.indices.clearRetainingCapacity();
@@ -126,6 +145,22 @@ pub fn pushRectangle(self: *Self, vertices: *const [4]Core.Vertex) void {
         bottom_left,
         bottom_right,
     });
+}
+
+pub fn setFillColor(self: *Self, fill_color: [4]f32) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(fill_color, self.frag_state.fill_color);
+
+    self.frag_state.fill_color = fill_color;
+    fw.log.debug("Fill Color: {any}", .{fill_color});
+}
+
+pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
+    self.frag_state_changed = self.frag_state_changed or
+        cycle_type != self.frag_state.cycle_type;
+
+    self.frag_state.cycle_type = cycle_type;
+    fw.log.debug("Cycle Type: {t}", .{cycle_type});
 }
 
 pub fn uploadBuffers(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
@@ -189,14 +224,19 @@ fn pushPrimitive(self: *Self, vertices: []const Core.Vertex, indices: []const Co
     self.indices.appendSliceAssumeCapacity(indices);
     self.vertices.appendSliceAssumeCapacity(vertices);
 
-    if (self.getCurrentDisplayGroup()) |display_group| {
-        display_group.len += @intCast(indices.len);
-        return;
+    if (!self.frag_state_changed) {
+        if (self.getCurrentDisplayGroup()) |display_group| {
+            display_group.len += @intCast(indices.len);
+            return;
+        }
     }
 
     self.display_groups.appendAssumeCapacity(.{
         .len = @intCast(indices.len),
+        .frag_state = self.frag_state,
     });
+
+    self.frag_state_changed = false;
 }
 
 fn getCurrentDisplayGroup(self: *Self) ?*DisplayGroup {

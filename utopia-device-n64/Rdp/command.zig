@@ -23,17 +23,16 @@ pub fn setScissor(core: *Core, word: u64) void {
     core.target.setImageHeight(cmd.yl.int());
 }
 
+pub fn setOtherModes(core: *Core, word: u64) void {
+    const cmd: SetOtherModes = @bitCast(word);
+    fw.log.debug("SET_OTHER_MODES: {any}", .{cmd});
+    core.display_list.setCycleType(@enumFromInt(cmd.cycle_type));
+}
+
 pub fn setFillColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
-
     fw.log.debug("SET_FILL_COLOR: {X:08}", .{color});
-
-    core.fill_color = .{
-        @as(f32, @floatFromInt(color >> 24)) / 255.0,
-        @as(f32, @floatFromInt((color >> 16) & 255)) / 255.0,
-        @as(f32, @floatFromInt((color >> 8) & 255)) / 255.0,
-        @as(f32, @floatFromInt(color & 255)) / 255.0,
-    };
+    core.display_list.setFillColor(parseColor(color));
 }
 
 pub fn setColorImage(core: *Core, word: u64) void {
@@ -75,6 +74,15 @@ pub fn Fixed(comptime T: type, frac: comptime_int) type {
     };
 }
 
+fn parseColor(color: u32) [4]f32 {
+    return .{
+        @as(f32, @floatFromInt(color >> 24)) / 255.0,
+        @as(f32, @floatFromInt((color >> 16) & 255)) / 255.0,
+        @as(f32, @floatFromInt((color >> 8) & 255)) / 255.0,
+        @as(f32, @floatFromInt(color & 255)) / 255.0,
+    };
+}
+
 const SetScissor = packed struct(u64) {
     yl: Fixed(u12, 2),
     xl: Fixed(u12, 2),
@@ -84,6 +92,43 @@ const SetScissor = packed struct(u64) {
     yh: Fixed(u12, 2),
     xh: Fixed(u12, 2),
     __1: u8,
+};
+
+const SetOtherModes = packed struct(u64) {
+    alpha_compare_en: bool,
+    dither_alpha_en: bool,
+    z_source_sel: bool,
+    antialias_en: bool,
+    z_compare_en: bool,
+    z_update_en: bool,
+    image_read_en: bool,
+    color_on_cvg: bool,
+    cvg_dest: u2,
+    z_mode: u2,
+    cvg_times_alpha: bool,
+    alpha_cvg_select: bool,
+    force_blend: bool,
+    _0: bool,
+    blend: u16,
+    _1: u4,
+    alpha_dither_sel: u2,
+    rgb_dither_sel: u2,
+    key_en: bool,
+    convert_one: bool,
+    bi_lerp_0: bool,
+    bi_lerp_1: bool,
+    mid_texel: bool,
+    sample_type: bool,
+    tlut_type: bool,
+    en_tlut: bool,
+    tex_lod_en: bool,
+    sharpen_tex_en: bool,
+    detail_tex_en: bool,
+    persp_tex_en: bool,
+    cycle_type: u2,
+    _2: bool,
+    atomic_prim: bool,
+    _3: u8,
 };
 
 const Size = enum(u2) {
