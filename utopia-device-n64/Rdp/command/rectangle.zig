@@ -11,9 +11,10 @@ pub const RectangleType = enum {
 };
 
 pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
-    const word_count = 1 + if (rect_type == .fill) 0 else 1;
+    const word_count = comptime 1 + if (rect_type == .fill) 0 else 1;
+    const args = core.word_buf.items;
 
-    if (core.word_buf.items.len < word_count) {
+    if (args.len < word_count) {
         return null;
     }
 
@@ -22,7 +23,7 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         try core.target.update(core.gpu);
     }
 
-    const cmd: Rectangle = @bitCast(core.word_buf.items[0]);
+    const cmd: Rectangle = @bitCast(args[0]);
     fw.log.debug("RECTANGLE: {any}", .{cmd});
 
     var vertices: [4]Core.Vertex = undefined;

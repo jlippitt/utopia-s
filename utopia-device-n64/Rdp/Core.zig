@@ -120,6 +120,33 @@ pub fn step(self: *Self, word: u64) RenderError!void {
     self.word_buf.appendAssumeCapacity(word);
 
     switch (@as(u6, @truncate(self.word_buf.items[0] >> 56))) {
+        0x08 => try command.drawTriangle(.{}, self) orelse return,
+        0x09 => try command.drawTriangle(.{
+            .z_buffer = true,
+        }, self) orelse return,
+        0x0a => try command.drawTriangle(.{
+            .texture = true,
+        }, self) orelse return,
+        0x0b => try command.drawTriangle(.{
+            .texture = true,
+            .z_buffer = true,
+        }, self) orelse return,
+        0x0c => try command.drawTriangle(.{
+            .shade = true,
+        }, self) orelse return,
+        0x0d => try command.drawTriangle(.{
+            .shade = true,
+            .z_buffer = true,
+        }, self) orelse return,
+        0x0e => try command.drawTriangle(.{
+            .shade = true,
+            .texture = true,
+        }, self) orelse return,
+        0x0f => try command.drawTriangle(.{
+            .shade = true,
+            .texture = true,
+            .z_buffer = true,
+        }, self) orelse return,
         0x29 => try command.syncFull(self),
         0x36 => try command.drawRectangle(.fill, self) orelse return,
         0x37 => command.setFillColor(self, word),
@@ -128,7 +155,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         else => |cmd| fw.log.debug("Unknown Command: {X:02}", .{cmd}),
     }
 
-    _ = self.word_buf.pop();
+    self.word_buf.clearRetainingCapacity();
 }
 
 // Internal-facing interface

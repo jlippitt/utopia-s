@@ -8,6 +8,7 @@ const max_buffer_len = 1024;
 const index_buffer_size = @sizeOf(Core.Index) * max_buffer_len;
 const vertex_buffer_size = @sizeOf(Core.Vertex) * max_buffer_len;
 
+pub const triangle_size = 3;
 pub const rectangle_size = 6;
 
 pub const DisplayGroup = struct {
@@ -99,6 +100,16 @@ pub fn hasCapacity(self: *const Self, len: usize) bool {
         (self.indices.items.len + len) <= max_buffer_len;
 }
 
+pub fn pushTriangle(self: *Self, vertices: *const [3]Core.Vertex) void {
+    const base_index = self.vertices.items.len;
+
+    self.pushPrimitive(vertices, &.{
+        @intCast(base_index),
+        @intCast(base_index + 1),
+        @intCast(base_index + 2),
+    });
+}
+
 pub fn pushRectangle(self: *Self, vertices: *const [4]Core.Vertex) void {
     const base_index = self.vertices.items.len;
 
@@ -107,25 +118,13 @@ pub fn pushRectangle(self: *Self, vertices: *const [4]Core.Vertex) void {
     const top_right: Core.Index = @intCast(base_index + 2);
     const bottom_right: Core.Index = @intCast(base_index + 3);
 
-    const indices: [6]Core.Index = .{
+    self.pushPrimitive(vertices, &.{
         top_left,
         bottom_left,
         top_right,
         top_right,
         bottom_left,
         bottom_right,
-    };
-
-    self.indices.appendSliceAssumeCapacity(&indices);
-    self.vertices.appendSliceAssumeCapacity(vertices);
-
-    if (self.getCurrentDisplayGroup()) |display_group| {
-        display_group.len += rectangle_size;
-        return;
-    }
-
-    self.display_groups.appendAssumeCapacity(.{
-        .len = rectangle_size,
     });
 }
 
@@ -184,6 +183,20 @@ pub fn uploadBuffers(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
     }
 
     try command_buffer.submit();
+}
+
+fn pushPrimitive(self: *Self, vertices: []const Core.Vertex, indices: []const Core.Index) void {
+    self.indices.appendSliceAssumeCapacity(indices);
+    self.vertices.appendSliceAssumeCapacity(vertices);
+
+    if (self.getCurrentDisplayGroup()) |display_group| {
+        display_group.len += @intCast(indices.len);
+        return;
+    }
+
+    self.display_groups.appendAssumeCapacity(.{
+        .len = @intCast(indices.len),
+    });
 }
 
 fn getCurrentDisplayGroup(self: *Self) ?*DisplayGroup {

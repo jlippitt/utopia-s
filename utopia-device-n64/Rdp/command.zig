@@ -3,9 +3,13 @@ const fw = @import("framework");
 const Core = @import("./Core.zig");
 const Target = @import("./Target.zig");
 const rectangle = @import("./command/rectangle.zig");
+const triangle = @import("./command/triangle.zig");
 
 pub const drawRectangle = rectangle.drawRectangle;
 pub const RectangleType = rectangle.RectangleType;
+
+pub const drawTriangle = triangle.drawTriangle;
+pub const TriangleAttributes = triangle.TriangleAttributes;
 
 pub fn syncFull(core: *Core) Core.RenderError!void {
     fw.log.debug("SYNC_FULL", .{});
