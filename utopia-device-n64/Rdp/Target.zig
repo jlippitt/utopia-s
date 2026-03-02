@@ -109,6 +109,10 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
         .image_width = self.params.image_width,
         .image_height = self.params.image_height,
     };
+
+    self.params_changed = false;
+
+    fw.log.debug("Target updated", .{});
 }
 
 pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!void {

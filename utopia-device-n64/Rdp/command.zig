@@ -2,6 +2,10 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("./Core.zig");
 const Target = @import("./Target.zig");
+const rectangle = @import("./command/rectangle.zig");
+
+pub const drawRectangle = rectangle.drawRectangle;
+pub const RectangleType = rectangle.RectangleType;
 
 pub fn syncFull(core: *Core) Core.RenderError!void {
     fw.log.debug("SYNC_FULL", .{});
@@ -12,7 +16,20 @@ pub fn syncFull(core: *Core) Core.RenderError!void {
 pub fn setScissor(core: *Core, word: u64) void {
     const cmd: SetScissor = @bitCast(word);
     fw.log.debug("SET_SCISSOR: {any}", .{cmd});
-    core.target.setImageHeight(cmd.yl.get(u10, 0));
+    core.target.setImageHeight(cmd.yl.int());
+}
+
+pub fn setFillColor(core: *Core, word: u64) void {
+    const color: u32 = @truncate(word);
+
+    fw.log.debug("SET_FILL_COLOR: {X:08}", .{color});
+
+    core.fill_color = .{
+        @as(f32, @floatFromInt(color >> 24)) / 255.0,
+        @as(f32, @floatFromInt((color >> 16) & 255)) / 255.0,
+        @as(f32, @floatFromInt((color >> 8) & 255)) / 255.0,
+        @as(f32, @floatFromInt(color & 255)) / 255.0,
+    };
 }
 
 pub fn setColorImage(core: *Core, word: u64) void {
@@ -38,20 +55,18 @@ pub fn Fixed(comptime T: type, frac: comptime_int) type {
 
         value: T,
 
-        pub fn get(self: Self, comptime Dst: type, dst_frac: comptime_int) Dst {
-            const shift = dst_frac - frac;
+        pub fn int(self: Self) T {
+            return self.value >> frac;
+        }
 
-            if (@bitSizeOf(Dst) >= @bitSizeOf(T)) {
-                return std.math.shl(Dst, @as(Dst, self.value), shift);
-            }
-
-            return @as(Dst, @truncate(std.math.shl(T, self.value, shift)));
+        pub fn float(self: Self) f32 {
+            const value: f32 = @floatFromInt(self.value);
+            const divisor: f32 = @floatFromInt(@as(T, 1) << frac);
+            return value / divisor;
         }
 
         pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            const value: f64 = @floatFromInt(self.value);
-            const divisor: f64 = @floatFromInt(@as(T, 1) << frac);
-            writer.print("{d:." ++ frac ++ "}", .{value / divisor});
+            writer.print("{d:." ++ frac ++ "}", .{self.float()});
         }
     };
 }
