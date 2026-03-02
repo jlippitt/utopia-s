@@ -23,6 +23,8 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "framework", .module = utopia_framework },
             .{ .name = "sdl3", .module = sdl3.module("sdl3") },
+            shaderImport(b, "rdp.vert", "utopia-device-n64/Rdp/shader.vert"),
+            shaderImport(b, "rdp.frag", "utopia-device-n64/Rdp/shader.frag"),
         },
     });
 
@@ -63,4 +65,30 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
+}
+
+fn shaderImport(b: *std.Build, name: []const u8, path: []const u8) std.Build.Module.Import {
+    const cmd = b.addSystemCommand(&.{
+        "glslangValidator",
+        "-V",
+        "--quiet",
+        "-o",
+    });
+
+    const output_path = b.fmt("{s}.spv", .{
+        std.fmt.hex(std.hash.Fnv1a_128.hash(path)),
+    });
+
+    const spv = cmd.addOutputFileArg(output_path);
+    cmd.addFileArg(b.path(path));
+    cmd.stdio = .inherit;
+
+    const module = b.createModule(.{
+        .root_source_file = spv,
+    });
+
+    return .{
+        .name = name,
+        .module = module,
+    };
 }

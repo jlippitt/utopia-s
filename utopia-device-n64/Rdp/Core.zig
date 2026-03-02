@@ -6,6 +6,9 @@ const Rdp = @import("../Rdp.zig");
 const Target = @import("./Target.zig");
 const command = @import("./command.zig");
 
+const vertex_src align(@alignOf(u32)) = @embedFile("rdp.vert").*;
+const fragment_src align(@alignOf(u32)) = @embedFile("rdp.frag").*;
+
 pub const InitError = std.mem.Allocator.Error || sdl3.errors.Error;
 pub const RenderError = sdl3.errors.Error;
 
@@ -14,12 +17,67 @@ const max_command_length = 22;
 const Self = @This();
 
 gpu: sdl3.gpu.Device,
+pipeline: sdl3.gpu.GraphicsPipeline,
 target: Target,
 word_buf: std.ArrayListUnmanaged(u64),
 
 pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
-    const gpu = try sdl3.gpu.Device.init(.{ .spirv = true }, builtin.mode == .Debug, null);
+    const format_flags: sdl3.gpu.ShaderFormatFlags = .{ .spirv = true };
+
+    const gpu = try sdl3.gpu.Device.init(format_flags, builtin.mode == .Debug, null);
     errdefer gpu.deinit();
+
+    const vertex_shader = try gpu.createShader(.{
+        .code = &vertex_src,
+        .entry_point = "main",
+        .format = format_flags,
+        .stage = .vertex,
+    });
+    defer gpu.releaseShader(vertex_shader);
+
+    const fragment_shader = try gpu.createShader(.{
+        .code = &fragment_src,
+        .entry_point = "main",
+        .format = format_flags,
+        .stage = .fragment,
+    });
+    defer gpu.releaseShader(fragment_shader);
+
+    const pipeline = try gpu.createGraphicsPipeline(.{
+        .vertex_shader = vertex_shader,
+        .fragment_shader = fragment_shader,
+        .vertex_input_state = .{
+            // .vertex_buffer_descriptions = &.{
+            //     .{
+            //         .slot = 0,
+            //         .input_rate = .vertex,
+            //         .pitch = @sizeOf(Vertex),
+            //     },
+            // },
+            // .vertex_attributes = &.{
+            //     .{
+            //         .buffer_slot = 0,
+            //         .location = 0,
+            //         .format = .f32x3,
+            //         .offset = @offsetOf(Vertex, "pos"),
+            //     },
+            //     .{
+            //         .buffer_slot = 0,
+            //         .location = 1,
+            //         .format = .f32x4,
+            //         .offset = @offsetOf(Vertex, "color"),
+            //     },
+            // },
+        },
+        .target_info = .{
+            .color_target_descriptions = &.{
+                .{
+                    .format = .r8g8b8a8_uint,
+                },
+            },
+        },
+    });
+    errdefer gpu.releaseGraphicsPipeline(pipeline);
 
     var target = try Target.init(gpu);
     errdefer target.deinit(gpu);
@@ -31,6 +89,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 
     return .{
         .gpu = gpu,
+        .pipeline = pipeline,
         .target = target,
         .word_buf = word_buf,
     };
@@ -39,6 +98,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 // External-facing interface
 
 pub fn deinit(self: *Self) void {
+    self.gpu.releaseGraphicsPipeline(self.pipeline);
     self.target.deinit(self.gpu);
     self.gpu.deinit();
 }
@@ -86,6 +146,10 @@ pub fn render(self: *Self) RenderError!void {
     {
         const render_pass = command_buffer.beginRenderPass(&.{color_target}, null);
         defer render_pass.end();
+
+        render_pass.bindGraphicsPipeline(self.pipeline);
+
+        render_pass.drawPrimitives(3, 1, 0, 0);
     }
 
     try command_buffer.submit();
@@ -98,3 +162,8 @@ pub fn getRdp(self: *Self) *Rdp {
 pub fn getRdram(self: *Self) []u8 {
     return self.getRdp().getDevice().rdram;
 }
+
+pub const Vertex = struct {
+    pos: [3]f32,
+    color: [4]f32,
+};
