@@ -2,7 +2,6 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Core.zig");
 const DisplayList = @import("../DisplayList.zig");
-const command = @import("../command.zig");
 
 pub const RectangleType = enum {
     fill,
@@ -28,10 +27,21 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
 
     var vertices: [4]Core.Vertex = undefined;
 
-    const left = cmd.xh.float();
-    const right = cmd.xl.float() + 1.0;
-    const top = cmd.yh.float();
-    const bottom = cmd.yl.float() + 1.0;
+    const xl: u32, const yl: u32 = switch (core.display_list.getCycleType()) {
+        .copy, .fill => .{
+            @as(u32, cmd.xl + 1),
+            @as(u32, cmd.yl + 1),
+        },
+        else => .{
+            cmd.xl,
+            cmd.yl,
+        },
+    };
+
+    const left = @as(f32, @floatFromInt(cmd.xh)) / 4.0;
+    const top = @as(f32, @floatFromInt(cmd.yh)) / 4.0;
+    const right = @as(f32, @floatFromInt(xl)) / 4.0;
+    const bottom = @as(f32, @floatFromInt(yl)) / 4.0;
 
     vertices[0].pos[0] = left;
     vertices[0].pos[1] = top;
@@ -60,10 +70,10 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
 }
 
 const Rectangle = packed struct(u64) {
-    yh: command.Fixed(u12, 2),
-    xh: command.Fixed(u12, 2),
+    yh: u12,
+    xh: u12,
     __0: u8,
-    yl: command.Fixed(u12, 2),
-    xl: command.Fixed(u12, 2),
+    yl: u12,
+    xl: u12,
     __1: u8,
 };

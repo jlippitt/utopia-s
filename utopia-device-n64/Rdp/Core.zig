@@ -76,7 +76,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .target_info = .{
             .color_target_descriptions = &.{
                 .{
-                    .format = .r8g8b8a8_uint,
+                    .format = .r8g8b8a8_unorm,
                 },
             },
         },
@@ -229,7 +229,7 @@ pub fn getRdram(self: *Self) []u8 {
     return self.getRdp().getDevice().rdram;
 }
 
-pub const Vertex = struct {
+pub const Vertex = extern struct {
     pos: [3]f32,
     color: [4]f32,
 };

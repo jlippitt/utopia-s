@@ -94,7 +94,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
     }
 
     const color_image_texture = try gpu.createTexture(.{
-        .format = .r8g8b8a8_uint,
+        .format = .r8g8b8a8_unorm,
         .usage = .{ .color_target = true },
         .width = self.params.image_width,
         .height = self.params.image_height,

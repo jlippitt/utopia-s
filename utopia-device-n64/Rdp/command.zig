@@ -20,7 +20,7 @@ pub fn syncFull(core: *Core) Core.RenderError!void {
 pub fn setScissor(core: *Core, word: u64) void {
     const cmd: SetScissor = @bitCast(word);
     fw.log.debug("SET_SCISSOR: {any}", .{cmd});
-    core.target.setImageHeight(cmd.yl.int());
+    core.target.setImageHeight(cmd.yl >> 2);
 }
 
 pub fn setOtherModes(core: *Core, word: u64) void {
@@ -52,26 +52,9 @@ pub fn setColorImage(core: *Core, word: u64) void {
     core.target.setColorImageParams(cmd.dram_addr, color_format, @as(u32, cmd.width) + 1);
 }
 
-pub fn Fixed(comptime T: type, frac: comptime_int) type {
-    return packed struct(T) {
-        const Self = @This();
-
-        value: T,
-
-        pub fn int(self: Self) T {
-            return self.value >> frac;
-        }
-
-        pub fn float(self: Self) f32 {
-            const value: f32 = @floatFromInt(self.value);
-            const divisor: f32 = @floatFromInt(@as(T, 1) << frac);
-            return value / divisor;
-        }
-
-        pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-            writer.print("{d:." ++ frac ++ "}", .{self.float()});
-        }
-    };
+pub fn parseFloat(comptime T: type, value: T, frac_digits: std.math.Log2Int(T)) f32 {
+    const divisor: T = @as(T, 1) << frac_digits;
+    return @as(f32, @floatFromInt(value)) / @as(f32, @floatFromInt(divisor));
 }
 
 fn parseColor(color: u32) [4]f32 {
@@ -84,13 +67,13 @@ fn parseColor(color: u32) [4]f32 {
 }
 
 const SetScissor = packed struct(u64) {
-    yl: Fixed(u12, 2),
-    xl: Fixed(u12, 2),
+    yl: u12,
+    xl: u12,
     odd_line: bool,
     field: bool,
     __0: u6,
-    yh: Fixed(u12, 2),
-    xh: Fixed(u12, 2),
+    yh: u12,
+    xh: u12,
     __1: u8,
 };
 
