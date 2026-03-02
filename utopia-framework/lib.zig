@@ -15,13 +15,17 @@ pub const CliArg = struct {
     type: CliArgType,
 };
 
-pub const DeviceError = std.mem.Allocator.Error ||
+pub const InitError = std.mem.Allocator.Error ||
     std.fs.File.OpenError ||
     std.fs.File.ReadError ||
     error{
         ArgError,
         SdlError,
     };
+
+pub const RenderError = error{
+    SdlError,
+};
 
 pub const ScreenSize = struct {
     x: u32,
@@ -77,7 +81,7 @@ pub const ButtonState = struct {
 pub fn Interface(comptime Self: type) type {
     return struct {
         deinit: *const fn (self: *Self) void,
-        runFrame: *const fn (self: *Self) void,
+        runFrame: *const fn (self: *Self) RenderError!void,
         getScreenSize: *const fn (self: *const Self) ScreenSize,
         getPixels: *const fn (self: *const Self) []const u8,
         updateControllerState: *const fn (self: *Self, state: *const ControllerState) void,
@@ -93,7 +97,7 @@ pub const Device = struct {
     pub fn init(
         inner: anytype,
         comptime iface: Interface(@typeInfo(@TypeOf(inner)).pointer.child),
-    ) DeviceError!Self {
+    ) InitError!Self {
         const Inner = @typeInfo(@TypeOf(inner)).pointer.child;
 
         const gen = struct {
@@ -102,7 +106,7 @@ pub const Device = struct {
                 return @call(.always_inline, iface.deinit, .{self});
             }
 
-            fn runFrameImpl(ptr: *anyopaque) void {
+            fn runFrameImpl(ptr: *anyopaque) RenderError!void {
                 const self: *Inner = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.runFrame, .{self});
             }
@@ -141,7 +145,7 @@ pub const Device = struct {
         return self.vtable.deinit(self.ptr);
     }
 
-    pub fn runFrame(self: Self) void {
+    pub fn runFrame(self: Self) RenderError!void {
         return self.vtable.runFrame(self.ptr);
     }
 

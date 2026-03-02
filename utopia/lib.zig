@@ -8,7 +8,7 @@ pub const log = struct {
 };
 
 pub const Device = fw.Device;
-pub const DeviceError = fw.DeviceError;
+pub const DeviceError = fw.InitError;
 pub const ScreenSize = fw.ScreenSize;
 pub const ControllerState = fw.ControllerState;
 pub const ButtonState = fw.ButtonState;

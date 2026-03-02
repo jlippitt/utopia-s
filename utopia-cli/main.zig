@@ -26,6 +26,8 @@ pub fn main() !void {
 
     _ = app_args;
 
+    sdl3.errors.error_callback = sdlError;
+
     try sdl3.init(.everything);
     defer sdl3.quit(.everything);
 
@@ -89,7 +91,8 @@ pub fn main() !void {
         }
 
         device.updateControllerState(&controller_state);
-        device.runFrame();
+
+        try device.runFrame();
 
         const new_size = device.getScreenSize();
 
@@ -155,4 +158,12 @@ fn getBestSize(
         .x = min_size.x * scale,
         .y = min_size.y * scale,
     };
+}
+
+fn sdlError(err: ?[:0]const u8) void {
+    if (err) |err_string| {
+        std.debug.print("SDL Error: {s}\n", .{err_string});
+    } else {
+        std.debug.print("SDL Error: Unknown\n", .{});
+    }
 }

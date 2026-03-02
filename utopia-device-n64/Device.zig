@@ -98,7 +98,7 @@ arena: std.heap.ArenaAllocator,
 
 // utopia.Device methods
 
-pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.DeviceError!fw.Device {
+pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.InitError!fw.Device {
     var arena = std.heap.ArenaAllocator.init(allocator);
 
     const rom = try fw.fs.readFileAllocAligned(
@@ -164,7 +164,7 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
-pub fn runFrame(self: *Self) void {
+pub fn runFrame(self: *Self) fw.RenderError!void {
     while (true) {
         self.cpu.step();
         self.rsp.step();
@@ -177,8 +177,9 @@ pub fn runFrame(self: *Self) void {
             switch (event) {
                 .cpu_interrupt => self.cpu.handleInterruptEvent(),
                 .cpu_timer => self.cpu.handleTimerEvent(),
+                .rdp_dma => try self.rdp.handleDmaEvent(),
                 .ai_sample => self.ai.handleSampleEvent(),
-                .vi_new_line => if (self.vi.handleNewLineEvent()) {
+                .vi_new_line => if (try self.vi.handleNewLineEvent()) {
                     return;
                 },
             }

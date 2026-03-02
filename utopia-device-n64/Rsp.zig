@@ -26,7 +26,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) !Self {
     };
 }
 
-// Device-accessible methods
+// External-facing interface
 
 pub fn step(self: *Self) void {
     if (self.status.halted) {
@@ -170,7 +170,7 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
     }
 }
 
-// Core-visible methods
+// Internal-facing interface
 
 pub fn readInstruction(self: *const Self, address: u12) u32 {
     return fw.mem.readBe(u32, self.mem, @as(u13, 0x1000) | address);
@@ -257,8 +257,6 @@ pub fn break_(self: *Self) void {
         self.getDevice().mi.raiseInterrupt(.sp);
     }
 }
-
-// Private methods
 
 fn transferDma(self: *Self, comptime direction: DmaDirection) void {
     const rdram = self.getDevice().rdram;

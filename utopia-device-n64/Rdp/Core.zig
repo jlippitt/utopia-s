@@ -6,6 +6,9 @@ const Rdp = @import("../Rdp.zig");
 const Target = @import("./Target.zig");
 const command = @import("./command.zig");
 
+pub const InitError = std.mem.Allocator.Error || sdl3.errors.Error;
+pub const RenderError = sdl3.errors.Error;
+
 const max_command_length = 22;
 
 const Self = @This();
@@ -14,7 +17,7 @@ gpu: sdl3.gpu.Device,
 target: Target,
 word_buf: std.ArrayListUnmanaged(u64),
 
-pub fn init(arena: *std.heap.ArenaAllocator) error{ SdlError, OutOfMemory }!Self {
+pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     const gpu = try sdl3.gpu.Device.init(.{ .spirv = true }, builtin.mode == .Debug, null);
     errdefer gpu.deinit();
 
@@ -33,18 +36,35 @@ pub fn init(arena: *std.heap.ArenaAllocator) error{ SdlError, OutOfMemory }!Self
     };
 }
 
+// External-facing interface
+
 pub fn deinit(self: *Self) void {
     self.target.deinit(self.gpu);
     self.gpu.deinit();
 }
 
-pub fn downloadImageData(self: *Self) !void {
+pub fn downloadImageData(self: *Self) RenderError!void {
     try self.target.update(self.gpu);
     try self.render();
     try self.target.downloadImageData(self.gpu, self.getRdram());
 }
 
-pub fn render(self: *Self) error{SdlError}!void {
+pub fn step(self: *Self, word: u64) RenderError!void {
+    self.word_buf.appendAssumeCapacity(word);
+
+    switch (@as(u6, @truncate(self.word_buf.items[0] >> 56))) {
+        0x29 => try command.syncFull(self),
+        0x2d => command.setScissor(self, word),
+        0x3f => command.setColorImage(self, word),
+        else => |cmd| fw.log.debug("Unknown Command: {X:02}", .{cmd}),
+    }
+
+    _ = self.word_buf.pop();
+}
+
+// Internal-facing interface
+
+pub fn render(self: *Self) RenderError!void {
     const surface = self.target.getSurface() orelse {
         return;
     };
@@ -69,19 +89,6 @@ pub fn render(self: *Self) error{SdlError}!void {
     }
 
     try command_buffer.submit();
-}
-
-pub fn step(self: *Self, word: u64) !void {
-    self.word_buf.appendAssumeCapacity(word);
-
-    switch (@as(u6, @truncate(self.word_buf.items[0] >> 56))) {
-        0x29 => try command.syncFull(self),
-        0x2d => command.setScissor(self, word),
-        0x3f => command.setColorImage(self, word),
-        else => |cmd| fw.log.debug("Unknown Command: {X:02}", .{cmd}),
-    }
-
-    _ = self.word_buf.pop();
 }
 
 pub fn getRdp(self: *Self) *Rdp {

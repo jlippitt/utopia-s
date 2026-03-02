@@ -3,7 +3,7 @@ const fw = @import("framework");
 const Core = @import("./Core.zig");
 const Target = @import("./Target.zig");
 
-pub fn syncFull(core: *Core) !void {
+pub fn syncFull(core: *Core) Core.RenderError!void {
     fw.log.debug("SYNC_FULL", .{});
     try core.downloadImageData();
     return core.getRdp().syncFull();
