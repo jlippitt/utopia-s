@@ -59,6 +59,7 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
 
     fw.log.trace("{X:03}: {t} {t}, {t}, {t}[E:{d}]", .{
         core.pc,
+        op,
         args.vd,
         args.vs,
         args.vt,
