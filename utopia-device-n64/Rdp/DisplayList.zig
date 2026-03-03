@@ -124,7 +124,7 @@ pub fn clear(self: *Self) void {
 pub fn hasCapacity(self: *const Self, len: usize) bool {
     // There will always be fewer vertices than indices, so we can skip
     // checking the vertex array capacity
-    return self.display_groups.items.len < max_display_groups or
+    return self.display_groups.items.len < max_display_groups and
         (self.indices.items.len + len) <= max_buffer_len;
 }
 
