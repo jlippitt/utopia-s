@@ -80,6 +80,29 @@ fn write(self: *Self, index: u5, regs: Entry) void {
     fw.log.trace("TLB Entry {}: {any}", .{ index, entry.* });
 }
 
+fn probe(self: *const Self, entry_hi: EntryHi) Index {
+    for (self.entries, 0..) |entry, index| {
+        const lhs = entry_hi;
+        const rhs = entry.entry_hi;
+        const mask: u27 = entry.page_mask.mask;
+
+        if (lhs.region == rhs.region and
+            (lhs.vpn2 & ~mask) == (rhs.vpn2 & ~mask) and
+            (rhs.global or lhs.asid == rhs.asid))
+        {
+            return .{
+                .index = @intCast(index),
+                .probe_failed = false,
+            };
+        }
+    }
+
+    return .{
+        .index = 0,
+        .probe_failed = true,
+    };
+}
+
 pub fn tlbwi(core: *Core, word: u32) void {
     _ = word;
 
@@ -92,4 +115,12 @@ pub fn tlbwi(core: *Core, word: u32) void {
         .entry_hi = core.cp0.entry_hi,
         .entry_lo = core.cp0.entry_lo,
     });
+}
+
+pub fn tlbp(core: *Core, word: u32) void {
+    _ = word;
+
+    fw.log.trace("{X:08}: TLBP", .{core.pc});
+
+    core.cp0.setIndex(core.cp0.tlb.probe(core.cp0.entry_hi));
 }
