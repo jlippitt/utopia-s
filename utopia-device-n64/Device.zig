@@ -61,7 +61,7 @@ const Page = enum {
 };
 
 const memory_map: [512]Page = blk: {
-    var pages: [512]Page = undefined;
+    var pages: [512]Page = @splat(.unmapped);
     pages[0x03f] = .rdram_registers;
     pages[0x040] = .rsp;
     pages[0x041] = .rdp_command;
@@ -226,6 +226,10 @@ pub fn read(self: *Self, address: u32) u32 {
         .dd_ipl_rom => 0, // TODO
         .cartridge_rom => self.pi.readRom(address),
         .pifdata => self.si.readPif(address),
+        .unmapped => blk: {
+            fw.log.warn("Read from unmapped address: {X:08}", .{address});
+            break :blk 0;
+        },
         else => |page| fw.log.todo("Read from memory page: {t}", .{page}),
     };
 }
@@ -269,6 +273,10 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
             else => fw.log.warn("Write to cartridge ROM: {X:08} <= {X:08}", .{ address, value }),
         },
         .pifdata => self.si.writePif(address, value, mask),
+        .unmapped => fw.log.warn("Write to unmapped address: {X:08} <= {X:08}", .{
+            address,
+            value,
+        }),
         else => |page| fw.log.todo("Write to memory page: {t}", .{page}),
     }
 }
