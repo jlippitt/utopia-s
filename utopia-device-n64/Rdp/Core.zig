@@ -77,6 +77,15 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
             .color_target_descriptions = &.{
                 .{
                     .format = .r8g8b8a8_unorm,
+                    .blend_state = .{
+                        .enable_blend = true,
+                        .source_color = .src_alpha,
+                        .destination_color = .one_minus_src_alpha,
+                        .color_blend = .add,
+                        .source_alpha = .src_alpha,
+                        .destination_alpha = .one_minus_src_alpha,
+                        .alpha_blend = .add,
+                    },
                 },
             },
         },
