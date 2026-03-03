@@ -297,7 +297,11 @@ fn queryJoybus(
                     try recv_data.appendSliceBounded(&.{ 0x05, 0x00, 0x02 });
                 },
                 1, 2, 3 => {}, // TODO: Multiple controller support
-                4 => fw.log.todo("EEPROM", .{}),
+                4 => {
+                    // TODO: EEPROM saves
+                    // For now, always report 4KiB of EEPROM
+                    try recv_data.appendSliceBounded(&.{ 0x00, 0x80, 0x00 });
+                },
                 else => fw.log.panic("Invalid joybus channel: {}", .{channel}),
             }
         },
@@ -318,6 +322,14 @@ fn queryJoybus(
             }
 
             try recv_data.appendBounded(crc8(send_data[3..35]));
+        },
+        0x04 => {
+            // TODO: EEPROM saves
+            try recv_data.appendSliceBounded(&[1]u8{0} ** 8);
+        },
+        0x05 => {
+            // TODO: EEPROM saves
+            try recv_data.appendBounded(0);
         },
         else => |cmd| fw.log.unimplemented("Joybus command: {X:02}", .{cmd}),
     }
