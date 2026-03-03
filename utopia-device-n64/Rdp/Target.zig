@@ -156,13 +156,7 @@ pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{S
                 const src_data: []const [4]u8 = @ptrCast(pixels[0..(image_size * 4)]);
 
                 for (dst_data, src_data) |*dst, src| {
-                    const color = (@as(u16, src[0] >> 3) << 11) |
-                        (@as(u16, src[1] >> 3) << 6) |
-                        (@as(u16, src[2] >> 3) << 1) |
-                        @as(u16, src[3] >> 7);
-
-                    dst[0] = @truncate(color >> 8);
-                    dst[1] = @truncate(color);
+                    dst.* = fw.color.Rgba16.fromAbgr32Bytes(src).toBytesBe();
                 }
             },
             .rgba32 => @memcpy(

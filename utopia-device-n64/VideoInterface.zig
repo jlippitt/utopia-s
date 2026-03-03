@@ -198,11 +198,7 @@ fn render(self: *Self) void {
                 const src_data: []const [2]u8 = @ptrCast(rdram[src_index..][0..(min_pitch / 2)]);
 
                 for (dst_data, src_data) |*dst, src| {
-                    const color = (@as(u16, src[0]) << 8) | src[1];
-                    dst[0] = (@as(u8, @truncate(color >> 11)) & 31) << 3;
-                    dst[1] = (@as(u8, @truncate(color >> 6)) & 31) << 3;
-                    dst[2] = (@as(u8, @truncate(color >> 1)) & 31) << 3;
-                    dst[3] = if ((color & 1) != 0) 255 else 0;
+                    dst.* = fw.color.Rgba16.fromBytesBe(src).toAbgr32Bytes();
                 }
 
                 @memset(
