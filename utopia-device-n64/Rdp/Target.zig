@@ -148,7 +148,23 @@ pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{S
         const image_size = surface.image_width * surface.image_height;
 
         switch (surface.color_image_format) {
-            .rgba16 => fw.log.todo("RGBA16 target textures", .{}),
+            .rgba16 => {
+                const dst_data: [][2]u8 = @ptrCast(
+                    rdram[surface.color_image_address..][0..(image_size * 2)],
+                );
+
+                const src_data: []const [4]u8 = @ptrCast(pixels[0..(image_size * 4)]);
+
+                for (dst_data, src_data) |*dst, src| {
+                    const color = (@as(u16, src[0] >> 3) << 11) |
+                        (@as(u16, src[1] >> 3) << 6) |
+                        (@as(u16, src[2] >> 3) << 1) |
+                        @as(u16, src[3] >> 7);
+
+                    dst[0] = @truncate(color >> 8);
+                    dst[1] = @truncate(color);
+                }
+            },
             .rgba32 => @memcpy(
                 rdram[surface.color_image_address..][0..(image_size * 4)],
                 pixels[0..(image_size * 4)],
