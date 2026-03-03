@@ -19,7 +19,7 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
 
     if (core.target.paramsChanged()) {
         try core.render();
-        try core.target.update(core.gpu);
+        try core.target.update(core.gpu, core.getRdram());
     }
 
     const cmd: Rectangle = @bitCast(args[0]);

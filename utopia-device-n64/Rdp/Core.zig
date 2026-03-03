@@ -184,15 +184,9 @@ pub fn render(self: *Self) RenderError!void {
     };
 
     const color_target: sdl3.gpu.ColorTargetInfo = .{
-        .texture = surface.color_image_texture,
-        .load = .clear,
+        .texture = surface.color_texture,
+        .load = .load,
         .store = .store,
-        .clear_color = .{
-            .r = 0.0,
-            .g = 0.0,
-            .b = 0.0,
-            .a = 0.0,
-        },
     };
 
     const command_buffer = try self.gpu.acquireCommandBuffer();

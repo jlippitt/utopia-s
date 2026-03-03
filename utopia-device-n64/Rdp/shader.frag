@@ -195,7 +195,7 @@ void main() {
         return;
     }
 
-    vec4 tex0 = vec4(0.0, 0.0, 0.0, 1.0);
+    vec4 tex0 = vec4(1.0, 1.0, 1.0, 1.0);
 
     if (cycle_type == CT_COPY) {
         f_color = tex0;

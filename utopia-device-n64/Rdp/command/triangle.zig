@@ -23,7 +23,7 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
 
     if (core.target.paramsChanged()) {
         try core.render();
-        try core.target.update(core.gpu);
+        try core.target.update(core.gpu, core.getRdram());
     }
 
     const cmd: Triangle = @bitCast(args[0]);
