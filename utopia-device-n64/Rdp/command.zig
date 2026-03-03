@@ -12,6 +12,21 @@ pub const RectangleType = rectangle.RectangleType;
 pub const drawTriangle = triangle.drawTriangle;
 pub const TriangleAttributes = triangle.TriangleAttributes;
 
+pub fn syncLoad(core: *Core) void {
+    _ = core;
+    fw.log.debug("SYNC_LOAD", .{});
+}
+
+pub fn syncPipe(core: *Core) void {
+    _ = core;
+    fw.log.debug("SYNC_PIPE", .{});
+}
+
+pub fn syncTile(core: *Core) void {
+    _ = core;
+    fw.log.debug("SYNC_TILE", .{});
+}
+
 pub fn syncFull(core: *Core) Core.RenderError!void {
     fw.log.debug("SYNC_FULL", .{});
     try core.downloadImageData();
