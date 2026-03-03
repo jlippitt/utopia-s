@@ -31,6 +31,7 @@ params: Params = .{},
 params_changed: bool = false,
 download_buffer: sdl3.gpu.TransferBuffer,
 upload_buffer: sdl3.gpu.TransferBuffer,
+color_image_dirty: bool = false,
 
 pub fn init(gpu: sdl3.gpu.Device) error{SdlError}!Self {
     const download_buffer = try gpu.createTransferBuffer(.{
@@ -92,6 +93,10 @@ pub fn setImageHeight(self: *Self, height: u32) void {
     fw.log.debug("Image Height: {d}", .{self.params.image_height});
 }
 
+pub fn markDirty(self: *Self) void {
+    self.color_image_dirty = true;
+}
+
 pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!void {
     if (!self.params_changed) {
         return;
@@ -130,6 +135,13 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
 pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!void {
     const surface = self.surface orelse return;
+    const dirty = self.color_image_dirty;
+
+    self.color_image_dirty = false;
+
+    if (!dirty) {
+        return;
+    }
 
     const command_buffer = try gpu.acquireCommandBuffer();
 

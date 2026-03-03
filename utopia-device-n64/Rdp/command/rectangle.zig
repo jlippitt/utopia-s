@@ -22,6 +22,8 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         try core.target.update(core.gpu, core.getRdram());
     }
 
+    core.target.markDirty();
+
     const cmd: Rectangle = @bitCast(args[0]);
     fw.log.debug("RECTANGLE: {any}", .{cmd});
 
