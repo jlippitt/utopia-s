@@ -118,7 +118,7 @@ pub fn set(self: *Self, comptime fmt: Format, reg: Register, value: fmt.Type()) 
                 reg,
                 fmt,
                 @as(f32, @floatFromInt(@as(u32, @truncate(self.regs[index])))),
-                fw.num.truncate(i32, self.regs[index]),
+                @as(u32, @truncate(self.regs[index])),
             });
         },
         .D, .L => {
@@ -132,7 +132,7 @@ pub fn set(self: *Self, comptime fmt: Format, reg: Register, value: fmt.Type()) 
                 reg,
                 fmt,
                 @as(f64, @floatFromInt(self.regs[index])),
-                fw.num.signed(self.regs[index]),
+                self.regs[index],
             });
         },
     }
