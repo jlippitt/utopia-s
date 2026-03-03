@@ -3,6 +3,7 @@ const sdl3 = @import("sdl3");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 const Core = @import("./Rdp/Core.zig");
+const register = @import("./register.zig");
 
 pub const InitError = Core.InitError;
 pub const RenderError = Core.RenderError;
@@ -84,12 +85,38 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
                     fw.log.todo("RDP DMA queue", .{});
                 }
             } else {
-                fw.log.todo("DPC_END update while start pending flag is not set", .{});
+                self.dma_active.end = self.dma_regs.end;
+                fw.log.debug("RDP DMA Active: {any}", .{self.dma_active});
             }
 
             if (self.dma_active.start != self.dma_active.end and !self.status.freeze) {
                 self.getDevice().clock.schedule(.rdp_dma, 0);
             }
+        },
+        3 => {
+            const masked_value = value & mask;
+
+            register.setFlag(&self.status, "xbus", masked_value, 0);
+            register.setFlag(&self.status, "freeze", masked_value, 2);
+            register.setFlag(&self.status, "flush", masked_value, 4);
+
+            if ((masked_value & 0x0040) != 0) {
+                self.status.tmem_busy = false;
+            }
+
+            if ((masked_value & 0x0080) != 0) {
+                self.status.pipe_busy = false;
+            }
+
+            if ((masked_value & 0x0100) != 0) {
+                self.status.cmd_busy = false;
+            }
+
+            if (self.status.freeze) {
+                fw.log.todo("RDP freeze flag", .{});
+            }
+
+            fw.log.debug("DPC_STATUS: {any}", .{self.status});
         },
         else => fw.log.panic("Unmapped RDP register write: {} <= {X:08}", .{ index, value }),
     }
