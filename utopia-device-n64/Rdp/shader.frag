@@ -66,7 +66,7 @@ layout (std140, set = 3, binding = 0) uniform UniformBlock {
     CombineMode combine_1;
     BlendMode blend_0;
     BlendMode blend_1;
-    vec4 fill_color;
+    mat4 fill_colors;
     vec4 fog_color;
     vec4 blend_color;
     vec4 prim_color;
@@ -75,6 +75,7 @@ layout (std140, set = 3, binding = 0) uniform UniformBlock {
 };
 
 layout (location = 0) in vec4 v_color;
+layout (location = 1) in float v_pos_x;
 layout (location = 0) out vec4 f_color;
 
 vec3 blendInput(uint input_type, vec3 pixel_rgb) {
@@ -190,7 +191,7 @@ vec4 combine(CombineMode combine, vec4 tex0, vec4 combined) {
 
 void main() {
     if (cycle_type == CT_FILL) {
-        f_color = fill_color;
+        f_color = fill_colors[uint(v_pos_x) & 3];
         return;
     }
 

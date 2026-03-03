@@ -245,3 +245,18 @@ pub const Vertex = extern struct {
 };
 
 pub const Index = u16;
+
+pub const PixelSize = enum(u2) {
+    @"4",
+    @"8",
+    @"16",
+    @"32",
+};
+
+pub const PixelFormat = enum(u3) {
+    rgba,
+    yuv,
+    color_index,
+    ia,
+    i,
+};

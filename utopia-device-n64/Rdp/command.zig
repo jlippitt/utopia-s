@@ -49,7 +49,7 @@ pub fn setOtherModes(core: *Core, word: u64) void {
 pub fn setFillColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
     fw.log.debug("SET_FILL_COLOR: {X:08}", .{color});
-    core.display_list.setFillColor(parseColor(color));
+    core.display_list.setFillColor(color);
 }
 
 pub fn setFogColor(core: *Core, word: u64) void {
@@ -97,6 +97,7 @@ pub fn setColorImage(core: *Core, word: u64) void {
     };
 
     core.target.setColorImageParams(cmd.dram_addr, color_format, @as(u32, cmd.width) + 1);
+    core.display_list.setPixelSize(cmd.size);
 }
 
 pub fn parseFloat(comptime T: type, value: T, frac_digits: std.math.Log2Int(T)) f32 {
@@ -161,27 +162,12 @@ const SetOtherModes = packed struct(u64) {
     _3: u8,
 };
 
-const Size = enum(u2) {
-    @"4",
-    @"8",
-    @"16",
-    @"32",
-};
-
-const Format = enum(u3) {
-    rgba,
-    yuv,
-    color_index,
-    ia,
-    i,
-};
-
 const SetColorImage = packed struct(u64) {
     dram_addr: u24,
     __0: u8,
     width: u10,
     __1: u9,
-    size: Size,
-    format: Format,
+    size: Core.PixelSize,
+    format: Core.PixelFormat,
     __2: u8,
 };

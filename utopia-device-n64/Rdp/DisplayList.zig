@@ -22,7 +22,7 @@ pub const CycleType = enum(u32) {
 const FragmentState = extern struct {
     combine: [2]fragment.CombineMode = @splat(.{}),
     blend: [2]fragment.BlendMode = @splat(.{}),
-    fill_color: [4]f32 = @splat(0.0),
+    fill_colors: [4][4]f32 = @splat(@splat(0.0)),
     fog_color: [4]f32 = @splat(0.0),
     blend_color: [4]f32 = @splat(0.0),
     prim_color: [4]f32 = @splat(0.0),
@@ -46,6 +46,8 @@ index_upload_buffer: sdl3.gpu.TransferBuffer,
 vertex_upload_buffer: sdl3.gpu.TransferBuffer,
 frag_state: FragmentState = .{},
 frag_state_changed: bool = false,
+fill_color: u32 = 0,
+pixel_size: Core.PixelSize = .@"32",
 
 pub fn init(
     arena: *std.heap.ArenaAllocator,
@@ -174,14 +176,6 @@ pub fn setBlendMode(self: *Self, blend: [2]fragment.BlendMode) void {
     fw.log.debug("Blend (Cycle 1): {f}", .{blend[1]});
 }
 
-pub fn setFillColor(self: *Self, fill_color: [4]f32) void {
-    self.frag_state_changed = self.frag_state_changed or
-        !std.meta.eql(fill_color, self.frag_state.fill_color);
-
-    self.frag_state.fill_color = fill_color;
-    fw.log.debug("Fill Color: {any}", .{fill_color});
-}
-
 pub fn setFogColor(self: *Self, fog_color: [4]f32) void {
     self.frag_state_changed = self.frag_state_changed or
         !std.meta.eql(fog_color, self.frag_state.fog_color);
@@ -220,6 +214,18 @@ pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
 
     self.frag_state.cycle_type = cycle_type;
     fw.log.debug("Cycle Type: {t}", .{cycle_type});
+}
+
+pub fn setFillColor(self: *Self, fill_color: u32) void {
+    self.fill_color = fill_color;
+    fw.log.debug("Fill Color: {X:08}", .{fill_color});
+    self.updateFillColor();
+}
+
+pub fn setPixelSize(self: *Self, pixel_size: Core.PixelSize) void {
+    self.pixel_size = pixel_size;
+    fw.log.debug("Pixel Size: {t}", .{pixel_size});
+    self.updateFillColor();
 }
 
 pub fn uploadBuffers(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
@@ -304,4 +310,59 @@ fn getCurrentDisplayGroup(self: *Self) ?*DisplayGroup {
     }
 
     return &self.display_groups.items[self.display_groups.items.len - 1];
+}
+
+fn updateFillColor(self: *Self) void {
+    var fill_colors: [4][4]f32 = undefined;
+
+    switch (self.pixel_size) {
+        .@"4" => fw.log.unimplemented("4BPP fill color", .{}),
+        .@"8" => for (&fill_colors, 0..) |*fill_color, index| {
+            const shift = @as(u5, @intCast(index ^ 3)) * 8;
+            const intensity = @as(u8, @truncate(self.fill_color >> shift));
+            const float_value = @as(f32, @floatFromInt(intensity)) / 255.0;
+            fill_color.* = [1]f32{float_value} ** 4;
+        },
+        .@"16" => {
+            var colors: [2][4]f32 = undefined;
+
+            for (&colors, 0..) |*color, index| {
+                const shift = @as(u5, @intCast(index ^ 1)) * 16;
+                const rgba16 = self.fill_color >> shift;
+
+                const red = (@as(u8, @truncate(rgba16 >> 11)) & 31) << 3;
+                const green = (@as(u8, @truncate(rgba16 >> 6)) & 31) << 3;
+                const blue = (@as(u8, @truncate(rgba16 >> 1)) & 31) << 3;
+                const alpha: u8 = if ((rgba16 & 1) != 0) 255 else 0;
+
+                color.* = .{
+                    @as(f32, @floatFromInt(red)) / 255.0,
+                    @as(f32, @floatFromInt(green)) / 255.0,
+                    @as(f32, @floatFromInt(blue)) / 255.0,
+                    @as(f32, @floatFromInt(alpha)) / 255.0,
+                };
+            }
+
+            fill_colors = .{
+                colors[0],
+                colors[1],
+                colors[0],
+                colors[1],
+            };
+        },
+        .@"32" => {
+            fill_colors = @splat(.{
+                @as(f32, @floatFromInt(self.fill_color >> 24)) / 255.0,
+                @as(f32, @floatFromInt((self.fill_color >> 16) & 255)) / 255.0,
+                @as(f32, @floatFromInt((self.fill_color >> 8) & 255)) / 255.0,
+                @as(f32, @floatFromInt(self.fill_color & 255)) / 255.0,
+            });
+        },
+    }
+
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(self.frag_state.fill_colors, fill_colors);
+
+    self.frag_state.fill_colors = fill_colors;
+    fw.log.debug("Fill Colors: {any}", .{self.frag_state.fill_colors});
 }
