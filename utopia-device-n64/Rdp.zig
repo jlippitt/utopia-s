@@ -37,7 +37,13 @@ pub fn writeCommand(self: *Self, address: u32, value: u32, mask: u32) void {
 
 pub fn readRegister(self: *Self, index: u3) u32 {
     return switch (index) {
+        0 => self.dma_regs.start,
+        1 => self.dma_regs.end,
+        2 => self.dma_active.start,
         3 => @bitCast(self.status),
+        5 => @intFromBool(self.status.cmd_busy),
+        6 => @intFromBool(self.status.pipe_busy),
+        7 => @intFromBool(self.status.tmem_busy),
         else => fw.log.panic("Unmapped RDP register read: {}", .{index}),
     };
 }
