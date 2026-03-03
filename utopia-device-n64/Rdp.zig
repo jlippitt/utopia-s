@@ -14,6 +14,7 @@ dma_regs: Dma = .{},
 dma_active: Dma = .{},
 dma_pending: Dma = .{},
 status: Status = .{},
+clock_reset: u64 = 0,
 core: Core,
 
 pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
@@ -42,10 +43,12 @@ pub fn readRegister(self: *Self, index: u3) u32 {
         1 => self.dma_regs.end,
         2 => self.dma_active.start,
         3 => @bitCast(self.status),
+        4 => @truncate(
+            ((self.getDeviceConst().clock.getCycles() - self.clock_reset) / 3) & 0x00ff_ffff,
+        ),
         5 => @intFromBool(self.status.cmd_busy),
         6 => @intFromBool(self.status.pipe_busy),
         7 => @intFromBool(self.status.tmem_busy),
-        else => fw.log.panic("Unmapped RDP register read: {}", .{index}),
     };
 }
 
@@ -112,6 +115,11 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
                 self.status.cmd_busy = false;
             }
 
+            if ((value & 0x0200) != 0) {
+                self.clock_reset = self.getDeviceConst().clock.getCycles();
+                fw.log.debug("DPC_CLOCK reset", .{});
+            }
+
             if (self.status.freeze) {
                 fw.log.todo("RDP freeze flag", .{});
             }
@@ -143,7 +151,12 @@ pub fn handleDmaEvent(self: *Self) RenderError!void {
         defer fw.log.popContext();
 
         if (self.status.xbus) {
-            fw.log.todo("RDP XBus DMA", .{});
+            const dmem = self.getDeviceConst().rsp.getDmemConst();
+
+            while (self.dma_active.start != self.dma_active.end) {
+                try self.core.step(fw.mem.readBe(u64, dmem, self.dma_active.start & 0xff8));
+                self.dma_active.start +%= 8;
+            }
         } else {
             const rdram = self.getDeviceConst().rdram;
 

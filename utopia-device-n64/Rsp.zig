@@ -28,6 +28,10 @@ pub fn init(arena: *std.heap.ArenaAllocator) !Self {
 
 // External-facing interface
 
+pub fn getDmemConst(self: *const Self) *align(16) const [bank_size]u8 {
+    return self.mem[bank_size..][0..bank_size];
+}
+
 pub fn step(self: *Self) void {
     if (self.status.halted) {
         return;
