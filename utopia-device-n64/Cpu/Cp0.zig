@@ -93,6 +93,16 @@ pub fn setIndex(self: *Self, index: Tlb.Index) void {
     fw.log.trace("  Index: {any}", .{self.index});
 }
 
+pub fn setEntry(self: *Self, entry: Tlb.Entry) void {
+    self.entry_lo = entry.entry_lo;
+    self.entry_hi = entry.entry_hi;
+    self.page_mask = entry.page_mask;
+    fw.log.trace("  EntryLo0: {any}", .{self.entry_lo[0]});
+    fw.log.trace("  EntryLo1: {any}", .{self.entry_lo[1]});
+    fw.log.trace("  EntryHi: {any}", .{self.entry_hi});
+    fw.log.trace("  PageMask: {any}", .{self.page_mask});
+}
+
 pub fn setLLAddr(self: *Self, ll_addr: u32) void {
     self.ll_addr = ll_addr;
     fw.log.trace("  LLAddr: {X:08}", .{self.ll_addr});
@@ -341,6 +351,7 @@ pub fn cop0(core: *Core, word: u32) void {
 
     if (rs >= 0o20) {
         return switch (@as(u6, @truncate(word))) {
+            0o01 => Tlb.tlbr(core, word),
             0o02 => Tlb.tlbwi(core, word),
             0o10 => Tlb.tlbp(core, word),
             0o30 => eret(core, word),

@@ -33,7 +33,7 @@ pub const PageMask = packed struct(u64) {
     __1: u39 = 0,
 };
 
-const Entry = struct {
+pub const Entry = struct {
     page_mask: PageMask = .{},
     entry_hi: EntryHi = .{},
     entry_lo: [2]EntryLo = @splat(.{}),
@@ -45,6 +45,15 @@ entries: [32]Entry = @splat(.{}),
 
 pub fn init() Self {
     return .{};
+}
+
+fn read(self: *const Self, index: u5) Entry {
+    var entry = self.entries[index];
+    entry.entry_lo[0].global = entry.entry_hi.global;
+    entry.entry_lo[1].global = entry.entry_hi.global;
+    entry.entry_hi.vpn2 &= ~@as(u27, entry.page_mask.mask);
+    entry.entry_hi.global = false;
+    return entry;
 }
 
 fn write(self: *Self, index: u5, regs: Entry) void {
@@ -119,8 +128,13 @@ pub fn tlbwi(core: *Core, word: u32) void {
 
 pub fn tlbp(core: *Core, word: u32) void {
     _ = word;
-
     fw.log.trace("{X:08}: TLBP", .{core.pc});
-
     core.cp0.setIndex(core.cp0.tlb.probe(core.cp0.entry_hi));
+}
+
+pub fn tlbr(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: TLBR", .{core.pc});
+    const index: u5 = @truncate(core.cp0.index.index);
+    core.cp0.setEntry(core.cp0.tlb.read(index));
 }
