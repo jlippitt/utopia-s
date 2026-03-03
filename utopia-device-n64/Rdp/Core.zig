@@ -148,6 +148,8 @@ pub fn step(self: *Self, word: u64) RenderError!void {
             .texture = true,
             .z_buffer = true,
         }, self) orelse return,
+        0x24 => try command.drawRectangle(.texture, self) orelse return,
+        0x25 => try command.drawRectangle(.texture_flip, self) orelse return,
         0x29 => try command.syncFull(self),
         0x2d => command.setScissor(self, word),
         0x2f => command.setOtherModes(self, word),
