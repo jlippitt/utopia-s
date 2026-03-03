@@ -67,12 +67,10 @@ pub fn init() Self {
 }
 
 pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
-    fw.log.trace("CPU Interrupt Cleared: {t}", .{interrupt});
     self.cp0.clearInterrupt(interrupt);
 }
 
 pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
-    fw.log.trace("CPU Interrupt Raised: {t}", .{interrupt});
     self.cp0.raiseInterrupt(interrupt);
 }
 

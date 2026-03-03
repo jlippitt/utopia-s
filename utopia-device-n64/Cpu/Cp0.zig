@@ -109,11 +109,13 @@ pub fn setLLAddr(self: *Self, ll_addr: u32) void {
 }
 
 pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.trace("CPU Interrupt Cleared: {t}", .{interrupt});
     self.cause.ip &= ~@intFromEnum(interrupt);
     fw.log.trace("  Cause: {any}", .{self.cause});
 }
 
 pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.trace("CPU Interrupt Raised: {t}", .{interrupt});
     self.cause.ip |= @intFromEnum(interrupt);
     fw.log.trace("  Cause: {any}", .{self.cause});
     self.checkPendingInterrupts();
