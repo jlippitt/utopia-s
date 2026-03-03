@@ -69,6 +69,8 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
             register.setFlag(&self.mask, "dp", masked_value, 10);
 
             fw.log.debug("MI_MASK: {any}", .{self.mask});
+
+            self.updateCpuState();
         },
     }
 }
