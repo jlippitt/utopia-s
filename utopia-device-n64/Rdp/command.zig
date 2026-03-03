@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("./Core.zig");
 const Target = @import("./Target.zig");
+const fragment = @import("./fragment.zig");
 const rectangle = @import("./command/rectangle.zig");
 const triangle = @import("./command/triangle.zig");
 
@@ -27,12 +28,43 @@ pub fn setOtherModes(core: *Core, word: u64) void {
     const cmd: SetOtherModes = @bitCast(word);
     fw.log.debug("SET_OTHER_MODES: {any}", .{cmd});
     core.display_list.setCycleType(@enumFromInt(cmd.cycle_type));
+    core.display_list.setBlendMode(cmd.blend.parse());
 }
 
 pub fn setFillColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
     fw.log.debug("SET_FILL_COLOR: {X:08}", .{color});
     core.display_list.setFillColor(parseColor(color));
+}
+
+pub fn setFogColor(core: *Core, word: u64) void {
+    const color: u32 = @truncate(word);
+    fw.log.debug("SET_FOG_COLOR: {X:08}", .{color});
+    core.display_list.setFogColor(parseColor(color));
+}
+
+pub fn setBlendColor(core: *Core, word: u64) void {
+    const color: u32 = @truncate(word);
+    fw.log.debug("SET_BLEND_COLOR: {X:08}", .{color});
+    core.display_list.setBlendColor(parseColor(color));
+}
+
+pub fn setPrimColor(core: *Core, word: u64) void {
+    const color: u32 = @truncate(word);
+    fw.log.debug("SET_PRIM_COLOR: {X:08}", .{color});
+    core.display_list.setPrimColor(parseColor(color));
+}
+
+pub fn setEnvColor(core: *Core, word: u64) void {
+    const color: u32 = @truncate(word);
+    fw.log.debug("SET_ENV_COLOR: {X:08}", .{color});
+    core.display_list.setEnvColor(parseColor(color));
+}
+
+pub fn setCombineMode(core: *Core, word: u64) void {
+    const cmd: fragment.CombineParams = @bitCast(word);
+    fw.log.debug("SET_COMBINE_MODE: {any}", .{cmd});
+    core.display_list.setCombineMode(cmd.parse());
 }
 
 pub fn setColorImage(core: *Core, word: u64) void {
@@ -92,7 +124,7 @@ const SetOtherModes = packed struct(u64) {
     alpha_cvg_select: bool,
     force_blend: bool,
     _0: bool,
-    blend: u16,
+    blend: fragment.BlendParams,
     _1: u4,
     alpha_dither_sel: u2,
     rgb_dither_sel: u2,

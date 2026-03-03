@@ -2,6 +2,7 @@ const fw = @import("framework");
 const std = @import("std");
 const Core = @import("./Core.zig");
 const sdl3 = @import("sdl3");
+const fragment = @import("./fragment.zig");
 
 const max_display_groups = 256;
 const max_buffer_len = 1024;
@@ -19,7 +20,13 @@ pub const CycleType = enum(u32) {
 };
 
 const FragmentState = extern struct {
+    combine: [2]fragment.CombineMode = @splat(.{}),
+    blend: [2]fragment.BlendMode = @splat(.{}),
     fill_color: [4]f32 = @splat(0.0),
+    fog_color: [4]f32 = @splat(0.0),
+    blend_color: [4]f32 = @splat(0.0),
+    prim_color: [4]f32 = @splat(0.0),
+    env_color: [4]f32 = @splat(0.0),
     cycle_type: CycleType = .one_cycle,
 };
 
@@ -147,12 +154,64 @@ pub fn pushRectangle(self: *Self, vertices: *const [4]Core.Vertex) void {
     });
 }
 
+pub fn setCombineMode(self: *Self, combine: [2]fragment.CombineMode) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(combine, self.frag_state.combine);
+
+    self.frag_state.combine = combine;
+    fw.log.debug("RGB (Cycle 0): {f}", .{combine[0].rgb});
+    fw.log.debug("RGB (Cycle 1): {f}", .{combine[1].rgb});
+    fw.log.debug("Alpha (Cycle 0): {f}", .{combine[0].a});
+    fw.log.debug("Alpha (Cycle 1): {f}", .{combine[1].a});
+}
+
+pub fn setBlendMode(self: *Self, blend: [2]fragment.BlendMode) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(blend, self.frag_state.blend);
+
+    self.frag_state.blend = blend;
+    fw.log.debug("Blend (Cycle 0): {f}", .{blend[0]});
+    fw.log.debug("Blend (Cycle 1): {f}", .{blend[1]});
+}
+
 pub fn setFillColor(self: *Self, fill_color: [4]f32) void {
     self.frag_state_changed = self.frag_state_changed or
         !std.meta.eql(fill_color, self.frag_state.fill_color);
 
     self.frag_state.fill_color = fill_color;
     fw.log.debug("Fill Color: {any}", .{fill_color});
+}
+
+pub fn setFogColor(self: *Self, fog_color: [4]f32) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(fog_color, self.frag_state.fog_color);
+
+    self.frag_state.fog_color = fog_color;
+    fw.log.debug("Fog Color: {any}", .{fog_color});
+}
+
+pub fn setBlendColor(self: *Self, blend_color: [4]f32) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(blend_color, self.frag_state.blend_color);
+
+    self.frag_state.blend_color = blend_color;
+    fw.log.debug("Blend Color: {any}", .{blend_color});
+}
+
+pub fn setPrimColor(self: *Self, prim_color: [4]f32) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(prim_color, self.frag_state.prim_color);
+
+    self.frag_state.prim_color = prim_color;
+    fw.log.debug("Prim Color: {any}", .{prim_color});
+}
+
+pub fn setEnvColor(self: *Self, env_color: [4]f32) void {
+    self.frag_state_changed = self.frag_state_changed or
+        !std.meta.eql(env_color, self.frag_state.env_color);
+
+    self.frag_state.env_color = env_color;
+    fw.log.debug("Env Color: {any}", .{env_color});
 }
 
 pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
