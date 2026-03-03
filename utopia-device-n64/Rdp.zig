@@ -55,19 +55,17 @@ pub fn readRegister(self: *Self, index: u3) u32 {
 pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
     switch (index) {
         0 => {
-            if (self.status.start_pending) {
-                fw.log.todo("DPC_START write while starting pending flag is set", .{});
+            if (!self.status.start_pending) {
+                fw.num.writeMasked(
+                    u24,
+                    &self.dma_regs.start,
+                    @truncate(value),
+                    @truncate(mask & ~@as(u32, 7)),
+                );
+
+                fw.log.debug("DPC_START: {X:08}", .{self.dma_regs.start});
+                self.status.start_pending = true;
             }
-
-            fw.num.writeMasked(
-                u24,
-                &self.dma_regs.start,
-                @truncate(value),
-                @truncate(mask & ~@as(u32, 7)),
-            );
-
-            fw.log.debug("DPC_START: {X:08}", .{self.dma_regs.start});
-            self.status.start_pending = true;
         },
         1 => {
             fw.num.writeMasked(
