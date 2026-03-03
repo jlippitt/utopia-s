@@ -118,11 +118,11 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
                 fw.log.debug("DPC_CLOCK reset", .{});
             }
 
-            if (self.status.freeze) {
-                fw.log.todo("RDP freeze flag", .{});
-            }
-
             fw.log.debug("DPC_STATUS: {any}", .{self.status});
+
+            if (self.dma_active.start != self.dma_active.end and !self.status.freeze) {
+                self.getDevice().clock.schedule(.rdp_dma, 0);
+            }
         },
         else => fw.log.panic("Unmapped RDP register write: {} <= {X:08}", .{ index, value }),
     }
