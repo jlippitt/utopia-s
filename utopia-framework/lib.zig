@@ -1,5 +1,6 @@
 const std = @import("std");
 
+pub const color = @import("./color.zig");
 pub const fs = @import("./fs.zig");
 pub const log = @import("./log.zig");
 pub const mem = @import("./mem.zig");

@@ -55,25 +55,25 @@ pub fn setFillColor(core: *Core, word: u64) void {
 pub fn setFogColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
     fw.log.debug("SET_FOG_COLOR: {X:08}", .{color});
-    core.display_list.setFogColor(parseColor(color));
+    core.display_list.setFogColor(.fromRgba32Uint(color));
 }
 
 pub fn setBlendColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
     fw.log.debug("SET_BLEND_COLOR: {X:08}", .{color});
-    core.display_list.setBlendColor(parseColor(color));
+    core.display_list.setBlendColor(.fromRgba32Uint(color));
 }
 
 pub fn setPrimColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
     fw.log.debug("SET_PRIM_COLOR: {X:08}", .{color});
-    core.display_list.setPrimColor(parseColor(color));
+    core.display_list.setPrimColor(.fromRgba32Uint(color));
 }
 
 pub fn setEnvColor(core: *Core, word: u64) void {
     const color: u32 = @truncate(word);
     fw.log.debug("SET_ENV_COLOR: {X:08}", .{color});
-    core.display_list.setEnvColor(parseColor(color));
+    core.display_list.setEnvColor(.fromRgba32Uint(color));
 }
 
 pub fn setCombineMode(core: *Core, word: u64) void {
@@ -98,20 +98,6 @@ pub fn setColorImage(core: *Core, word: u64) void {
 
     core.target.setColorImageParams(cmd.dram_addr, color_format, @as(u32, cmd.width) + 1);
     core.display_list.setPixelSize(cmd.size);
-}
-
-pub fn parseFloat(comptime T: type, value: T, frac_digits: std.math.Log2Int(T)) f32 {
-    const divisor: T = @as(T, 1) << frac_digits;
-    return @as(f32, @floatFromInt(value)) / @as(f32, @floatFromInt(divisor));
-}
-
-fn parseColor(color: u32) [4]f32 {
-    return .{
-        @as(f32, @floatFromInt(color >> 24)) / 255.0,
-        @as(f32, @floatFromInt((color >> 16) & 255)) / 255.0,
-        @as(f32, @floatFromInt((color >> 8) & 255)) / 255.0,
-        @as(f32, @floatFromInt(color & 255)) / 255.0,
-    };
 }
 
 const SetScissor = packed struct(u64) {
