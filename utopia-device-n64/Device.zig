@@ -177,7 +177,6 @@ pub fn runFrame(self: *Self) fw.RenderError!void {
             switch (event) {
                 .cpu_interrupt => self.cpu.handleInterruptEvent(),
                 .cpu_timer => self.cpu.handleTimerEvent(),
-                .rdp_dma => try self.rdp.handleDmaEvent(),
                 .ai_sample => self.ai.handleSampleEvent(),
                 .vi_new_line => if (try self.vi.handleNewLineEvent()) {
                     return;
