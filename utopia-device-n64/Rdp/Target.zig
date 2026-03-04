@@ -53,6 +53,10 @@ pub fn init(gpu: sdl3.gpu.Device) error{SdlError}!Self {
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
+    if (self.surface) |surface| {
+        gpu.releaseTexture(surface.color_texture);
+    }
+
     gpu.releaseTransferBuffer(self.upload_buffer);
     gpu.releaseTransferBuffer(self.download_buffer);
 }
@@ -109,6 +113,10 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     try self.downloadImageData(gpu, rdram);
 
+    if (self.surface) |surface| {
+        gpu.releaseTexture(surface.color_texture);
+    }
+
     const color_texture = try gpu.createTexture(.{
         .format = .r8g8b8a8_unorm,
         .usage = .{ .color_target = true },
@@ -118,8 +126,6 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
         .num_levels = 1,
     });
 
-    try self.uploadImageData(gpu, rdram);
-
     self.surface = .{
         .color_texture = color_texture,
         .color_address = self.params.color_address,
@@ -127,6 +133,8 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
         .image_width = self.params.image_width,
         .image_height = self.params.image_height,
     };
+
+    try self.uploadImageData(gpu, rdram);
 
     self.params_changed = false;
 
