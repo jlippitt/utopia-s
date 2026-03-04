@@ -39,12 +39,12 @@ pub fn cop0(core: *Core, word: u32) void {
 
 fn mfc0(core: *Core, word: u32) void {
     const args: MType = @bitCast(word);
-    fw.log.trace("{X:08}: MFC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
+    fw.log.trace("{X:03}: MFC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
     core.set(args.rt, core.getRsp().readCp0Register(args.rd));
 }
 
 fn mtc0(core: *Core, word: u32) void {
     const args: MType = @bitCast(word);
-    fw.log.trace("{X:08}: MTC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
+    fw.log.trace("{X:03}: MTC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
     core.getRsp().writeCp0Register(args.rd, core.get(args.rt));
 }
