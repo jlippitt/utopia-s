@@ -37,6 +37,9 @@ pub fn step(self: *Self) void {
         return;
     }
 
+    fw.log.pushContext("rsp");
+    defer fw.log.popContext();
+
     self.core.step();
     self.status.halted = self.status.halted or self.status.sstep;
 }

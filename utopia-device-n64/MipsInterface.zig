@@ -80,12 +80,18 @@ pub fn hasInterrupt(self: *const Self, interrupt: Interrupt) bool {
 }
 
 pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.pushContext("main");
+    defer fw.log.popContext();
+
     fw.log.debug("MI Interrupt Cleared: {t}", .{interrupt});
     self.interrupt &= ~@intFromEnum(interrupt);
     self.updateCpuState();
 }
 
 pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
+    fw.log.pushContext("main");
+    defer fw.log.popContext();
+
     fw.log.debug("MI Interrupt Raised: {t}", .{interrupt});
     self.interrupt |= @intFromEnum(interrupt);
     self.updateCpuState();
