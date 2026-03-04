@@ -146,32 +146,41 @@ pub fn transferDma(self: *Self) RenderError!void {
     self.status.pipe_busy = true;
     self.status.gclk = true;
 
-    fw.log.debug("Processing RDP commands..", .{});
+    if (self.status.xbus) {
+        fw.log.debug("RDP DMA: Uploading {} commands ({} bytes) from DMEM:{X:03}", .{
+            (self.dma_active.end - self.dma_active.start) / 8,
+            self.dma_active.end - self.dma_active.start,
+            self.dma_active.start & 0xff8,
+        });
 
-    {
         fw.log.pushContext("rdp");
         defer fw.log.popContext();
 
-        if (self.status.xbus) {
-            const dmem = self.getDeviceConst().rsp.getDmemConst();
+        const dmem = self.getDeviceConst().rsp.getDmemConst();
 
-            while (self.dma_active.start != self.dma_active.end) {
-                try self.core.step(fw.mem.readBe(u64, dmem, self.dma_active.start & 0xff8));
-                self.dma_active.start +%= 8;
-            }
-        } else {
-            const rdram = self.getDeviceConst().rdram;
+        while (self.dma_active.start != self.dma_active.end) {
+            try self.core.step(fw.mem.readBe(u64, dmem, self.dma_active.start & 0xff8));
+            self.dma_active.start +%= 8;
+        }
+    } else {
+        fw.log.debug("RDP DMA: Uploading {} commands ({} bytes) from {X:08}", .{
+            (self.dma_active.end - self.dma_active.start) / 8,
+            self.dma_active.end - self.dma_active.start,
+            self.dma_active.start,
+        });
 
-            while (self.dma_active.start != self.dma_active.end) {
-                try self.core.step(fw.mem.readBe(u64, rdram, self.dma_active.start));
-                self.dma_active.start +%= 8;
-            }
+        const rdram = self.getDeviceConst().rdram;
+
+        fw.log.pushContext("rdp");
+        defer fw.log.popContext();
+
+        while (self.dma_active.start != self.dma_active.end) {
+            try self.core.step(fw.mem.readBe(u64, rdram, self.dma_active.start));
+            self.dma_active.start +%= 8;
         }
     }
 
     // TODO: RDP DMA queue
-
-    fw.log.debug("RDP DMA complete", .{});
 }
 
 // Internal-facing interface
