@@ -114,11 +114,10 @@ pub fn set(self: *Self, comptime fmt: Format, reg: Register, value: fmt.Type()) 
                 self.regs[index] |= @as(u64, @as(u32, @bitCast(value))) << 32;
             }
 
-            fw.log.trace("  {t}.{t}: {d} ({X:08})", .{
+            fw.log.trace("  {t}: {d} ({X:08})", .{
                 reg,
-                fmt,
-                @as(f32, @floatFromInt(@as(u32, @truncate(self.regs[index])))),
-                @as(u32, @truncate(self.regs[index])),
+                @as(f32, @bitCast(value)),
+                @as(u32, @bitCast(value)),
             });
         },
         .D, .L => {
@@ -128,11 +127,10 @@ pub fn set(self: *Self, comptime fmt: Format, reg: Register, value: fmt.Type()) 
 
             self.regs[index] = @bitCast(value);
 
-            fw.log.trace("  {t}.{t}: {d} ({X:08})", .{
+            fw.log.trace("  {t}: {d} ({X:08})", .{
                 reg,
-                fmt,
-                @as(f64, @floatFromInt(self.regs[index])),
-                self.regs[index],
+                @as(f64, @bitCast(value)),
+                @as(u64, @bitCast(value)),
             });
         },
     }
