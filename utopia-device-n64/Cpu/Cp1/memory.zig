@@ -16,6 +16,12 @@ pub const LoadOp = enum {
 };
 
 pub fn load(comptime op: LoadOp, core: *Core, word: u32) void {
+    if (!core.cp0.cp1Usable()) {
+        @branchHint(.unlikely);
+        core.except(.{ .coprocessor_unusable = 1 });
+        return;
+    }
+
     const args: Cp1.IType = @bitCast(word);
     const offset = fw.num.signExtend(u32, args.imm);
 
@@ -54,6 +60,12 @@ pub const StoreOp = enum {
 };
 
 pub fn store(comptime op: StoreOp, core: *Core, word: u32) void {
+    if (!core.cp0.cp1Usable()) {
+        @branchHint(.unlikely);
+        core.except(.{ .coprocessor_unusable = 1 });
+        return;
+    }
+
     const args: Cp1.IType = @bitCast(word);
     const offset = fw.num.signExtend(u32, args.imm);
 

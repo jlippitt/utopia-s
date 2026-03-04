@@ -142,6 +142,12 @@ fn fr(self: *const Self) bool {
 }
 
 pub fn cop1(core: *Core, word: u32) void {
+    if (!core.cp0.cp1Usable()) {
+        @branchHint(.unlikely);
+        core.except(.{ .coprocessor_unusable = 1 });
+        return;
+    }
+
     const rs: u5 = @truncate(word >> 21);
 
     switch (rs) {

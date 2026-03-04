@@ -111,6 +111,10 @@ pub fn init() Self {
     return .{};
 }
 
+pub fn cp1Usable(self: *const Self) bool {
+    return self.status.cu1;
+}
+
 pub fn fr(self: *const Self) bool {
     return self.status.fr;
 }
