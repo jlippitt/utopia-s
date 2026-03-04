@@ -81,6 +81,15 @@ pub const Exception = union(ExceptionType) {
             else => false,
         };
     }
+
+    fn unusual(self: @This()) bool {
+        return switch (self) {
+            .interrupt => false,
+            .tlb_miss_load, .tlb_miss_store => |miss| miss.invalid,
+            .coprocessor_unusable => |index| index != 1,
+            else => true,
+        };
+    }
 };
 
 pub const Self = @This();
@@ -159,6 +168,10 @@ pub fn mapAddress(self: *const Self, vaddr: u32, store: bool) Tlb.Error!u32 {
 pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
     if (self.status.exl or self.status.erl) {
         fw.log.unimplemented("Nested exceptions", .{});
+    }
+
+    if (exception.unusual()) {
+        fw.log.warn("Unusual CPU exception: {any}", .{exception});
     }
 
     fw.log.debug("-- Exception: {any} --", .{exception});

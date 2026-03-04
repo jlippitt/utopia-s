@@ -140,6 +140,7 @@ pub fn writeDataAlignedMasked(
 pub fn jump(self: *Self, target: u12) void {
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
+        fw.log.warn("Jump in RSP delay slot", .{});
         return;
     }
 
@@ -154,6 +155,7 @@ pub fn branch(self: *Self, comptime params: BranchParams, offset: u12, taken: bo
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
+        fw.log.warn("Branch in RSP delay slot", .{});
         return;
     }
 
@@ -170,7 +172,12 @@ pub fn branch(self: *Self, comptime params: BranchParams, offset: u12, taken: bo
 }
 
 pub fn link(self: *Self, reg: Register) void {
-    self.set(reg, if (self.pipe_state == .delay) self.target_pc +% 4 else self.pc +% 8);
+    const address = if (self.pipe_state == .delay) blk: {
+        fw.log.warn("Link in RSP delay slot", .{});
+        break :blk self.target_pc +% 4;
+    } else self.pc +% 8;
+
+    self.set(reg, address);
 }
 
 pub fn getRsp(self: *Self) *Rsp {

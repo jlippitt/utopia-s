@@ -165,6 +165,7 @@ pub fn writeDoubleWord(self: *Self, paddr: u32, value: u64, mask: u64) void {
 pub fn jump(self: *Self, target: u32) void {
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
+        fw.log.warn("Jump in CPU delay slot", .{});
         return;
     }
 
@@ -179,6 +180,7 @@ pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bo
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
+        fw.log.warn("Branch in CPU delay slot", .{});
         return;
     }
 
@@ -201,7 +203,11 @@ pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bo
 }
 
 pub fn link(self: *Self, reg: Register) void {
-    const address = if (self.pipe_state == .delay) self.target_pc +% 4 else self.pc +% 8;
+    const address = if (self.pipe_state == .delay) blk: {
+        fw.log.warn("Link in CPU delay slot", .{});
+        break :blk self.target_pc +% 4;
+    } else self.pc +% 8;
+
     self.set(reg, fw.num.signExtend(u64, address));
 }
 
