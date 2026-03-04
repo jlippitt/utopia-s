@@ -262,4 +262,5 @@ pub const PixelFormat = enum(u3) {
     color_index,
     ia,
     i,
+    _,
 };

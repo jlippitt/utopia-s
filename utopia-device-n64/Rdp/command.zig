@@ -93,7 +93,10 @@ pub fn setColorImage(core: *Core, word: u64) void {
             .@"32" => .rgba32,
             else => fw.log.unimplemented("Color image RGBA bit depth: {t}", .{cmd.size}),
         },
-        else => fw.log.unimplemented("Color image format: {t}", .{cmd.format}),
+        else => fw.log.unimplemented(
+            "Color image format: {s}",
+            .{std.enums.tagName(Core.PixelFormat, cmd.format) orelse "unknown"},
+        ),
     };
 
     core.target.setColorImageParams(cmd.dram_addr, color_format, @as(u32, cmd.width) + 1);
