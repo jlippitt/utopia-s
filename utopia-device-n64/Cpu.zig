@@ -83,7 +83,7 @@ pub fn handleTimerEvent(self: *Self) void {
 }
 
 pub fn step(self: *Self) void {
-    const address = self.mapAddress(self.pc) orelse return;
+    const address = self.mapAddress(self.pc, false) orelse return;
     const word = self.getDevice().read(address);
 
     dispatch(self, word);
@@ -117,15 +117,15 @@ pub fn set(self: *Self, reg: Register, value: u64) void {
     }
 }
 
-pub fn mapAddress(self: *Self, vaddr: u32) ?u32 {
-    _ = self;
-
+pub fn mapAddress(self: *Self, vaddr: u32, store: bool) ?u32 {
     if ((vaddr & 0xc000_0000) == 0x8000_0000) {
         @branchHint(.likely);
         return vaddr & 0x1fff_ffff;
     }
 
-    fw.log.todo("TLB lookups", .{});
+    return self.cp0.mapAddress(vaddr, store) catch {
+        fw.log.todo("TLB exceptions", .{});
+    };
 }
 
 pub fn readWord(self: *Self, paddr: u32) u32 {

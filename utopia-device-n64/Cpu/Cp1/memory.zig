@@ -28,7 +28,7 @@ pub fn load(comptime op: LoadOp, core: *Core, word: u32) void {
     });
 
     const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
-    const paddr = core.mapAddress(vaddr) orelse return;
+    const paddr = core.mapAddress(vaddr, false) orelse return;
 
     if ((paddr & op.alignMask()) != 0) {
         @branchHint(.cold);
@@ -66,7 +66,7 @@ pub fn store(comptime op: StoreOp, core: *Core, word: u32) void {
     });
 
     const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
-    const paddr = core.mapAddress(vaddr) orelse return;
+    const paddr = core.mapAddress(vaddr, true) orelse return;
 
     if ((paddr & op.alignMask()) != 0) {
         @branchHint(.cold);

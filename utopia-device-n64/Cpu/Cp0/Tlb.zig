@@ -39,12 +39,49 @@ pub const Entry = struct {
     entry_lo: [2]EntryLo = @splat(.{}),
 };
 
+pub const Error = error{
+    TlbMiss,
+    TlbInvalid,
+    TlbModification,
+};
+
 const Self = @This();
 
 entries: [32]Entry = @splat(.{}),
 
 pub fn init() Self {
     return .{};
+}
+
+pub fn mapAddress(self: *const Self, vaddr: u32, asid: u8, store: bool) Error!u32 {
+    for (self.entries) |entry| {
+        const entry_hi = entry.entry_hi;
+        const page = @as(u32, entry_hi.vpn2) << 13;
+        const mask = ~@as(u32, entry.page_mask.mask) << 13;
+
+        if (page != (vaddr & mask)) {
+            continue;
+        }
+
+        if (!entry_hi.global and entry_hi.asid != asid) {
+            continue;
+        }
+
+        const selector_bit = (~mask + 1) >> 1;
+        const entry_lo = entry.entry_lo[@intFromBool((vaddr & selector_bit) != 0)];
+
+        if (!entry_lo.valid) {
+            return error.TlbInvalid;
+        }
+
+        if (store and !entry_lo.dirty) {
+            return error.TlbModification;
+        }
+
+        return (@as(u32, entry_lo.pfn) << 12) | (vaddr & ~mask & ~selector_bit);
+    }
+
+    return error.TlbMiss;
 }
 
 fn read(self: *const Self, index: u5) Entry {

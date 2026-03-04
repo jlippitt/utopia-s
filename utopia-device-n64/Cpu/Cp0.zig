@@ -121,6 +121,10 @@ pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
     self.checkPendingInterrupts();
 }
 
+pub fn mapAddress(self: *const Self, vaddr: u32, store: bool) Tlb.Error!u32 {
+    return self.tlb.mapAddress(vaddr, self.entry_hi.asid, store);
+}
+
 pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
     if (self.status.exl or self.status.erl) {
         fw.log.unimplemented("Nested exceptions", .{});
