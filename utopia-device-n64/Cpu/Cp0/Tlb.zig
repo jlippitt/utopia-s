@@ -68,21 +68,21 @@ fn write(self: *Self, index: u5, regs: Entry) void {
 
     entry.entry_hi = .{
         .asid = regs.entry_hi.asid,
-        .global = regs.entry_lo[0].global or regs.entry_lo[1].global,
+        .global = regs.entry_lo[0].global and regs.entry_lo[1].global,
         .vpn2 = regs.entry_hi.vpn2 & ~@as(u27, mask),
         .region = regs.entry_hi.region,
     };
 
-    for (0..1) |id| {
+    for (&entry.entry_lo, regs.entry_lo) |*dst, src| {
         // Note: Fields are explicitly copied to avoid copying bits that aren't assigned to a
         // named struct field. This is important as some of those bits are writable on the CP0
         // register but shouldn't be carried over to the TLB entry.
-        entry.entry_lo[id] = .{
-            .global = regs.entry_lo[id].global,
-            .valid = regs.entry_lo[id].valid,
-            .dirty = regs.entry_lo[id].dirty,
-            .cache = regs.entry_lo[id].cache,
-            .pfn = regs.entry_lo[id].pfn,
+        dst.* = .{
+            .global = src.global,
+            .valid = src.valid,
+            .dirty = src.dirty,
+            .cache = src.cache,
+            .pfn = src.pfn,
         };
     }
 
