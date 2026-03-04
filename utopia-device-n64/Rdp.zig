@@ -43,9 +43,11 @@ pub fn readRegister(self: *Self, index: u3) u32 {
         1 => self.dma_regs.end,
         2 => self.dma_active.start,
         3 => @bitCast(self.status),
-        4 => @truncate(
-            ((self.getDeviceConst().clock.getCycles() - self.clock_reset) / 3) & 0x00ff_ffff,
-        ),
+        // TODO: DPC clock (awaiting more accurate timing)
+        4 => 0x00ff_ffff,
+        // 4 => @truncate(
+        //     ((self.getDeviceConst().clock.getCycles() - self.clock_reset) / 3) & 0x00ff_ffff,
+        // ),
         5 => @intFromBool(self.status.cmd_busy),
         6 => @intFromBool(self.status.pipe_busy),
         7 => @intFromBool(self.status.tmem_busy),
