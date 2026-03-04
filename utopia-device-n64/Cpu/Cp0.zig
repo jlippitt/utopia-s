@@ -4,13 +4,14 @@ const Device = @import("../Device.zig");
 const Core = @import("../Cpu.zig");
 const Tlb = @import("./Cp0/Tlb.zig");
 
+const tlb_miss_vector = 0x8000_0000;
 const exception_vector = 0x8000_0180;
 
 const Register = enum(u5) {
     // zig fmt: off
     Index,    Random,   EntryLo0,    EntryLo1,
     Context,  PageMask, Wired,       R7,
-    BadVAddr, Count,    EntryHi,     Compare,
+    BadVaddr, Count,    EntryHi,     Compare,
     Status,   Cause,    EPC,         PRId,
     Config,   LLAddr,   WatchLo,     WatchHi,
     XContext, R21,      R22,         R23,
@@ -33,16 +34,27 @@ pub const Interrupt = enum(u8) {
     timer = 0x80,
 };
 
-const ExceptionType = enum(u5) {
+pub const ExceptionType = enum(u5) {
     interrupt = 0,
+    tlb_modification = 1,
+    tlb_miss_load = 2,
+    tlb_miss_store = 3,
     syscall = 8,
     breakpoint = 9,
     coprocessor_unusable = 11,
     trap = 13,
 };
 
+pub const TlbMiss = struct {
+    vaddr: u32,
+    invalid: bool,
+};
+
 pub const Exception = union(ExceptionType) {
     interrupt: void,
+    tlb_modification: u32,
+    tlb_miss_load: TlbMiss,
+    tlb_miss_store: TlbMiss,
     syscall: void,
     breakpoint: void,
     coprocessor_unusable: u2,
@@ -52,6 +64,21 @@ pub const Exception = union(ExceptionType) {
         return switch (self) {
             .coprocessor_unusable => |index| index,
             else => 0,
+        };
+    }
+
+    fn badVaddr(self: @This()) ?u32 {
+        return switch (self) {
+            .tlb_modification => |vaddr| vaddr,
+            .tlb_miss_load, .tlb_miss_store => |miss| miss.vaddr,
+            else => null,
+        };
+    }
+
+    fn tlbMiss(self: @This()) bool {
+        return switch (self) {
+            .tlb_miss_load, .tlb_miss_store => |miss| !miss.invalid,
+            else => false,
         };
     }
 };
@@ -143,7 +170,23 @@ pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
     self.epc = fw.num.signExtend(u64, if (delay) pc -% 4 else pc);
     fw.log.trace("  EPC: {X:016}", .{self.epc});
 
-    return exception_vector;
+    if (exception.badVaddr()) |vaddr| {
+        self.bad_vaddr = vaddr;
+        fw.log.trace("  BadVaddr: {X:08}", .{self.bad_vaddr});
+
+        const vpn2 = vaddr >> 13;
+
+        self.entry_hi.vpn2 = @truncate(vpn2);
+        fw.log.trace("  EntryHi: {any}", .{self.entry_hi});
+
+        self.context.bad_vpn2 = @truncate(vpn2);
+        fw.log.trace("  Context: {any}", .{self.context});
+
+        self.x_context.bad_vpn2 = @truncate(vpn2);
+        fw.log.trace("  XContext: {any}", .{self.x_context});
+    }
+
+    return if (exception.tlbMiss()) tlb_miss_vector else exception_vector;
 }
 
 fn get(self: *Self, reg: Register) u64 {
@@ -154,7 +197,7 @@ fn get(self: *Self, reg: Register) u64 {
         .PageMask => @bitCast(self.page_mask),
         .Context => @bitCast(self.context),
         .Wired => self.wired,
-        .BadVAddr => self.bad_vaddr,
+        .BadVaddr => self.bad_vaddr,
         .Count => self.getCurrentCount(),
         .EntryHi => @bitCast(self.entry_hi),
         .Compare => self.compare,
@@ -199,7 +242,7 @@ fn set(self: *Self, reg: Register, value: u64) void {
             self.wired = @truncate(value);
             fw.log.trace("  Wired: {d}", .{self.wired});
         },
-        .BadVAddr => {}, // Read-only
+        .BadVaddr => {}, // Read-only
         .Count => {
             self.count_value = @truncate(value);
             fw.log.trace("  Count: {X:08}", .{self.count_value});

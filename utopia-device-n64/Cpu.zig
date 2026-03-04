@@ -123,8 +123,20 @@ pub fn mapAddress(self: *Self, vaddr: u32, store: bool) ?u32 {
         return vaddr & 0x1fff_ffff;
     }
 
-    return self.cp0.mapAddress(vaddr, store) catch {
-        fw.log.todo("TLB exceptions", .{});
+    return self.cp0.mapAddress(vaddr, store) catch |err| {
+        self.except(switch (err) {
+            error.TlbModification => .{ .tlb_modification = vaddr },
+            error.TlbMiss => if (store)
+                .{ .tlb_miss_store = .{ .vaddr = vaddr, .invalid = false } }
+            else
+                .{ .tlb_miss_load = .{ .vaddr = vaddr, .invalid = false } },
+            error.TlbInvalid => if (store)
+                .{ .tlb_miss_store = .{ .vaddr = vaddr, .invalid = true } }
+            else
+                .{ .tlb_miss_load = .{ .vaddr = vaddr, .invalid = true } },
+        });
+
+        return null;
     };
 }
 

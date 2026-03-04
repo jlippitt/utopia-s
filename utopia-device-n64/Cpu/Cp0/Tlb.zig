@@ -40,9 +40,9 @@ pub const Entry = struct {
 };
 
 pub const Error = error{
+    TlbModification,
     TlbMiss,
     TlbInvalid,
-    TlbModification,
 };
 
 const Self = @This();
