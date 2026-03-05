@@ -5,6 +5,7 @@ const sdl3 = @import("sdl3");
 const Rdp = @import("../Rdp.zig");
 const DisplayList = @import("./DisplayList.zig");
 const Target = @import("./Target.zig");
+const Tmem = @import("./Tmem.zig");
 const command = @import("./command.zig");
 
 const vertex_src align(@alignOf(u32)) = @embedFile("rdp.vert").*;
@@ -20,6 +21,7 @@ const Self = @This();
 gpu: sdl3.gpu.Device,
 pipeline: sdl3.gpu.GraphicsPipeline,
 target: Target,
+tmem: Tmem,
 display_list: DisplayList,
 word_buf: std.ArrayListUnmanaged(u64),
 fill_color: [4]f32 = @splat(0.0),
@@ -95,6 +97,9 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     var target = try Target.init(gpu);
     errdefer target.deinit(gpu);
 
+    var tmem = try Tmem.init(gpu);
+    errdefer tmem.deinit(gpu);
+
     var display_list = try DisplayList.init(arena, gpu);
     errdefer display_list.deinit(gpu);
 
@@ -107,6 +112,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .gpu = gpu,
         .pipeline = pipeline,
         .target = target,
+        .tmem = tmem,
         .display_list = display_list,
         .word_buf = word_buf,
     };
@@ -116,6 +122,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 
 pub fn deinit(self: *Self) void {
     self.display_list.deinit(self.gpu);
+    self.tmem.deinit(self.gpu);
     self.target.deinit(self.gpu);
     self.gpu.releaseGraphicsPipeline(self.pipeline);
     self.gpu.deinit();
@@ -165,6 +172,8 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x29 => try command.syncFull(self),
         0x2d => command.setScissor(self, word),
         0x2f => command.setOtherModes(self, word),
+        0x32 => command.setTileSize(self, word),
+        0x35 => command.setTile(self, word),
         0x36 => try command.drawRectangle(.fill, self) orelse return,
         0x37 => command.setFillColor(self, word),
         0x38 => command.setFogColor(self, word),

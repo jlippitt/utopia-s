@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("./Core.zig");
 const Target = @import("./Target.zig");
+const Tmem = @import("./Tmem.zig");
 const fragment = @import("./fragment.zig");
 const rectangle = @import("./command/rectangle.zig");
 const triangle = @import("./command/triangle.zig");
@@ -44,6 +45,18 @@ pub fn setOtherModes(core: *Core, word: u64) void {
     fw.log.debug("SET_OTHER_MODES: {any}", .{cmd});
     core.display_list.setCycleType(@enumFromInt(cmd.cycle_type));
     core.display_list.setBlendMode(cmd.blend.parse());
+}
+
+pub fn setTileSize(core: *Core, word: u64) void {
+    const cmd: Tmem.TileSize = @bitCast(word);
+    fw.log.debug("SET_TILE_SIZE: {any}", .{cmd});
+    core.tmem.setTileSize(cmd);
+}
+
+pub fn setTile(core: *Core, word: u64) void {
+    const cmd: Tmem.TileDescriptor = @bitCast(word);
+    fw.log.debug("SET_TILE: {any}", .{cmd});
+    core.tmem.setTileDescriptor(cmd);
 }
 
 pub fn setFillColor(core: *Core, word: u64) void {
