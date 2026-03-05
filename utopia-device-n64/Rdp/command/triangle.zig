@@ -31,7 +31,7 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
     const cmd: Triangle = @bitCast(args[0]);
     fw.log.debug("TRIANGLE: {any}", .{cmd});
 
-    var vertices: [3]Core.Vertex = undefined;
+    var vertices: [3]Core.Vertex = @splat(.{});
 
     const edge_l: Edge = @bitCast(args[1]);
     fw.log.debug("Edge L: {any}", .{edge_l});
@@ -99,15 +99,6 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
             vertices[2].color[el] = float(color[el] +
                 ((low_y * color_de[el]) >> 16)) / 256.0;
         }
-    } else {
-        for (&vertices) |*vertex| {
-            vertex.color = @splat(0.0);
-        }
-    }
-
-    for (&vertices) |*vertex| {
-        // TODO: Z-buffering
-        vertex.pos[2] = 0.0;
     }
 
     fw.log.debug("Vertices: {any}", .{vertices});
@@ -116,7 +107,7 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         try core.render();
     }
 
-    core.display_list.pushTriangle(&vertices);
+    core.display_list.pushTriangle(core.gpu, &core.tmem, null, &vertices);
 }
 
 fn parseColor(int: Shade, frac: ShadeFrac) [4]i64 {

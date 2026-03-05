@@ -61,6 +61,8 @@ struct BlendMode {
     uint b;
 };
 
+layout(set = 2, binding = 0) uniform sampler2D tex0_sampler;
+
 layout (std140, set = 3, binding = 0) uniform UniformBlock {
     CombineMode combine_0;
     CombineMode combine_1;
@@ -75,7 +77,8 @@ layout (std140, set = 3, binding = 0) uniform UniformBlock {
 };
 
 layout (location = 0) in vec4 v_color;
-layout (location = 1) in float v_pos_x;
+layout (location = 1) in vec2 v_tex_coords;
+layout (location = 2) in float v_pos_x;
 layout (location = 0) out vec4 f_color;
 
 vec3 blendInput(uint input_type, vec3 pixel_rgb) {
@@ -195,7 +198,7 @@ void main() {
         return;
     }
 
-    vec4 tex0 = vec4(1.0, 1.0, 1.0, 1.0);
+    vec4 tex0 = texture(tex0_sampler, v_tex_coords / textureSize(tex0_sampler, 0));
 
     if (cycle_type == CT_COPY) {
         f_color = tex0;

@@ -48,13 +48,19 @@ pub fn setOtherModes(core: *Core, word: u64) void {
 }
 
 pub fn setTileSize(core: *Core, word: u64) void {
-    const cmd: Tmem.TileSize = @bitCast(word);
+    const cmd: Tmem.Tile.Size = @bitCast(word);
     fw.log.debug("SET_TILE_SIZE: {any}", .{cmd});
     core.tmem.setTileSize(cmd);
 }
 
+pub fn loadTile(core: *Core, word: u64) void {
+    const cmd: Tmem.Tile.Size = @bitCast(word);
+    fw.log.debug("LOAD_TILE: {any}", .{cmd});
+    core.tmem.loadTile(core.getRdramConst(), cmd);
+}
+
 pub fn setTile(core: *Core, word: u64) void {
-    const cmd: Tmem.TileDescriptor = @bitCast(word);
+    const cmd: Tmem.Tile.Descriptor = @bitCast(word);
     fw.log.debug("SET_TILE: {any}", .{cmd});
     core.tmem.setTileDescriptor(cmd);
 }

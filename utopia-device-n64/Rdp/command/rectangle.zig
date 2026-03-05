@@ -27,21 +27,22 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
     const cmd: Rectangle = @bitCast(args[0]);
     fw.log.debug("RECTANGLE: {any}", .{cmd});
 
-    var vertices: [4]Core.Vertex = undefined;
+    const cycle_type = core.display_list.getCycleType();
 
-    const xl: u32, const yl: u32 = switch (core.display_list.getCycleType()) {
-        .copy, .fill => .{
-            @as(u32, cmd.xl + 1),
-            @as(u32, cmd.yl + 1),
-        },
-        else => .{
-            cmd.xl,
-            cmd.yl,
-        },
-    };
+    var vertices: [4]Core.Vertex = @splat(.{});
 
-    const left = @as(f32, @floatFromInt(cmd.xh)) / 4.0;
-    const top = @as(f32, @floatFromInt(cmd.yh)) / 4.0;
+    const xh: u32 = cmd.xh;
+    const yh: u32 = cmd.yh;
+    var xl: u32 = cmd.xl;
+    var yl: u32 = cmd.yl;
+
+    if (cycle_type == .copy or cycle_type == .fill) {
+        xl += 1;
+        yl += 1;
+    }
+
+    const left = @as(f32, @floatFromInt(xh)) / 4.0;
+    const top = @as(f32, @floatFromInt(yh)) / 4.0;
     const right = @as(f32, @floatFromInt(xl)) / 4.0;
     const bottom = @as(f32, @floatFromInt(yl)) / 4.0;
 
@@ -54,13 +55,53 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
     vertices[3].pos[0] = right;
     vertices[3].pos[1] = bottom;
 
-    for (&vertices) |*vertex| {
-        // TODO: Z-buffering
-        vertex.pos[2] = 0.0;
+    const texture = if (comptime rect_type != .fill) blk: {
+        const tile = core.tmem.getTile(cmd.tile);
 
-        // TODO: Proper fill color implementation
-        vertex.color = core.fill_color;
-    }
+        const tex_coords: TexCoords = @bitCast(args[1]);
+        fw.log.debug("Tex Coords: {any}", .{tex_coords});
+
+        const s = @as(u64, tex_coords.s) << 5;
+        const t = @as(u64, tex_coords.t) << 5;
+        var dsdx: u64 = tex_coords.dsdx;
+        const dtdy: u64 = tex_coords.dtdy;
+
+        if (cycle_type == .copy) {
+            dsdx /= (64 / tile.bitsPerPixel());
+        }
+
+        const tile_x = @as(u64, tile.x()) << 10;
+        const tile_y = @as(u64, tile.y()) << 10;
+
+        const sh = tile_x + s;
+        const th = tile_y + t;
+        const sl = sh + (dsdx * (xl - xh));
+        const tl = th + (dtdy * (yl - yh));
+
+        const tex_left = @as(f32, @floatFromInt(sh)) / 4096.0;
+        const tex_right = @as(f32, @floatFromInt(sl)) / 4096.0;
+        const tex_top = @as(f32, @floatFromInt(th)) / 4096.0;
+        const tex_bottom = @as(f32, @floatFromInt(tl)) / 4096.0;
+
+        vertices[0].tex_coords[0] = tex_left;
+        vertices[0].tex_coords[1] = tex_top;
+        vertices[3].tex_coords[0] = tex_right;
+        vertices[3].tex_coords[1] = tex_bottom;
+
+        if (comptime rect_type == .texture_flip) {
+            vertices[1].tex_coords[0] = tex_right;
+            vertices[1].tex_coords[1] = tex_top;
+            vertices[2].tex_coords[0] = tex_left;
+            vertices[2].tex_coords[1] = tex_bottom;
+        } else {
+            vertices[1].tex_coords[0] = tex_left;
+            vertices[1].tex_coords[1] = tex_bottom;
+            vertices[2].tex_coords[0] = tex_right;
+            vertices[2].tex_coords[1] = tex_top;
+        }
+
+        break :blk try core.tmem.createTexture(core.gpu, cmd.tile);
+    } else null;
 
     fw.log.debug("Vertices: {any}", .{vertices});
 
@@ -68,14 +109,22 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         try core.render();
     }
 
-    core.display_list.pushRectangle(&vertices);
+    core.display_list.pushRectangle(core.gpu, &core.tmem, texture, &vertices);
 }
 
 const Rectangle = packed struct(u64) {
     yh: u12,
     xh: u12,
-    __0: u8,
+    tile: u3,
+    __0: u5,
     yl: u12,
     xl: u12,
     __1: u8,
+};
+
+const TexCoords = packed struct(u64) {
+    dtdy: u16,
+    dsdx: u16,
+    t: u16,
+    s: u16,
 };

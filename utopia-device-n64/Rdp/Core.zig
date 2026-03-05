@@ -20,11 +20,11 @@ const Self = @This();
 
 gpu: sdl3.gpu.Device,
 pipeline: sdl3.gpu.GraphicsPipeline,
+sampler: sdl3.gpu.Sampler,
 target: Target,
 tmem: Tmem,
 display_list: DisplayList,
 word_buf: std.ArrayListUnmanaged(u64),
-fill_color: [4]f32 = @splat(0.0),
 
 pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     const format_flags: sdl3.gpu.ShaderFormatFlags = .{ .spirv = true };
@@ -45,6 +45,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .entry_point = "main",
         .format = format_flags,
         .stage = .fragment,
+        .num_samplers = 1,
         .num_uniform_buffers = 1,
     });
     defer gpu.releaseShader(fragment_shader);
@@ -73,6 +74,12 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
                     .format = .f32x4,
                     .offset = @offsetOf(Vertex, "color"),
                 },
+                .{
+                    .buffer_slot = 0,
+                    .location = 2,
+                    .format = .f32x2,
+                    .offset = @offsetOf(Vertex, "tex_coords"),
+                },
             },
         },
         .target_info = .{
@@ -94,14 +101,24 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     });
     errdefer gpu.releaseGraphicsPipeline(pipeline);
 
+    const sampler = try gpu.createSampler(.{
+        .mag_filter = .linear,
+        .min_filter = .nearest,
+        .mipmap_mode = .nearest,
+        .address_mode_u = .clamp_to_edge,
+        .address_mode_v = .clamp_to_edge,
+        .address_mode_w = .clamp_to_edge,
+    });
+    errdefer gpu.releaseSampler(sampler);
+
     var target = try Target.init(gpu);
     errdefer target.deinit(gpu);
 
-    var tmem = try Tmem.init(gpu);
+    var tmem = try Tmem.init(arena, gpu);
     errdefer tmem.deinit(gpu);
 
-    var display_list = try DisplayList.init(arena, gpu);
-    errdefer display_list.deinit(gpu);
+    var display_list = try DisplayList.init(arena, gpu, &tmem);
+    errdefer display_list.deinit(gpu, &tmem);
 
     const word_buf = try std.ArrayListUnmanaged(u64).initCapacity(
         arena.allocator(),
@@ -111,6 +128,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     return .{
         .gpu = gpu,
         .pipeline = pipeline,
+        .sampler = sampler,
         .target = target,
         .tmem = tmem,
         .display_list = display_list,
@@ -121,9 +139,10 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 // External-facing interface
 
 pub fn deinit(self: *Self) void {
-    self.display_list.deinit(self.gpu);
+    self.display_list.deinit(self.gpu, &self.tmem);
     self.tmem.deinit(self.gpu);
     self.target.deinit(self.gpu);
+    self.gpu.releaseSampler(self.sampler);
     self.gpu.releaseGraphicsPipeline(self.pipeline);
     self.gpu.deinit();
 }
@@ -173,6 +192,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x2d => command.setScissor(self, word),
         0x2f => command.setOtherModes(self, word),
         0x32 => command.setTileSize(self, word),
+        0x34 => command.loadTile(self, word),
         0x35 => command.setTile(self, word),
         0x36 => try command.drawRectangle(.fill, self) orelse return,
         0x37 => command.setFillColor(self, word),
@@ -234,17 +254,30 @@ pub fn render(self: *Self) RenderError!void {
 
         for (display_groups) |display_group| {
             command_buffer.pushFragmentUniformData(0, std.mem.asBytes(&display_group.frag_state));
+
+            render_pass.bindFragmentSamplers(0, &.{
+                .{
+                    .texture = self.tmem.getBinding(display_group.texture),
+                    .sampler = self.sampler,
+                },
+            });
+
             render_pass.drawIndexedPrimitives(display_group.len, 1, index_offset, 0, 0);
+
             index_offset += display_group.len;
         }
     }
 
     try command_buffer.submit();
 
-    self.display_list.clear();
+    self.display_list.clear(self.gpu, &self.tmem);
 }
 
 pub fn getRdp(self: *Self) *Rdp {
+    return @alignCast(@fieldParentPtr("core", self));
+}
+
+pub fn getRdpConst(self: *const Self) *const Rdp {
     return @alignCast(@fieldParentPtr("core", self));
 }
 
@@ -252,9 +285,14 @@ pub fn getRdram(self: *Self) []u8 {
     return self.getRdp().getDevice().rdram;
 }
 
+pub fn getRdramConst(self: *const Self) []const u8 {
+    return self.getRdpConst().getDeviceConst().rdram;
+}
+
 pub const Vertex = extern struct {
-    pos: [3]f32,
-    color: [4]f32,
+    pos: [3]f32 = @splat(0.0),
+    color: [4]f32 = @splat(0.0),
+    tex_coords: [2]f32 = @splat(0.0),
 };
 
 pub const Index = u16;

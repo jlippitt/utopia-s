@@ -1,6 +1,7 @@
 const fw = @import("framework");
 const std = @import("std");
 const Core = @import("./Core.zig");
+const Tmem = @import("./Tmem.zig");
 const sdl3 = @import("sdl3");
 const fragment = @import("./fragment.zig");
 
@@ -32,6 +33,7 @@ const FragmentState = extern struct {
 
 pub const DisplayGroup = struct {
     len: u32,
+    texture: Tmem.Texture,
     frag_state: FragmentState,
 };
 
@@ -44,6 +46,8 @@ index_buffer: sdl3.gpu.Buffer,
 vertex_buffer: sdl3.gpu.Buffer,
 index_upload_buffer: sdl3.gpu.TransferBuffer,
 vertex_upload_buffer: sdl3.gpu.TransferBuffer,
+texture: Tmem.Texture,
+texture_changed: bool = false,
 frag_state: FragmentState = .{},
 frag_state_changed: bool = false,
 fill_color: u32 = 0,
@@ -52,7 +56,8 @@ pixel_size: Core.PixelSize = .@"32",
 pub fn init(
     arena: *std.heap.ArenaAllocator,
     gpu: sdl3.gpu.Device,
-) error{ SdlError, OutOfMemory }!Self {
+    tmem: *Tmem,
+) error{ OutOfMemory, SdlError }!Self {
     const index_buffer = try gpu.createBuffer(.{
         .size = index_buffer_size,
         .usage = .{ .index = true },
@@ -85,10 +90,13 @@ pub fn init(
         .vertex_buffer = vertex_buffer,
         .index_upload_buffer = index_upload_buffer,
         .vertex_upload_buffer = vertex_upload_buffer,
+        .texture = tmem.nullTexture(),
     };
 }
 
-pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
+pub fn deinit(self: *Self, gpu: sdl3.gpu.Device, tmem: *Tmem) void {
+    self.clear(gpu, tmem);
+    tmem.unrefTexture(gpu, self.texture);
     gpu.releaseTransferBuffer(self.vertex_upload_buffer);
     gpu.releaseTransferBuffer(self.index_upload_buffer);
     gpu.releaseBuffer(self.vertex_buffer);
@@ -115,7 +123,11 @@ pub fn getCycleType(self: *Self) CycleType {
     return self.frag_state.cycle_type;
 }
 
-pub fn clear(self: *Self) void {
+pub fn clear(self: *Self, gpu: sdl3.gpu.Device, tmem: *Tmem) void {
+    for (self.display_groups.items) |display_group| {
+        tmem.unrefTexture(gpu, display_group.texture);
+    }
+
     self.display_groups.clearRetainingCapacity();
     self.indices.clearRetainingCapacity();
     self.vertices.clearRetainingCapacity();
@@ -128,17 +140,29 @@ pub fn hasCapacity(self: *const Self, len: usize) bool {
         (self.indices.items.len + len) <= max_buffer_len;
 }
 
-pub fn pushTriangle(self: *Self, vertices: *const [3]Core.Vertex) void {
+pub fn pushTriangle(
+    self: *Self,
+    gpu: sdl3.gpu.Device,
+    tmem: *Tmem,
+    texture: ?Tmem.Texture,
+    vertices: *const [3]Core.Vertex,
+) void {
     const base_index = self.vertices.items.len;
 
-    self.pushPrimitive(vertices, &.{
+    self.pushPrimitive(gpu, tmem, texture, vertices, &.{
         @intCast(base_index),
         @intCast(base_index + 1),
         @intCast(base_index + 2),
     });
 }
 
-pub fn pushRectangle(self: *Self, vertices: *const [4]Core.Vertex) void {
+pub fn pushRectangle(
+    self: *Self,
+    gpu: sdl3.gpu.Device,
+    tmem: *Tmem,
+    texture: ?Tmem.Texture,
+    vertices: *const [4]Core.Vertex,
+) void {
     const base_index = self.vertices.items.len;
 
     const top_left: Core.Index = @intCast(base_index);
@@ -146,7 +170,7 @@ pub fn pushRectangle(self: *Self, vertices: *const [4]Core.Vertex) void {
     const top_right: Core.Index = @intCast(base_index + 2);
     const bottom_right: Core.Index = @intCast(base_index + 3);
 
-    self.pushPrimitive(vertices, &.{
+    self.pushPrimitive(gpu, tmem, texture, vertices, &.{
         top_left,
         bottom_left,
         top_right,
@@ -283,19 +307,33 @@ pub fn uploadBuffers(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
     try command_buffer.submit();
 }
 
-fn pushPrimitive(self: *Self, vertices: []const Core.Vertex, indices: []const Core.Index) void {
+fn pushPrimitive(
+    self: *Self,
+    gpu: sdl3.gpu.Device,
+    tmem: *Tmem,
+    texture: ?Tmem.Texture,
+    vertices: []const Core.Vertex,
+    indices: []const Core.Index,
+) void {
     self.indices.appendSliceAssumeCapacity(indices);
     self.vertices.appendSliceAssumeCapacity(vertices);
 
-    if (!self.frag_state_changed) {
+    const prev_texture = self.texture;
+    self.texture = texture orelse tmem.nullTexture();
+    tmem.unrefTexture(gpu, prev_texture);
+
+    if (self.texture == prev_texture and !self.frag_state_changed) {
         if (self.getCurrentDisplayGroup()) |display_group| {
             display_group.len += @intCast(indices.len);
             return;
         }
     }
 
+    tmem.refTexture(self.texture);
+
     self.display_groups.appendAssumeCapacity(.{
         .len = @intCast(indices.len),
+        .texture = self.texture,
         .frag_state = self.frag_state,
     });
 
