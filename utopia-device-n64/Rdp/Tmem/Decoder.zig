@@ -59,6 +59,11 @@ pub fn decode(
             .@"4" => self.decodeFormat(ia4, tile, tmem_width),
             else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
         },
+        .i => switch (size) {
+            .@"8" => self.decodeFormat(intensity8, tile, tmem_width),
+            .@"4" => self.decodeFormat(intensity4, tile, tmem_width),
+            else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
+        },
         else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
     }
 
@@ -168,5 +173,31 @@ pub const ia4 = struct {
             intensity,
             alpha,
         };
+    }
+};
+
+pub const intensity8 = struct {
+    const dst_chunk_size = 4;
+    const src_chunk_size = 1;
+
+    fn decode(src: [1]u8) [4]u8 {
+        return @splat(src[0]);
+    }
+};
+
+pub const intensity4 = struct {
+    const dst_chunk_size = 8;
+    const src_chunk_size = 1;
+
+    fn decode(src: [1]u8) [8]u8 {
+        const hi = decodeNibble(@truncate(src[0] >> 4));
+        const lo = decodeNibble(@truncate(src[0]));
+        return hi ++ lo;
+    }
+
+    fn decodeNibble(src: u4) [4]u8 {
+        const value: u8 = src & 0x0f;
+        const intensity = (value << 4) | value;
+        return @splat(intensity);
     }
 };
