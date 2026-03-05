@@ -4,6 +4,8 @@ const Core = @import("./Core.zig");
 
 const Self = @This();
 
+image_width: u24 = 0,
+image_address: u24 = 0,
 tiles: [8]Tile = @splat(.{}),
 
 pub fn init(gpu: sdl3.gpu.Device) error{SdlError}!Self {
@@ -14,6 +16,14 @@ pub fn init(gpu: sdl3.gpu.Device) error{SdlError}!Self {
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     _ = self;
     _ = gpu;
+}
+
+pub fn setImageParams(self: *Self, address: u24, width: u24) void {
+    self.image_address = address;
+    fw.log.debug("Image Address: {X:08}", .{self.image_address});
+
+    self.image_width = width;
+    fw.log.debug("Image Width: {d}", .{self.image_width});
 }
 
 pub fn setTileDescriptor(self: *Self, desc: TileDescriptor) void {

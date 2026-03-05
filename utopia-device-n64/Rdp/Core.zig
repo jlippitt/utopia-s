@@ -181,6 +181,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x3a => command.setPrimColor(self, word),
         0x3b => command.setEnvColor(self, word),
         0x3c => command.setCombineMode(self, word),
+        0x3d => command.setTextureImage(self, word),
         0x3f => command.setColorImage(self, word),
         else => |cmd| fw.log.debug("Unknown Command: {X:02}", .{cmd}),
     }

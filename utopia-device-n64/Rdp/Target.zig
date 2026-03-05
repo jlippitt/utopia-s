@@ -22,8 +22,8 @@ pub const Surface = struct {
 const Params = struct {
     color_address: u24 = 0,
     color_format: ColorImageFormat = .rgba32,
-    image_width: u32 = 0,
-    image_height: u32 = 0,
+    image_width: u24 = 0,
+    image_height: u24 = 0,
 };
 
 surface: ?Surface = null,
@@ -73,7 +73,7 @@ pub fn setColorImageParams(
     self: *Self,
     address: u24,
     format: ColorImageFormat,
-    width: u32,
+    width: u24,
 ) void {
     self.params_changed = self.params_changed or
         address != self.params.color_address or
@@ -90,7 +90,7 @@ pub fn setColorImageParams(
     fw.log.debug("Image Width: {d}", .{self.params.image_width});
 }
 
-pub fn setImageHeight(self: *Self, height: u32) void {
+pub fn setImageHeight(self: *Self, height: u24) void {
     self.params_changed = self.params_changed or height != self.params.image_height;
 
     self.params.image_height = height;

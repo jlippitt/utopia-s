@@ -95,8 +95,14 @@ pub fn setCombineMode(core: *Core, word: u64) void {
     core.display_list.setCombineMode(cmd.parse());
 }
 
+pub fn setTextureImage(core: *Core, word: u64) void {
+    const cmd: SetImage = @bitCast(word);
+    fw.log.debug("SET_TEXTURE_IMAGE: {any}", .{cmd});
+    core.tmem.setImageParams(cmd.dram_addr, @as(u24, cmd.width + 1));
+}
+
 pub fn setColorImage(core: *Core, word: u64) void {
-    const cmd: SetColorImage = @bitCast(word);
+    const cmd: SetImage = @bitCast(word);
 
     fw.log.debug("SET_COLOR_IMAGE: {any}", .{cmd});
 
@@ -112,7 +118,7 @@ pub fn setColorImage(core: *Core, word: u64) void {
         ),
     };
 
-    core.target.setColorImageParams(cmd.dram_addr, color_format, @as(u32, cmd.width) + 1);
+    core.target.setColorImageParams(cmd.dram_addr, color_format, @as(u24, cmd.width) + 1);
     core.display_list.setPixelSize(cmd.size);
 }
 
@@ -164,7 +170,7 @@ const SetOtherModes = packed struct(u64) {
     _3: u8,
 };
 
-const SetColorImage = packed struct(u64) {
+const SetImage = packed struct(u64) {
     dram_addr: u24,
     __0: u8,
     width: u10,
