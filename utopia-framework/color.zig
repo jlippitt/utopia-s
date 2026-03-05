@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const Rgba16 = packed struct(u16) {
     const Self = @This();
 
@@ -74,7 +76,7 @@ pub const Abgr32 = packed struct(u32) {
             .r = @as(u8, other.r) << 3,
             .g = @as(u8, other.g) << 3,
             .b = @as(u8, other.b) << 3,
-            .a = @as(u8, other.a) << 7,
+            .a = std.math.boolMask(u8, other.a != 0),
         };
     }
 };

@@ -21,7 +21,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
 pub fn decode(
     self: *Self,
     tile: Tile,
-    tmem: *const [Tmem.data_len]u64,
+    tmem_data: *const [Tmem.data_len]u64,
 ) error{TextureTooBig}![]const u8 {
     const width = tile.width();
     const height = tile.height();
@@ -34,7 +34,13 @@ pub fn decode(
         return error.TextureTooBig;
     }
 
-    self.deinterleave(tile, tmem);
+    const tmem_width = std.math.divCeil(
+        u32,
+        tile.width() * tile.bitsPerPixel(),
+        64,
+    ) catch unreachable;
+
+    self.deinterleave(tile, tmem_width, tmem_data);
 
     const format = tile.pixelFormat();
     const size = tile.pixelSize();
@@ -44,6 +50,7 @@ pub fn decode(
     switch (format) {
         .rgba => switch (size) {
             .@"32" => return std.mem.sliceAsBytes(self.deinterleave_buf)[0..dst_image_size],
+            .@"16" => self.decodeFormat(rgba16, tile, tmem_width),
             else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
         },
         else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
@@ -52,19 +59,18 @@ pub fn decode(
     return self.decode_buf[0..dst_image_size];
 }
 
-fn deinterleave(self: *Self, tile: Tile, tmem: *const [Tmem.data_len]u64) void {
-    const tmem_width = std.math.divCeil(
-        u32,
-        tile.width() * tile.bitsPerPixel(),
-        64,
-    ) catch unreachable;
-
+fn deinterleave(
+    self: *Self,
+    tile: Tile,
+    tmem_width: u32,
+    tmem_data: *const [Tmem.data_len]u64,
+) void {
     var dst_index: u32 = 0;
     var src_index = tile.tmemAddress();
 
     for (0..tile.height()) |line| {
         for (0..tmem_width) |_| {
-            var word = tmem[src_index & 0x1ff];
+            var word = tmem_data[src_index & 0x1ff];
 
             if ((line & 1) != 0) {
                 word = std.math.rotl(u64, word, 32);
@@ -77,3 +83,26 @@ fn deinterleave(self: *Self, tile: Tile, tmem: *const [Tmem.data_len]u64) void {
         }
     }
 }
+
+fn decodeFormat(self: *Self, comptime Format: type, tile: Tile, tmem_width: u32) void {
+    const src_data: []const [Format.src_chunk_size]u8 = @ptrCast(
+        self.deinterleave_buf[0..(tmem_width * tile.height())],
+    );
+
+    const dst_data: [][Format.dst_chunk_size]u8 = @ptrCast(
+        self.decode_buf[0..(src_data.len * Format.dst_chunk_size)],
+    );
+
+    for (dst_data, src_data) |*dst, src| {
+        dst.* = Format.decode(src);
+    }
+}
+
+pub const rgba16 = struct {
+    const dst_chunk_size = 4;
+    const src_chunk_size = 2;
+
+    fn decode(src: [2]u8) [4]u8 {
+        return fw.color.Rgba16.fromBytesBe(src).toAbgr32Bytes();
+    }
+};
