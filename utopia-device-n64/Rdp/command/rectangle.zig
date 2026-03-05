@@ -70,8 +70,8 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
             dsdx /= (64 / tile.bitsPerPixel());
         }
 
-        const tile_x = @as(u64, tile.x()) << 10;
-        const tile_y = @as(u64, tile.y()) << 10;
+        const tile_x = @as(u64, tile.x()) << 12;
+        const tile_y = @as(u64, tile.y()) << 12;
 
         const sh = tile_x + s;
         const th = tile_y + t;

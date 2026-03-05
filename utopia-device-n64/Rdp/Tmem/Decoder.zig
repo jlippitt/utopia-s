@@ -53,6 +53,12 @@ pub fn decode(
             .@"16" => self.decodeFormat(rgba16, tile, tmem_width),
             else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
         },
+        .ia => switch (size) {
+            .@"16" => self.decodeFormat(ia16, tile, tmem_width),
+            .@"8" => self.decodeFormat(ia8, tile, tmem_width),
+            .@"4" => self.decodeFormat(ia4, tile, tmem_width),
+            else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
+        },
         else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
     }
 
@@ -104,5 +110,63 @@ pub const rgba16 = struct {
 
     fn decode(src: [2]u8) [4]u8 {
         return fw.color.Rgba16.fromBytesBe(src).toAbgr32Bytes();
+    }
+};
+
+pub const ia16 = struct {
+    const dst_chunk_size = 4;
+    const src_chunk_size = 2;
+
+    fn decode(src: [2]u8) [4]u8 {
+        const intensity = src[0];
+        const alpha = src[1];
+
+        return .{
+            intensity,
+            intensity,
+            intensity,
+            alpha,
+        };
+    }
+};
+
+pub const ia8 = struct {
+    const dst_chunk_size = 4;
+    const src_chunk_size = 1;
+
+    fn decode(src: [1]u8) [4]u8 {
+        const intensity = (src[0] & 0xf0) | (src[0] >> 4);
+        const alpha = (src[0] << 4) | (src[0] & 0x0f);
+
+        return .{
+            intensity,
+            intensity,
+            intensity,
+            alpha,
+        };
+    }
+};
+
+pub const ia4 = struct {
+    const dst_chunk_size = 8;
+    const src_chunk_size = 1;
+
+    fn decode(src: [1]u8) [8]u8 {
+        const hi = decodeNibble(@truncate(src[0] >> 4));
+        const lo = decodeNibble(@truncate(src[0]));
+        return hi ++ lo;
+    }
+
+    fn decodeNibble(src: u4) [4]u8 {
+        const value: u8 = src & 0x0e;
+        const intensity = (value << 5) | (value << 2) | (value >> 1);
+        const alpha = std.math.boolMask(u8, (src & 0x01) != 0);
+
+        return .{
+            intensity,
+            intensity,
+            intensity,
+            alpha,
+        };
     }
 };

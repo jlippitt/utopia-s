@@ -111,7 +111,7 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
     const dram_begin = self.image_address +% dram_y_offset;
     var dram_addr = dram_begin;
 
-    const tmem_width = std.math.divCeil(u32, tile.width() * bpp, 64) catch unreachable;
+    const tmem_width = std.math.divCeil(u32, @min(tile.width(), self.image_width) * bpp, 64) catch unreachable;
     var tmem_addr = tile.tmemAddress();
 
     for (0..tile.height()) |line| {
