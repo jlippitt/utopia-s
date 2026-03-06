@@ -193,6 +193,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x2f => command.setOtherModes(self, word),
         0x30 => command.loadTlut(self, word),
         0x32 => command.setTileSize(self, word),
+        0x33 => command.loadBlock(self, word),
         0x34 => command.loadTile(self, word),
         0x35 => command.setTile(self, word),
         0x36 => try command.drawRectangle(.fill, self) orelse return,

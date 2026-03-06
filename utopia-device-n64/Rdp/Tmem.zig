@@ -117,6 +117,34 @@ pub fn setTileSize(self: *Self, size: Tile.Size) void {
     fw.log.debug("Tile {d} Size: {any}", .{ index, self.tiles[index].size });
 }
 
+pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    // Note: Loading TLUT data does not update the size of stored tile
+    var tile = self.tiles[size.tile];
+    tile.size = size;
+
+    const dram_addr: u32 = self.image_address;
+    const tmem_addr = tile.tmemAddress();
+
+    const width = tile.width() * tile.height();
+    const dst_data = self.data[tmem_addr..][0..width];
+    const src_data: []const [2]u8 = @ptrCast(rdram[dram_addr..][0..(width * 2)]);
+
+    for (dst_data, src_data) |*dst, src| {
+        const color = (@as(u64, src[0]) << 8) | src[1];
+        dst.* = (color << 48) | (color << 32) | (color << 16) | color;
+    }
+
+    fw.log.debug("TLUT data uploaded from {X:08}..{X:08} to {X:03}..{X:03} ({}x{} words = {} bytes)", .{
+        dram_addr,
+        dram_addr + width * 2,
+        tmem_addr * 8,
+        (tmem_addr + width) * 8,
+        tile.width(),
+        tile.height(),
+        width * 8,
+    });
+}
+
 pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
     self.setTileSize(size);
 
@@ -127,7 +155,7 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
     const dram_x_offset = std.math.divCeil(u32, tile.x() * bpp, 8) catch unreachable;
     const dram_width = std.math.divCeil(u32, @as(u32, self.image_width) * bpp, 8) catch unreachable;
     const dram_y_offset = tile.y() * dram_width;
-    const dram_begin = self.image_address +% dram_y_offset;
+    const dram_begin = @as(u32, self.image_address) + dram_y_offset;
     var dram_addr = dram_begin;
 
     const tmem_width = std.math.divCeil(u32, @min(tile.width(), self.image_width) * bpp, 64) catch unreachable;
@@ -160,30 +188,80 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
     });
 }
 
-pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
-    // Note: Loading TLUT data does not update the size of stored tile
-    var tile = self.tiles[size.tile];
-    tile.size = size;
+pub fn loadBlock(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    // Loading block data does not update the size of stored tile
+    const tile = self.tiles[size.tile];
 
-    const dram_addr: u32 = self.image_address;
-    const tmem_addr = tile.tmemAddress();
+    const dxt = size.th;
 
-    const width = tile.width() * tile.height();
-    const dst_data = self.data[tmem_addr..][0..width];
-    const src_data: []const [2]u8 = @ptrCast(rdram[dram_addr..][0..(width * 2)]);
-
-    for (dst_data, src_data) |*dst, src| {
-        const color = (@as(u64, src[0]) << 8) | src[1];
-        dst.* = (color << 48) | (color << 32) | (color << 16) | color;
+    if (dxt == 0 and size.tl != 0) {
+        fw.log.panic("Cannot upload block with DXT == 0 and TL != 0", .{});
     }
 
-    fw.log.debug("TLUT data uploaded from {X:08}..{X:08} to {X:03}..{X:03} ({}x{} words = {} bytes)", .{
+    const bpp = tile.bitsPerPixel();
+
+    const dram_y_offset = if (dxt != 0)
+        @as(u32, size.tl) * (std.math.divCeil(u32, 2048, dxt) catch unreachable) * 8
+    else
+        0;
+
+    const dram_x_offset = std.math.divCeil(u32, size.sl, 8) catch unreachable;
+    const dram_begin = @as(u32, self.image_address + dram_y_offset + dram_x_offset);
+    var dram_addr = dram_begin;
+
+    const tmem_width = std.math.divCeil(u32, (@as(u32, size.sh) - size.sl + 1) * bpp, 64) catch unreachable;
+    const tmem_begin = tile.tmemAddress();
+    const tmem_end = tmem_begin + tmem_width;
+    var tmem_addr = tmem_begin;
+
+    var t_pos: u32 = 0;
+
+    while (tmem_addr < tmem_end) {
+        {
+            const tmem_line_begin = tmem_addr;
+            const dram_line_begin = dram_addr;
+
+            while ((t_pos & 0x0800) == 0 and tmem_addr < tmem_end) {
+                tmem_addr += 1;
+                dram_addr += 8;
+                t_pos += dxt;
+            }
+
+            const dst_data = self.data[tmem_line_begin..tmem_addr];
+            const src_data = rdram[dram_line_begin..dram_addr];
+            @memcpy(std.mem.sliceAsBytes(dst_data), src_data);
+        }
+
+        if (tmem_addr >= tmem_end) {
+            break;
+        }
+
+        {
+            const tmem_line_begin = tmem_addr;
+            const dram_line_begin = dram_addr;
+
+            while ((t_pos & 0x0800) != 0 and tmem_addr < tmem_end) {
+                tmem_addr += 1;
+                dram_addr += 8;
+                t_pos += dxt;
+            }
+
+            const dst_data = self.data[tmem_line_begin..tmem_addr];
+            const src_data = rdram[dram_line_begin..dram_addr];
+            @memcpy(std.mem.sliceAsBytes(dst_data), src_data);
+
+            for (dst_data) |*word| {
+                word.* = std.math.rotl(u64, word.*, 32);
+            }
+        }
+    }
+
+    fw.log.debug("Block data uploaded from {X:08}..{X:08} to {X:03}..{X:03} ({} words = {} bytes)", .{
+        dram_begin,
         dram_addr,
-        dram_addr + width * 2,
+        tmem_begin * 8,
         tmem_addr * 8,
-        (tmem_addr + width) * 8,
-        tile.width(),
-        tile.height(),
-        width * 8,
+        tmem_addr - tmem_begin,
+        dram_addr - dram_begin,
     });
 }

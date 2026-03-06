@@ -60,6 +60,12 @@ pub fn setTileSize(core: *Core, word: u64) void {
     core.tmem.setTileSize(cmd);
 }
 
+pub fn loadBlock(core: *Core, word: u64) void {
+    const cmd: Tmem.Tile.Size = @bitCast(word);
+    fw.log.debug("LOAD_BLOCK: {any}", .{cmd});
+    core.tmem.loadBlock(core.getRdramConst(), cmd);
+}
+
 pub fn loadTile(core: *Core, word: u64) void {
     const cmd: Tmem.Tile.Size = @bitCast(word);
     fw.log.debug("LOAD_TILE: {any}", .{cmd});
