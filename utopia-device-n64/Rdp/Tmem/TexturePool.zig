@@ -23,7 +23,7 @@ const TextureMapContext = struct {
     }
 };
 
-const TextureMap = std.HashMapUnmanaged(u64, *std.DoublyLinkedList.Node, TextureMapContext, 80);
+const TextureMap = std.HashMapUnmanaged(u64, *std.DoublyLinkedList.Node, TextureMapContext, 50);
 
 const Self = @This();
 
@@ -41,8 +41,9 @@ pub fn init(
         texture.* = .init();
     }
 
+    // Map has twice the capacity of the texture pool to help reduce collisions
     var texture_map: TextureMap = .empty;
-    try texture_map.ensureTotalCapacity(arena.allocator(), pool_size);
+    try texture_map.ensureTotalCapacity(arena.allocator(), pool_size * 2);
 
     const lru_nodes = try arena.allocator().alloc(LruNode, pool_size);
     var lru: std.DoublyLinkedList = .{};
