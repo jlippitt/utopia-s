@@ -64,7 +64,7 @@ pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     gpu.releaseTransferBuffer(self.upload_buffer);
 }
 
-pub fn create(
+pub fn getOrInsert(
     self: *Self,
     gpu: sdl3.gpu.Device,
     width: u32,

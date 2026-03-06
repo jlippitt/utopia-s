@@ -2,7 +2,7 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const fw = @import("framework");
 const Decoder = @import("./Tmem/Decoder.zig");
-const TexturePool = @import("./Tmem/TexturePool.zig");
+const TextureCache = @import("./Tmem/TextureCache.zig");
 
 pub const Tile = @import("./Tmem/Tile.zig");
 pub const Texture = @import("./Tmem/Texture.zig");
@@ -18,7 +18,7 @@ const Self = @This();
 
 data: *[data_len]u64,
 decoder: Decoder,
-texture_pool: TexturePool,
+texture_cache: TextureCache,
 null_texture: Texture,
 image_width: u24 = 0,
 image_address: u24 = 0,
@@ -40,20 +40,20 @@ pub fn init(
     var null_texture = Texture.init();
     try null_texture.activate(gpu, upload_buffer, 1, 1, &.{ 0, 0, 0, 0 });
 
-    var texture_pool = try TexturePool.init(arena, upload_buffer);
+    var texture_pool = try TextureCache.init(arena, upload_buffer);
     errdefer texture_pool.deinit(gpu);
 
     return .{
         .data = data[0..data_len],
         .decoder = try .init(arena),
-        .texture_pool = texture_pool,
+        .texture_cache = texture_pool,
         .null_texture = null_texture,
     };
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     self.null_texture.deactivate(gpu);
-    self.texture_pool.deinit(gpu);
+    self.texture_cache.deinit(gpu);
 }
 
 pub fn getTile(self: *const Self, index: u3) Tile {
@@ -83,7 +83,7 @@ pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlErro
         return self.nullTexture();
     };
 
-    return self.texture_pool.create(gpu, tile.width(), tile.height(), pixels);
+    return self.texture_cache.getOrInsert(gpu, tile.width(), tile.height(), pixels);
 }
 
 pub fn setImageParams(self: *Self, address: u24, width: u24) void {
