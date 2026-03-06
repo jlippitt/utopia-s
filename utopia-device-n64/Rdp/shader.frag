@@ -194,14 +194,14 @@ vec4 combine(CombineMode combine, vec4 tex0, vec4 combined) {
 
 void main() {
     if (cycle_type == CT_FILL) {
-        f_color = fill_colors[uint(v_pos_x) & 3];
+        f_color = vec4(fill_colors[uint(v_pos_x) & 3].xyz, 1.0);
         return;
     }
 
     vec4 tex0 = texture(tex0_sampler, v_tex_coords.xy / textureSize(tex0_sampler, 0));
 
     if (cycle_type == CT_COPY) {
-        f_color = tex0;
+        f_color = vec4(tex0.xyz, 1.0);
         return;
     }
 
