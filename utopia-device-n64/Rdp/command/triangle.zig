@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Core.zig");
 const DisplayList = @import("../DisplayList.zig");
+const Tmem = @import("../Tmem.zig");
 
 pub const TriangleAttributes = struct {
     z_buffer: bool = false,
@@ -103,7 +104,9 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         }
     }
 
-    const texture = if (comptime attr.texture) blk: {
+    var texture: *Tmem.Texture = core.tmem.nullTexture();
+
+    if (comptime attr.texture) {
         const coords: TexCoords = @bitCast(args[arg_index + 0]);
         fw.log.debug("TexCoords: {any}", .{coords});
         const coords_dx: TexCoords = @bitCast(args[arg_index + 1]);
@@ -153,8 +156,8 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
                 offset[el]) / 32.0;
         }
 
-        break :blk try core.tmem.createTexture(core.gpu, cmd.tile);
-    } else null;
+        texture = try core.tmem.createTexture(core.gpu, cmd.tile);
+    }
 
     fw.log.debug("Vertices: {any}", .{vertices});
 
@@ -162,7 +165,7 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         try core.render();
     }
 
-    core.display_list.pushTriangle(core.gpu, &core.tmem, texture, &vertices);
+    core.display_list.pushTriangle(texture, &vertices);
 }
 
 fn parseColor(int: Shade, frac: ShadeFrac) [4]i64 {

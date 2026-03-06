@@ -5,7 +5,7 @@ const Decoder = @import("./Tmem/Decoder.zig");
 const TexturePool = @import("./Tmem/TexturePool.zig");
 
 pub const Tile = @import("./Tmem/Tile.zig");
-pub const Texture = TexturePool.Id;
+pub const Texture = @import("./Tmem/Texture.zig");
 pub const TlutType = Decoder.TlutType;
 
 pub const data_len = 512;
@@ -31,10 +31,17 @@ pub fn init(
 ) error{ OutOfMemory, SdlError }!Self {
     const data = try arena.allocator().alloc(u64, data_len);
 
-    var texture_pool = try TexturePool.init(arena, gpu);
-    errdefer texture_pool.deinit(gpu);
+    const upload_buffer = try gpu.createTransferBuffer(.{
+        .size = max_texture_size,
+        .usage = .upload,
+    });
+    errdefer gpu.releaseTransferBuffer(upload_buffer);
 
-    const null_texture = try texture_pool.create(gpu, 1, 1, &.{ 0, 0, 0, 0 });
+    var null_texture = Texture.init();
+    try null_texture.activate(gpu, upload_buffer, 1, 1, &.{ 0, 0, 0, 0 });
+
+    var texture_pool = try TexturePool.init(arena, upload_buffer);
+    errdefer texture_pool.deinit(gpu);
 
     return .{
         .data = data[0..data_len],
@@ -45,7 +52,7 @@ pub fn init(
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
-    self.texture_pool.unref(gpu, self.null_texture);
+    self.null_texture.deactivate(gpu);
     self.texture_pool.deinit(gpu);
 }
 
@@ -53,16 +60,11 @@ pub fn getTile(self: *const Self, index: u3) Tile {
     return self.tiles[index];
 }
 
-pub fn getBinding(self: *Self, texture: Texture) sdl3.gpu.Texture {
-    return self.texture_pool.get(texture).getBinding();
+pub fn nullTexture(self: *Self) *Texture {
+    return &self.null_texture;
 }
 
-pub fn nullTexture(self: *Self) Texture {
-    self.texture_pool.ref(self.null_texture);
-    return self.null_texture;
-}
-
-pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlError}!Texture {
+pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlError}!*Texture {
     const tile = self.tiles[index];
 
     const pixels = self.decoder.decode(tile, self.data, self.tlut_type) catch |err| {
@@ -82,14 +84,6 @@ pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlErro
     };
 
     return self.texture_pool.create(gpu, tile.width(), tile.height(), pixels);
-}
-
-pub fn refTexture(self: *Self, texture: Texture) void {
-    self.texture_pool.ref(texture);
-}
-
-pub fn unrefTexture(self: *Self, gpu: sdl3.gpu.Device, texture: Texture) void {
-    self.texture_pool.unref(gpu, texture);
 }
 
 pub fn setImageParams(self: *Self, address: u24, width: u24) void {

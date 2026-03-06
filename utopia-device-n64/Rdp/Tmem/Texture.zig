@@ -5,15 +5,24 @@ const fw = @import("framework");
 const Self = @This();
 
 ref_count: u32 = 0,
-texture: sdl3.gpu.Texture = undefined,
+texture: ?sdl3.gpu.Texture = null,
 
 pub fn init() Self {
     return .{};
 }
 
+pub fn hasRefs(self: *const Self) bool {
+    return self.ref_count != 0;
+}
+
+pub fn isActive(self: *const Self) bool {
+    return self.texture != null;
+}
+
 pub fn getBinding(self: *const Self) sdl3.gpu.Texture {
-    std.debug.assert(self.ref_count != 0);
-    return self.texture;
+    std.debug.assert(self.hasRefs());
+    std.debug.assert(self.isActive());
+    return self.texture.?;
 }
 
 pub fn activate(
@@ -24,9 +33,10 @@ pub fn activate(
     height: u32,
     pixels: []const u8,
 ) error{SdlError}!void {
-    std.debug.assert(self.ref_count == 0);
+    std.debug.assert(!self.hasRefs());
+    std.debug.assert(!self.isActive());
 
-    self.texture = try gpu.createTexture(.{
+    const texture = try gpu.createTexture(.{
         .format = .r8g8b8a8_unorm,
         .usage = .{ .sampler = true },
         .width = width,
@@ -53,7 +63,7 @@ pub fn activate(
                 .offset = 0,
             },
             .{
-                .texture = self.texture,
+                .texture = texture,
                 .width = width,
                 .height = height,
                 .depth = 1,
@@ -64,21 +74,20 @@ pub fn activate(
 
     try command_buffer.submit();
 
-    self.ref_count = 1;
+    self.texture = texture;
+}
+
+pub fn deactivate(self: *Self, gpu: sdl3.gpu.Device) void {
+    std.debug.assert(!self.hasRefs());
+    std.debug.assert(self.isActive());
+    gpu.releaseTexture(self.texture.?);
+    self.texture = null;
 }
 
 pub fn ref(self: *Self) void {
-    std.debug.assert(self.ref_count != 0);
     self.ref_count += 1;
 }
 
-pub fn unref(self: *Self, gpu: sdl3.gpu.Device) bool {
-    std.debug.assert(self.ref_count != 0);
+pub fn unref(self: *Self) void {
     self.ref_count -= 1;
-
-    if (self.ref_count == 0) {
-        gpu.releaseTexture(self.texture);
-    }
-
-    return self.ref_count == 0;
 }

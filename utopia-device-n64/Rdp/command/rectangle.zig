@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Core.zig");
 const DisplayList = @import("../DisplayList.zig");
+const Tmem = @import("../Tmem.zig");
 
 pub const RectangleType = enum {
     fill,
@@ -55,7 +56,9 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
     vertices[3].pos[0] = right;
     vertices[3].pos[1] = bottom;
 
-    const texture = if (comptime rect_type != .fill) blk: {
+    var texture: *Tmem.Texture = core.tmem.nullTexture();
+
+    if (comptime rect_type != .fill) {
         const tile = core.tmem.getTile(cmd.tile);
 
         const tex_coords: TexCoords = @bitCast(args[1]);
@@ -100,8 +103,8 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
             vertices[2].tex_coords[1] = tex_top;
         }
 
-        break :blk try core.tmem.createTexture(core.gpu, cmd.tile);
-    } else null;
+        texture = try core.tmem.createTexture(core.gpu, cmd.tile);
+    }
 
     fw.log.debug("Vertices: {any}", .{vertices});
 
@@ -109,7 +112,7 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         try core.render();
     }
 
-    core.display_list.pushRectangle(core.gpu, &core.tmem, texture, &vertices);
+    core.display_list.pushRectangle(texture, &vertices);
 }
 
 const Rectangle = packed struct(u64) {

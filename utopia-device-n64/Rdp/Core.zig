@@ -117,8 +117,8 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     var tmem = try Tmem.init(arena, gpu);
     errdefer tmem.deinit(gpu);
 
-    var display_list = try DisplayList.init(arena, gpu, &tmem);
-    errdefer display_list.deinit(gpu, &tmem);
+    var display_list = try DisplayList.init(arena, gpu);
+    errdefer display_list.deinit(gpu);
 
     const word_buf = try std.ArrayListUnmanaged(u64).initCapacity(
         arena.allocator(),
@@ -139,7 +139,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 // External-facing interface
 
 pub fn deinit(self: *Self) void {
-    self.display_list.deinit(self.gpu, &self.tmem);
+    self.display_list.deinit(self.gpu);
     self.tmem.deinit(self.gpu);
     self.target.deinit(self.gpu);
     self.gpu.releaseSampler(self.sampler);
@@ -259,7 +259,7 @@ pub fn render(self: *Self) RenderError!void {
 
             render_pass.bindFragmentSamplers(0, &.{
                 .{
-                    .texture = self.tmem.getBinding(display_group.texture),
+                    .texture = display_group.texture.getBinding(),
                     .sampler = self.sampler,
                 },
             });
@@ -272,7 +272,7 @@ pub fn render(self: *Self) RenderError!void {
 
     try command_buffer.submit();
 
-    self.display_list.clear(self.gpu, &self.tmem);
+    self.display_list.clear();
 }
 
 pub fn getRdp(self: *Self) *Rdp {
