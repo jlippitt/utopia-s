@@ -77,7 +77,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
                 .{
                     .buffer_slot = 0,
                     .location = 2,
-                    .format = .f32x2,
+                    .format = .f32x3,
                     .offset = @offsetOf(Vertex, "tex_coords"),
                 },
             },
@@ -293,7 +293,7 @@ pub fn getRdramConst(self: *const Self) []const u8 {
 pub const Vertex = extern struct {
     pos: [3]f32 = @splat(0.0),
     color: [4]f32 = @splat(0.0),
-    tex_coords: [2]f32 = @splat(0.0),
+    tex_coords: [3]f32 = @splat(0.0),
 };
 
 pub const Index = u16;
