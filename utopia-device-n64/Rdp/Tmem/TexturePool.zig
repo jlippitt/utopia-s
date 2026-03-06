@@ -7,14 +7,27 @@ const Texture = @import("./Texture.zig");
 const pool_size = 1024;
 
 const LruNode = struct {
-    key: u32,
+    key: u64,
     texture: *Texture,
     node: std.DoublyLinkedList.Node,
 };
 
+const TextureMapContext = struct {
+    pub fn hash(_: @This(), key: u64) u64 {
+        // Value passed in is already hashed
+        return key;
+    }
+
+    pub fn eql(_: @This(), lhs: u64, rhs: u64) bool {
+        return lhs == rhs;
+    }
+};
+
+const TextureMap = std.HashMapUnmanaged(u64, *std.DoublyLinkedList.Node, TextureMapContext, 80);
+
 const Self = @This();
 
-texture_map: std.AutoHashMapUnmanaged(u32, *std.DoublyLinkedList.Node),
+texture_map: TextureMap,
 lru: std.DoublyLinkedList,
 upload_buffer: sdl3.gpu.TransferBuffer,
 
@@ -28,7 +41,7 @@ pub fn init(
         texture.* = .init();
     }
 
-    var texture_map: std.AutoHashMapUnmanaged(u32, *std.DoublyLinkedList.Node) = .empty;
+    var texture_map: TextureMap = .empty;
     try texture_map.ensureTotalCapacity(arena.allocator(), pool_size);
 
     const lru_nodes = try arena.allocator().alloc(LruNode, pool_size);
@@ -57,7 +70,7 @@ pub fn create(
     height: u32,
     pixels: []const u8,
 ) error{SdlError}!*Texture {
-    var hasher = std.hash.Fnv1a_32.init();
+    var hasher = std.hash.Wyhash.init(0);
     std.hash.autoHashStrat(&hasher, .{ width, height, pixels }, .Deep);
     const key = hasher.final();
 
