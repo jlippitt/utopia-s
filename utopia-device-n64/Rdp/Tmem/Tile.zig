@@ -40,7 +40,7 @@ pub fn init() Self {
 }
 
 pub fn tmemAddress(self: *const Self) u32 {
-    return @as(u32, self.desc.tmem_addr) * 8;
+    return @as(u32, self.desc.tmem_addr);
 }
 
 pub fn pixelFormat(self: *const Self) Core.PixelFormat {
@@ -53,6 +53,10 @@ pub fn pixelSize(self: *const Self) Core.PixelSize {
 
 pub fn bitsPerPixel(self: *const Self) u32 {
     return @as(u32, 4) << @intFromEnum(self.desc.size);
+}
+
+pub fn palette(self: *const Self) u32 {
+    return self.desc.palette;
 }
 
 pub fn x(self: *const Self) u32 {

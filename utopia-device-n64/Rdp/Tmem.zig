@@ -6,6 +6,7 @@ const TexturePool = @import("./Tmem/TexturePool.zig");
 
 pub const Tile = @import("./Tmem/Tile.zig");
 pub const Texture = TexturePool.Id;
+pub const TlutType = Decoder.TlutType;
 
 pub const data_len = 512;
 pub const data_size = data_len * 8;
@@ -21,6 +22,7 @@ texture_pool: TexturePool,
 null_texture: Texture,
 image_width: u24 = 0,
 image_address: u24 = 0,
+tlut_type: TlutType = .rgba,
 tiles: [8]Tile = @splat(.init()),
 
 pub fn init(
@@ -63,7 +65,19 @@ pub fn nullTexture(self: *Self) Texture {
 pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlError}!Texture {
     const tile = self.tiles[index];
 
-    const pixels = self.decoder.decode(tile, self.data) catch {
+    const pixels = self.decoder.decode(tile, self.data, self.tlut_type) catch |err| {
+        switch (err) {
+            error.TextureTooBig => fw.log.warn("Texture too big: {} * {} * {}", .{
+                tile.width(),
+                tile.height(),
+                tile.bitsPerPixel(),
+            }),
+            error.FormatNotSupported => fw.log.warn("Texture format unsupported: {t} {t}", .{
+                tile.pixelFormat(),
+                tile.pixelSize(),
+            }),
+        }
+
         return self.nullTexture();
     };
 
@@ -86,6 +100,11 @@ pub fn setImageParams(self: *Self, address: u24, width: u24) void {
     fw.log.debug("Image Width: {d}", .{self.image_width});
 }
 
+pub fn setTlutType(self: *Self, tlut_type: TlutType) void {
+    self.tlut_type = tlut_type;
+    fw.log.debug("TLUT Type: {t}", .{tlut_type});
+}
+
 pub fn setTileDescriptor(self: *Self, desc: Tile.Descriptor) void {
     const index = desc.tile;
     self.tiles[index].desc = desc;
@@ -101,7 +120,7 @@ pub fn setTileSize(self: *Self, size: Tile.Size) void {
 pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
     self.setTileSize(size);
 
-    const tile = &self.tiles[size.tile];
+    const tile = self.tiles[size.tile];
 
     const bpp = tile.bitsPerPixel();
 
@@ -138,5 +157,33 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
         tmem_width,
         tile.height(),
         tmem_width * tile.height() * 8,
+    });
+}
+
+pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    // Note: Loading TLUT data does not update the size of stored tile
+    var tile = self.tiles[size.tile];
+    tile.size = size;
+
+    const dram_addr: u32 = self.image_address;
+    const tmem_addr = tile.tmemAddress();
+
+    const width = tile.width() * tile.height();
+    const dst_data = self.data[tmem_addr..][0..width];
+    const src_data: []const [2]u8 = @ptrCast(rdram[dram_addr..][0..(width * 2)]);
+
+    for (dst_data, src_data) |*dst, src| {
+        const color = (@as(u64, src[0]) << 8) | src[1];
+        dst.* = (color << 48) | (color << 32) | (color << 16) | color;
+    }
+
+    fw.log.debug("TLUT data uploaded from {X:08}..{X:08} to {X:03}..{X:03} ({}x{} words = {} bytes)", .{
+        dram_addr,
+        dram_addr + width * 2,
+        tmem_addr * 8,
+        (tmem_addr + width) * 8,
+        tile.width(),
+        tile.height(),
+        width * 8,
     });
 }

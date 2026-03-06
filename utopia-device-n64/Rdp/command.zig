@@ -45,6 +45,13 @@ pub fn setOtherModes(core: *Core, word: u64) void {
     fw.log.debug("SET_OTHER_MODES: {any}", .{cmd});
     core.display_list.setCycleType(@enumFromInt(cmd.cycle_type));
     core.display_list.setBlendMode(cmd.blend.parse());
+    core.tmem.setTlutType(cmd.tlut_type);
+}
+
+pub fn loadTlut(core: *Core, word: u64) void {
+    const cmd: Tmem.Tile.Size = @bitCast(word);
+    fw.log.debug("LOAD_TLUT: {any}", .{cmd});
+    core.tmem.loadTlut(core.getRdramConst(), cmd);
 }
 
 pub fn setTileSize(core: *Core, word: u64) void {
@@ -164,7 +171,7 @@ const SetOtherModes = packed struct(u64) {
     bi_lerp_1: bool,
     mid_texel: bool,
     sample_type: bool,
-    tlut_type: bool,
+    tlut_type: Tmem.TlutType,
     en_tlut: bool,
     tex_lod_en: bool,
     sharpen_tex_en: bool,

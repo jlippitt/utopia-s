@@ -1,7 +1,17 @@
 const std = @import("std");
 const fw = @import("framework");
+const Core = @import("../Core.zig");
 const Tmem = @import("../Tmem.zig");
 const Tile = @import("./Tile.zig");
+
+const tlut_begin = 256;
+
+pub const TlutType = enum(u1) {
+    rgba,
+    ia,
+};
+
+pub const TlutDecodeFn = fn ([2]u8, void) [4]u8;
 
 const Self = @This();
 
@@ -22,7 +32,8 @@ pub fn decode(
     self: *Self,
     tile: Tile,
     tmem_data: *const [Tmem.data_len]u64,
-) error{TextureTooBig}![]const u8 {
+    tlut_type: Tmem.TlutType,
+) error{ TextureTooBig, FormatNotSupported }![]const u8 {
     const width = tile.width();
     const height = tile.height();
     const bpp = tile.bitsPerPixel();
@@ -30,7 +41,6 @@ pub fn decode(
     const src_image_size = std.math.divCeil(u32, width * height * bpp, 8) catch unreachable;
 
     if (src_image_size > Tmem.data_size) {
-        fw.log.warn("Texture too big: {} * {} * {}", .{ width, height, bpp });
         return error.TextureTooBig;
     }
 
@@ -50,21 +60,25 @@ pub fn decode(
     switch (format) {
         .rgba => switch (size) {
             .@"32" => return std.mem.sliceAsBytes(self.deinterleave_buf)[0..dst_image_size],
-            .@"16" => self.decodeFormat(rgba16, tile, tmem_width),
-            else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
+            .@"16" => self.decodeFormat(rgba16, tile, tmem_width, {}),
+            else => return error.FormatNotSupported,
+        },
+        .color_index => switch (tlut_type) {
+            .rgba => try self.decodeTlutFormat(rgba16.decode, size, tile, tmem_width, tmem_data),
+            .ia => try self.decodeTlutFormat(ia16.decode, size, tile, tmem_width, tmem_data),
         },
         .ia => switch (size) {
-            .@"16" => self.decodeFormat(ia16, tile, tmem_width),
-            .@"8" => self.decodeFormat(ia8, tile, tmem_width),
-            .@"4" => self.decodeFormat(ia4, tile, tmem_width),
-            else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
+            .@"16" => self.decodeFormat(ia16, tile, tmem_width, {}),
+            .@"8" => self.decodeFormat(ia8, tile, tmem_width, {}),
+            .@"4" => self.decodeFormat(ia4, tile, tmem_width, {}),
+            else => return error.FormatNotSupported,
         },
         .i => switch (size) {
-            .@"8" => self.decodeFormat(intensity8, tile, tmem_width),
-            .@"4" => self.decodeFormat(intensity4, tile, tmem_width),
-            else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
+            .@"8" => self.decodeFormat(intensity8, tile, tmem_width, {}),
+            .@"4" => self.decodeFormat(intensity4, tile, tmem_width, {}),
+            else => return error.FormatNotSupported,
         },
-        else => fw.log.unimplemented("Texture format: {t} {t}", .{ format, size }),
+        else => return error.FormatNotSupported,
     }
 
     return self.decode_buf[0..dst_image_size];
@@ -95,7 +109,42 @@ fn deinterleave(
     }
 }
 
-fn decodeFormat(self: *Self, comptime Format: type, tile: Tile, tmem_width: u32) void {
+fn decodeTlutFormat(
+    self: *Self,
+    comptime decodeFn: TlutDecodeFn,
+    size: Core.PixelSize,
+    tile: Tmem.Tile,
+    tmem_width: u32,
+    tmem_data: *const [Tmem.data_len]u64,
+) error{FormatNotSupported}!void {
+    switch (size) {
+        .@"8" => self.decodeFormat(
+            Ci8(decodeFn),
+            tile,
+            tmem_width,
+            .{
+                .tlut = tmem_data[tlut_begin..][0..256],
+            },
+        ),
+        .@"4" => self.decodeFormat(
+            Ci4(decodeFn),
+            tile,
+            tmem_width,
+            .{
+                .tlut = tmem_data[(tlut_begin + (tile.palette() * 16))..][0..16],
+            },
+        ),
+        else => return error.FormatNotSupported,
+    }
+}
+
+fn decodeFormat(
+    self: *Self,
+    comptime Format: type,
+    tile: Tile,
+    tmem_width: u32,
+    options: Format.Options,
+) void {
     const src_data: []const [Format.src_chunk_size]u8 = @ptrCast(
         self.deinterleave_buf[0..(tmem_width * tile.height())],
     );
@@ -105,24 +154,26 @@ fn decodeFormat(self: *Self, comptime Format: type, tile: Tile, tmem_width: u32)
     );
 
     for (dst_data, src_data) |*dst, src| {
-        dst.* = Format.decode(src);
+        dst.* = Format.decode(src, options);
     }
 }
 
 pub const rgba16 = struct {
+    const Options = void;
     const dst_chunk_size = 4;
     const src_chunk_size = 2;
 
-    fn decode(src: [2]u8) [4]u8 {
+    fn decode(src: [2]u8, _: Options) [4]u8 {
         return fw.color.Rgba16.fromBytesBe(src).toAbgr32Bytes();
     }
 };
 
 pub const ia16 = struct {
+    const Options = void;
     const dst_chunk_size = 4;
     const src_chunk_size = 2;
 
-    fn decode(src: [2]u8) [4]u8 {
+    fn decode(src: [2]u8, _: Options) [4]u8 {
         const intensity = src[0];
         const alpha = src[1];
 
@@ -136,10 +187,11 @@ pub const ia16 = struct {
 };
 
 pub const ia8 = struct {
+    const Options = void;
     const dst_chunk_size = 4;
     const src_chunk_size = 1;
 
-    fn decode(src: [1]u8) [4]u8 {
+    fn decode(src: [1]u8, _: Options) [4]u8 {
         const intensity = (src[0] & 0xf0) | (src[0] >> 4);
         const alpha = (src[0] << 4) | (src[0] & 0x0f);
 
@@ -153,10 +205,11 @@ pub const ia8 = struct {
 };
 
 pub const ia4 = struct {
+    const Options = void;
     const dst_chunk_size = 8;
     const src_chunk_size = 1;
 
-    fn decode(src: [1]u8) [8]u8 {
+    fn decode(src: [1]u8, _: Options) [8]u8 {
         const hi = decodeNibble(@truncate(src[0] >> 4));
         const lo = decodeNibble(@truncate(src[0]));
         return hi ++ lo;
@@ -177,19 +230,21 @@ pub const ia4 = struct {
 };
 
 pub const intensity8 = struct {
+    const Options = void;
     const dst_chunk_size = 4;
     const src_chunk_size = 1;
 
-    fn decode(src: [1]u8) [4]u8 {
+    fn decode(src: [1]u8, _: Options) [4]u8 {
         return @splat(src[0]);
     }
 };
 
 pub const intensity4 = struct {
+    const Options = void;
     const dst_chunk_size = 8;
     const src_chunk_size = 1;
 
-    fn decode(src: [1]u8) [8]u8 {
+    fn decode(src: [1]u8, _: Options) [8]u8 {
         const hi = decodeNibble(@truncate(src[0] >> 4));
         const lo = decodeNibble(@truncate(src[0]));
         return hi ++ lo;
@@ -201,3 +256,41 @@ pub const intensity4 = struct {
         return @splat(intensity);
     }
 };
+
+pub fn Ci8(comptime decodeFn: TlutDecodeFn) type {
+    return struct {
+        const Options = struct {
+            tlut: *const [256]u64,
+        };
+
+        const dst_chunk_size = 4;
+        const src_chunk_size = 1;
+
+        fn decode(src: [1]u8, options: Options) [4]u8 {
+            const color: u16 = @truncate(options.tlut[src[0]]);
+            return decodeFn(@bitCast(@byteSwap(color)), {});
+        }
+    };
+}
+
+pub fn Ci4(comptime decodeFn: TlutDecodeFn) type {
+    return struct {
+        const Options = struct {
+            tlut: *const [16]u64,
+        };
+
+        const dst_chunk_size = 8;
+        const src_chunk_size = 1;
+
+        fn decode(src: [1]u8, options: Options) [8]u8 {
+            const hi = decodeNibble(@truncate(src[0] >> 4), options);
+            const lo = decodeNibble(@truncate(src[0]), options);
+            return hi ++ lo;
+        }
+
+        fn decodeNibble(src: u4, options: Options) [4]u8 {
+            const color: u16 = @truncate(options.tlut[src]);
+            return decodeFn(@bitCast(@byteSwap(color)), {});
+        }
+    };
+}

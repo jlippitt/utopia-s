@@ -191,6 +191,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x29 => try command.syncFull(self),
         0x2d => command.setScissor(self, word),
         0x2f => command.setOtherModes(self, word),
+        0x30 => command.loadTlut(self, word),
         0x32 => command.setTileSize(self, word),
         0x34 => command.loadTile(self, word),
         0x35 => command.setTile(self, word),
