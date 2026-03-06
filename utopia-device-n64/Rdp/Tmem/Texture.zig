@@ -7,10 +7,6 @@ const Self = @This();
 ref_count: u32 = 0,
 texture: ?sdl3.gpu.Texture = null,
 
-pub fn init() Self {
-    return .{};
-}
-
 pub fn hasRefs(self: *const Self) bool {
     return self.ref_count != 0;
 }

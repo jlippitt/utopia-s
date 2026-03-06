@@ -37,7 +37,7 @@ pub fn init(
     });
     errdefer gpu.releaseTransferBuffer(upload_buffer);
 
-    var null_texture = Texture.init();
+    var null_texture: Texture = .{};
     try null_texture.activate(gpu, upload_buffer, 1, 1, &.{ 0, 0, 0, 0 });
 
     var texture_pool = try TextureCache.init(arena, upload_buffer);
