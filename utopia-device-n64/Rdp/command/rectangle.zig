@@ -61,17 +61,17 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         const tex_coords: TexCoords = @bitCast(args[1]);
         fw.log.debug("Tex Coords: {any}", .{tex_coords});
 
-        const s = @as(u64, tex_coords.s) << 5;
-        const t = @as(u64, tex_coords.t) << 5;
-        var dsdx: u64 = tex_coords.dsdx;
-        const dtdy: u64 = tex_coords.dtdy;
+        const s = @as(i64, tex_coords.s) << 5;
+        const t = @as(i64, tex_coords.t) << 5;
+        var dsdx: i64 = tex_coords.dsdx;
+        const dtdy: i64 = tex_coords.dtdy;
 
         if (cycle_type == .copy) {
-            dsdx /= (64 / tile.bitsPerPixel());
+            dsdx = @divTrunc(dsdx, 64 / tile.bitsPerPixel());
         }
 
-        const tile_x = @as(u64, tile.x()) << 12;
-        const tile_y = @as(u64, tile.y()) << 12;
+        const tile_x = @as(i64, tile.x()) << 12;
+        const tile_y = @as(i64, tile.y()) << 12;
 
         const sh = s - tile_x;
         const th = t - tile_y;
