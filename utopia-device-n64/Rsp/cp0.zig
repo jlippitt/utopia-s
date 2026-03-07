@@ -29,9 +29,8 @@ const MType = packed struct(u32) {
     opcode: u6,
 };
 
-pub fn cop0(core: *Core, word: u32) void {
-    const instr = table[(@as(u5, @truncate(word >> 21)))];
-    instr(core, word);
+pub fn cop0(word: u32) *const Core.Instruction {
+    return table[(@as(u5, @truncate(word >> 21)))];
 }
 
 fn mfc0(core: *Core, word: u32) void {

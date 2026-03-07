@@ -118,25 +118,23 @@ pub fn broadcast(self: *Self, reg: Register, el: u4) @Vector(8, u16) {
     };
 }
 
-pub fn cop2(core: *Core, word: u32) void {
+pub fn cop2(word: u32) *const Core.Instruction {
     const rs: u5 = @truncate(word >> 21);
 
-    const instr = if (rs >= 0o20) blk: {
+    if (rs >= 0o20) {
         @branchHint(.likely);
-        break :blk compute_table[@as(u6, @truncate(word))];
-    } else main_table[@as(u4, @truncate(rs))];
+        return compute_table[@as(u6, @truncate(word))];
+    }
 
-    instr(core, word);
+    return main_table[@as(u4, @truncate(rs))];
 }
 
-pub fn lwc2(core: *Core, word: u32) void {
-    const instr = load_table[@as(u5, @truncate(word >> 11))];
-    instr(core, word);
+pub fn lwc2(word: u32) *const Core.Instruction {
+    return load_table[@as(u5, @truncate(word >> 11))];
 }
 
-pub fn swc2(core: *Core, word: u32) void {
-    const instr = store_table[@as(u5, @truncate(word >> 11))];
-    instr(core, word);
+pub fn swc2(word: u32) *const Core.Instruction {
+    return store_table[@as(u5, @truncate(word >> 11))];
 }
 
 fn mfc2(core: *Core, word: u32) void {

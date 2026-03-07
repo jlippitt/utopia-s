@@ -73,7 +73,8 @@ pub fn writePc(self: *Self, value: u12, mask: u12) void {
 pub fn step(self: *Self) void {
     const word = self.getRspConst().readInstruction(self.pc);
 
-    dispatch(self, word);
+    const instr = decode(word);
+    instr(self, word);
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
@@ -200,17 +201,18 @@ fn formatHex(value: anytype) [@typeInfo(@TypeOf(value)).int.bits >> 2]u8 {
     return std.fmt.bytesToHex(bytes, .upper);
 }
 
-fn dispatch(core: *Self, word: u32) void {
+fn decode(word: u32) *const Instruction {
     const opcode: u6 = @truncate(word >> 26);
 
-    const instr: *const Instruction = if (opcode == 0)
-        special_table[@as(u6, @truncate(word))]
-    else if (opcode == 1)
-        regimm_table[@as(u5, @truncate(word >> 16))]
-    else
-        main_table[opcode];
-
-    instr(core, word);
+    return switch (opcode) {
+        0o00 => special_table[@as(u6, @truncate(word))],
+        0o01 => regimm_table[@as(u5, @truncate(word >> 16))],
+        0o20 => cp0.cop0(word),
+        0o22 => Cp2.cop2(word),
+        0o62 => Cp2.lwc2(word),
+        0o72 => Cp2.swc2(word),
+        else => main_table[opcode],
+    };
 }
 
 const main_table: [64]*const Instruction = blk: {
@@ -229,8 +231,6 @@ const main_table: [64]*const Instruction = blk: {
     ops[0o15] = alu.iTypeLogic(.OR);
     ops[0o16] = alu.iTypeLogic(.XOR);
     ops[0o17] = alu.lui;
-    ops[0o20] = cp0.cop0;
-    ops[0o22] = Cp2.cop2;
     ops[0o40] = memory.load(.LB);
     ops[0o41] = memory.load(.LH);
     ops[0o43] = memory.load(.LW);
@@ -240,8 +240,6 @@ const main_table: [64]*const Instruction = blk: {
     ops[0o50] = memory.store(.SB);
     ops[0o51] = memory.store(.SH);
     ops[0o53] = memory.store(.SW);
-    ops[0o62] = Cp2.lwc2;
-    ops[0o72] = Cp2.swc2;
     break :blk ops;
 };
 
