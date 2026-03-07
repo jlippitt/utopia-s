@@ -8,6 +8,8 @@ const cp0 = @import("./cp0.zig");
 const memory = @import("./memory.zig");
 const shift = @import("./shift.zig");
 
+const icache_size = 1024;
+
 const Self = @This();
 
 // zig fmt: off
@@ -49,14 +51,28 @@ pub const BranchParams = struct {
 
 pub const Instruction = fn (self: *Self, word: u32) void;
 
+const ICacheEntry = struct {
+    instr: *const Instruction,
+    word: u32,
+};
+
 pc: u12 = 0,
 target_pc: u12 = 0,
 pipe_state: PipeState = .normal,
+icache: *[icache_size]ICacheEntry,
 regs: [32]u32 = @splat(0),
 cp2: Cp2,
 
-pub fn init() Self {
+pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    const icache = try arena.allocator().alloc(ICacheEntry, icache_size);
+
+    @memset(icache, .{
+        .instr = decode(0),
+        .word = 0,
+    });
+
     return .{
+        .icache = icache[0..icache_size],
         .cp2 = Cp2.init(),
     };
 }
@@ -70,11 +86,17 @@ pub fn writePc(self: *Self, value: u12, mask: u12) void {
     fw.log.debug("RSP PC: {X:08}", .{self.pc});
 }
 
-pub fn step(self: *Self) void {
-    const word = self.getRspConst().readInstruction(self.pc);
+pub fn writeICache(self: *Self, index: u10, word: u32) void {
+    self.icache[index] = .{
+        .instr = decode(word),
+        .word = word,
+    };
+}
 
-    const instr = decode(word);
-    instr(self, word);
+pub fn step(self: *Self) void {
+    const entry = self.icache[self.pc >> 2];
+
+    entry.instr(self, entry.word);
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);

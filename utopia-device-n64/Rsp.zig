@@ -21,7 +21,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) !Self {
     const mem = try arena.allocator().alignedAlloc(u8, .@"16", mem_size);
 
     return .{
-        .core = .init(),
+        .core = try .init(arena),
         .mem = mem[0..mem_size],
     };
 }
@@ -63,6 +63,12 @@ pub fn read(self: *Self, address: u32) u32 {
 pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     if ((address & 0x000c_0000) == 0) {
         fw.mem.writeMaskedBe(u32, self.mem, address & 0x1ffc, value, mask);
+
+        if ((address & 0x1000) != 0) {
+            std.debug.assert(mask == std.math.maxInt(u32));
+            self.core.writeICache(@truncate(address >> 2), value);
+        }
+
         return;
     }
 
@@ -179,10 +185,6 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
 
 // Internal-facing interface
 
-pub fn readInstruction(self: *const Self, address: u12) u32 {
-    return fw.mem.readBe(u32, self.mem, @as(u13, 0x1000) | address);
-}
-
 pub fn readData(self: *const Self, comptime T: type, address: u12) T {
     if (address <= (bank_size - @sizeOf(T))) {
         @branchHint(.likely);
@@ -267,7 +269,7 @@ pub fn break_(self: *Self) void {
 
 fn transferDma(self: *Self, comptime direction: DmaDirection) void {
     const rdram = self.getDevice().rdram;
-    const sp_bank = self.mem[(self.sp_addr & 0x1000)..][0..bank_size];
+    const sp_offset = self.sp_addr & 0x1000;
     const row_len = @as(u32, self.dma.len) + 8;
 
     while (true) {
@@ -282,10 +284,16 @@ fn transferDma(self: *Self, comptime direction: DmaDirection) void {
                     else
                         0;
 
-                    fw.mem.writeBe(u64, sp_bank, sp_index, value);
+                    fw.mem.writeBe(u64, self.mem, sp_offset | sp_index, value);
+
+                    if (sp_offset != 0) {
+                        const icache_index: u10 = @truncate(sp_index >> 2);
+                        self.core.writeICache(icache_index, @truncate(value >> 32));
+                        self.core.writeICache(icache_index +% 1, @truncate(value));
+                    }
                 },
                 .write => if (dram_addr < rdram.len) {
-                    const value = fw.mem.readBe(u64, sp_bank, sp_index);
+                    const value = fw.mem.readBe(u64, self.mem, sp_offset | sp_index);
                     fw.mem.writeBe(u64, rdram, dram_addr, value);
                 },
             }
@@ -295,14 +303,16 @@ fn transferDma(self: *Self, comptime direction: DmaDirection) void {
         }
 
         switch (comptime direction) {
-            .read => fw.log.debug("RSP DMA: {} bytes read from {X:08} to MEM:{X:04}", .{
+            .read => fw.log.debug("RSP DMA: {d} bytes read from {X:08} to {c}MEM:{X:03}", .{
                 row_len,
                 self.dram_addr,
-                self.sp_addr,
+                @as(u8, if (sp_offset != 0) 'I' else 'D'),
+                self.sp_addr & 0xfff,
             }),
-            .write => fw.log.debug("RSP DMA: {} bytes written from MEM:{X:04} to {X:08}", .{
+            .write => fw.log.debug("RSP DMA: {d} bytes written from {c}MEM:{X:03} to {X:08}", .{
                 row_len,
-                self.sp_addr,
+                @as(u8, if (sp_offset != 0) 'I' else 'D'),
+                self.sp_addr & 0xfff,
                 self.dram_addr,
             }),
         }
