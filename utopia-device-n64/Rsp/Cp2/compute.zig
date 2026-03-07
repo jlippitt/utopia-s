@@ -54,24 +54,48 @@ pub const ComputeOp = enum {
     VMRG,
 };
 
-pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
+pub fn compute(comptime op: ComputeOp) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const args: Args = @bitCast(word);
+
+            fw.log.trace("{X:03}: {t} {t}, {t}, {t}[E:{d}]", .{
+                core.pc,
+                op,
+                args.vd,
+                args.vs,
+                args.vt,
+                args.el,
+            });
+
+            const cp2 = &core.cp2;
+            const lhs = cp2.get(args.vs);
+            const rhs = cp2.broadcast(args.vt, args.el);
+            cp2.set(args.vd, computeOp(op, cp2, lhs, rhs));
+        }
+    }.instr;
+}
+
+pub fn vsar(core: *Core, word: u32) void {
     const args: Args = @bitCast(word);
 
-    fw.log.trace("{X:03}: {t} {t}, {t}, {t}[E:{d}]", .{
-        core.pc,
-        op,
-        args.vd,
-        args.vs,
-        args.vt,
-        args.el,
+    fw.log.trace("{X:03}: VSAR {t}[E:{d}]", .{ core.pc, args.vd, args.el });
+
+    core.cp2.set(args.vd, switch (args.el) {
+        8 => @truncate(core.cp2.acc >> @splat(32)),
+        9 => @truncate(core.cp2.acc >> @splat(16)),
+        10 => @truncate(core.cp2.acc),
+        else => @splat(0),
     });
+}
 
-    const cp2 = &core.cp2;
-
-    const lhs = cp2.get(args.vs);
-    const rhs = cp2.broadcast(args.vt, args.el);
-
-    cp2.set(args.vd, switch (comptime op) {
+fn computeOp(
+    comptime op: ComputeOp,
+    cp2: *Cp2,
+    lhs: @Vector(8, u16),
+    rhs: @Vector(8, u16),
+) @Vector(8, u16) {
+    return switch (comptime op) {
         .VMULF => blk: {
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
@@ -367,20 +391,7 @@ pub fn compute(comptime op: ComputeOp, core: *Core, word: u32) void {
 
             break :blk result;
         },
-    });
-}
-
-pub fn vsar(core: *Core, word: u32) void {
-    const args: Args = @bitCast(word);
-
-    fw.log.trace("{X:03}: VSAR {t}[E:{d}]", .{ core.pc, args.vd, args.el });
-
-    core.cp2.set(args.vd, switch (args.el) {
-        8 => @truncate(core.cp2.acc >> @splat(32)),
-        9 => @truncate(core.cp2.acc >> @splat(16)),
-        10 => @truncate(core.cp2.acc),
-        else => @splat(0),
-    });
+    };
 }
 
 fn select(

@@ -121,90 +121,22 @@ pub fn broadcast(self: *Self, reg: Register, el: u4) @Vector(8, u16) {
 pub fn cop2(core: *Core, word: u32) void {
     const rs: u5 = @truncate(word >> 21);
 
-    if (rs >= 0o20) {
+    const instr = if (rs >= 0o20) blk: {
         @branchHint(.likely);
+        break :blk compute_table[@as(u6, @truncate(word))];
+    } else main_table[@as(u4, @truncate(rs))];
 
-        return switch (@as(u6, @truncate(word))) {
-            0o00 => compute.compute(.VMULF, core, word),
-            0o01 => compute.compute(.VMULU, core, word),
-            0o04 => compute.compute(.VMUDL, core, word),
-            0o05 => compute.compute(.VMUDM, core, word),
-            0o06 => compute.compute(.VMUDN, core, word),
-            0o07 => compute.compute(.VMUDH, core, word),
-            0o10 => compute.compute(.VMACF, core, word),
-            0o11 => compute.compute(.VMACU, core, word),
-            0o14 => compute.compute(.VMADL, core, word),
-            0o15 => compute.compute(.VMADM, core, word),
-            0o16 => compute.compute(.VMADN, core, word),
-            0o17 => compute.compute(.VMADH, core, word),
-            0o20 => compute.compute(.VADD, core, word),
-            0o21 => compute.compute(.VSUB, core, word),
-            0o23 => compute.compute(.VABS, core, word),
-            0o24 => compute.compute(.VADDC, core, word),
-            0o25 => compute.compute(.VSUBC, core, word),
-            0o35 => compute.vsar(core, word),
-            0o40 => compute.compute(.VLT, core, word),
-            0o41 => compute.compute(.VEQ, core, word),
-            0o42 => compute.compute(.VNE, core, word),
-            0o43 => compute.compute(.VGE, core, word),
-            0o44 => compute.compute(.VCL, core, word),
-            0o45 => compute.compute(.VCH, core, word),
-            0o46 => compute.compute(.VCR, core, word),
-            0o47 => compute.compute(.VMRG, core, word),
-            0o50 => compute.compute(.VAND, core, word),
-            0o51 => compute.compute(.VNAND, core, word),
-            0o52 => compute.compute(.VOR, core, word),
-            0o53 => compute.compute(.VNOR, core, word),
-            0o54 => compute.compute(.VXOR, core, word),
-            0o55 => compute.compute(.VNXOR, core, word),
-            0o60 => single_lane.reciprocal(.VRCP, core, word),
-            0o61 => single_lane.reciprocal(.VRCPL, core, word),
-            0o62 => single_lane.reciprocal(.VRCPH, core, word),
-            0o63 => single_lane.vmov(core, word),
-            0o64 => single_lane.reciprocal(.VRSQ, core, word),
-            0o65 => single_lane.reciprocal(.VRSQL, core, word),
-            0o66 => single_lane.reciprocal(.VRSQH, core, word),
-            else => |funct| fw.log.todo("RSP COP2 funct: {o:02}", .{funct}),
-        };
-    }
-
-    switch (rs) {
-        0o00 => mfc2(core, word),
-        0o02 => cfc2(core, word),
-        0o04 => mtc2(core, word),
-        0o06 => ctc2(core, word),
-        else => fw.log.todo("RSP COP2 rs: {o:02}", .{rs}),
-    }
+    instr(core, word);
 }
 
 pub fn lwc2(core: *Core, word: u32) void {
-    switch (@as(u5, @truncate(word >> 11))) {
-        0o00 => memory.load(.BV, core, word),
-        0o01 => memory.load(.SV, core, word),
-        0o02 => memory.load(.LV, core, word),
-        0o03 => memory.load(.DV, core, word),
-        0o04 => memory.load(.QV, core, word),
-        0o05 => memory.load(.RV, core, word),
-        0o06 => memory.load(.PV, core, word),
-        0o07 => memory.load(.UV, core, word),
-        0o13 => memory.load(.TV, core, word),
-        else => |rd| fw.log.todo("RSP LWC2 rd: {o:02}", .{rd}),
-    }
+    const instr = load_table[@as(u5, @truncate(word >> 11))];
+    instr(core, word);
 }
 
 pub fn swc2(core: *Core, word: u32) void {
-    switch (@as(u5, @truncate(word >> 11))) {
-        0o00 => memory.store(.BV, core, word),
-        0o01 => memory.store(.SV, core, word),
-        0o02 => memory.store(.LV, core, word),
-        0o03 => memory.store(.DV, core, word),
-        0o04 => memory.store(.QV, core, word),
-        0o05 => memory.store(.RV, core, word),
-        0o06 => memory.store(.PV, core, word),
-        0o07 => memory.store(.UV, core, word),
-        0o13 => memory.store(.TV, core, word),
-        else => |rd| fw.log.todo("RSP SWC2 rd: {o:02}", .{rd}),
-    }
+    const instr = store_table[@as(u5, @truncate(word >> 11))];
+    instr(core, word);
 }
 
 fn mfc2(core: *Core, word: u32) void {
@@ -260,3 +192,84 @@ fn ctc2(core: *Core, word: u32) void {
         else => core.cp2.compare_ext = @bitCast(@bitReverse(@as(u8, @truncate(value)))),
     }
 }
+
+const main_table: [16]*const Core.Instruction = blk: {
+    var ops: [16]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = mfc2;
+    ops[0o02] = cfc2;
+    ops[0o04] = mtc2;
+    ops[0o06] = ctc2;
+    break :blk ops;
+};
+
+const compute_table: [64]*const Core.Instruction = blk: {
+    var ops: [64]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = compute.compute(.VMULF);
+    ops[0o01] = compute.compute(.VMULU);
+    ops[0o04] = compute.compute(.VMUDL);
+    ops[0o05] = compute.compute(.VMUDM);
+    ops[0o06] = compute.compute(.VMUDN);
+    ops[0o07] = compute.compute(.VMUDH);
+    ops[0o10] = compute.compute(.VMACF);
+    ops[0o11] = compute.compute(.VMACU);
+    ops[0o14] = compute.compute(.VMADL);
+    ops[0o15] = compute.compute(.VMADM);
+    ops[0o16] = compute.compute(.VMADN);
+    ops[0o17] = compute.compute(.VMADH);
+    ops[0o20] = compute.compute(.VADD);
+    ops[0o21] = compute.compute(.VSUB);
+    ops[0o23] = compute.compute(.VABS);
+    ops[0o24] = compute.compute(.VADDC);
+    ops[0o25] = compute.compute(.VSUBC);
+    ops[0o35] = compute.vsar;
+    ops[0o40] = compute.compute(.VLT);
+    ops[0o41] = compute.compute(.VEQ);
+    ops[0o42] = compute.compute(.VNE);
+    ops[0o43] = compute.compute(.VGE);
+    ops[0o44] = compute.compute(.VCL);
+    ops[0o45] = compute.compute(.VCH);
+    ops[0o46] = compute.compute(.VCR);
+    ops[0o47] = compute.compute(.VMRG);
+    ops[0o50] = compute.compute(.VAND);
+    ops[0o51] = compute.compute(.VNAND);
+    ops[0o52] = compute.compute(.VOR);
+    ops[0o53] = compute.compute(.VNOR);
+    ops[0o54] = compute.compute(.VXOR);
+    ops[0o55] = compute.compute(.VNXOR);
+    ops[0o60] = single_lane.reciprocal(.VRCP);
+    ops[0o61] = single_lane.reciprocal(.VRCPL);
+    ops[0o62] = single_lane.reciprocal(.VRCPH);
+    ops[0o63] = single_lane.vmov;
+    ops[0o64] = single_lane.reciprocal(.VRSQ);
+    ops[0o65] = single_lane.reciprocal(.VRSQL);
+    ops[0o66] = single_lane.reciprocal(.VRSQH);
+    break :blk ops;
+};
+
+const load_table: [32]*const Core.Instruction = blk: {
+    var ops: [32]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = memory.load(.BV);
+    ops[0o01] = memory.load(.SV);
+    ops[0o02] = memory.load(.LV);
+    ops[0o03] = memory.load(.DV);
+    ops[0o04] = memory.load(.QV);
+    ops[0o05] = memory.load(.RV);
+    ops[0o06] = memory.load(.PV);
+    ops[0o07] = memory.load(.UV);
+    ops[0o13] = memory.load(.TV);
+    break :blk ops;
+};
+
+const store_table: [32]*const Core.Instruction = blk: {
+    var ops: [32]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = memory.store(.BV);
+    ops[0o01] = memory.store(.SV);
+    ops[0o02] = memory.store(.LV);
+    ops[0o03] = memory.store(.DV);
+    ops[0o04] = memory.store(.QV);
+    ops[0o05] = memory.store(.RV);
+    ops[0o06] = memory.store(.PV);
+    ops[0o07] = memory.store(.UV);
+    ops[0o13] = memory.store(.TV);
+    break :blk ops;
+};

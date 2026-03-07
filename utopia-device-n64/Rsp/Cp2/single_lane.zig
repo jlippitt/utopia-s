@@ -76,45 +76,49 @@ pub const ReciprocalOp = enum {
     }
 };
 
-pub fn reciprocal(comptime op: ReciprocalOp, core: *Core, word: u32) void {
-    const args: Args = @bitCast(word);
+pub fn reciprocal(comptime op: ReciprocalOp) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const args: Args = @bitCast(word);
 
-    fw.log.trace("{X:03}: {t} {t}[E:{d}], {t}[E:{d}]", .{
-        core.pc,
-        op,
-        args.vd,
-        args.vd_el,
-        args.vt,
-        args.vt_el,
-    });
+            fw.log.trace("{X:03}: {t} {t}[E:{d}], {t}[E:{d}]", .{
+                core.pc,
+                op,
+                args.vd,
+                args.vd_el,
+                args.vt,
+                args.vt_el,
+            });
 
-    const cp2 = &core.cp2;
+            const cp2 = &core.cp2;
 
-    cp2.setAccLow(cp2.broadcast(args.vt, args.vt_el));
+            cp2.setAccLow(cp2.broadcast(args.vt, args.vt_el));
 
-    const vt_lane = args.vt_el & 7;
-    const vd_lane = args.vd_el & 7;
+            const vt_lane = args.vt_el & 7;
+            const vd_lane = args.vd_el & 7;
 
-    const value = cp2.getLane(args.vt, vt_lane);
+            const value = cp2.getLane(args.vt, vt_lane);
 
-    const result: u16 = switch (comptime op.stage()) {
-        .calc => calculate(op.func(), cp2, fw.num.signed(value)),
-        .calc_long => blk: {
-            const input: i32 = if (cp2.rcp_high)
-                fw.num.signed(cp2.rcp_in | value)
-            else
-                fw.num.signed(value);
+            const result: u16 = switch (comptime op.stage()) {
+                .calc => calculate(op.func(), cp2, fw.num.signed(value)),
+                .calc_long => blk: {
+                    const input: i32 = if (cp2.rcp_high)
+                        fw.num.signed(cp2.rcp_in | value)
+                    else
+                        fw.num.signed(value);
 
-            break :blk calculate(op.func(), cp2, input);
-        },
-        .extract_high => blk: {
-            cp2.rcp_in = @as(u32, value) << 16;
-            cp2.rcp_high = true;
-            break :blk @truncate(cp2.rcp_out >> 16);
-        },
-    };
+                    break :blk calculate(op.func(), cp2, input);
+                },
+                .extract_high => blk: {
+                    cp2.rcp_in = @as(u32, value) << 16;
+                    cp2.rcp_high = true;
+                    break :blk @truncate(cp2.rcp_out >> 16);
+                },
+            };
 
-    cp2.setLane(args.vd, vd_lane, result);
+            cp2.setLane(args.vd, vd_lane, result);
+        }
+    }.instr;
 }
 
 fn calculate(comptime op: ReciprocalFunc, cp2: *Cp2, input: i32) u16 {
