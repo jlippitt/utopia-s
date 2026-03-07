@@ -143,7 +143,9 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
             0,
         };
 
-        for (0..3) |el| {
+        const num_elements: usize = if (core.options.perspective_enable) 3 else 2;
+
+        for (0..num_elements) |el| {
             vertices[0].tex_coords[el] = float(texel[el] +
                 ((high_y * texel_de[el]) >> 16) -
                 offset[el]) / 32.0;

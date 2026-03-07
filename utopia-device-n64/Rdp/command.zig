@@ -42,10 +42,15 @@ pub fn setScissor(core: *Core, word: u64) void {
 
 pub fn setOtherModes(core: *Core, word: u64) void {
     const cmd: SetOtherModes = @bitCast(word);
+
     fw.log.debug("SET_OTHER_MODES: {any}", .{cmd});
+
     core.display_list.setCycleType(@enumFromInt(cmd.cycle_type));
     core.display_list.setBlendMode(cmd.blend.parse());
     core.tmem.setTlutType(cmd.tlut_type);
+
+    core.options.perspective_enable = cmd.persp_tex_en;
+    fw.log.debug("Perspective Enable: {}", .{core.options.perspective_enable});
 }
 
 pub fn loadTlut(core: *Core, word: u64) void {

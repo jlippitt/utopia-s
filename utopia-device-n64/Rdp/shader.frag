@@ -198,7 +198,9 @@ void main() {
         return;
     }
 
-    vec4 tex0 = texture(tex0_sampler, v_tex_coords.xy / textureSize(tex0_sampler, 0));
+    vec2 tex_coords = v_tex_coords.xy / (v_tex_coords.z / 1024.0);
+    vec2 tex0_size = textureSize(tex0_sampler, 0);
+    vec4 tex0 = texture(tex0_sampler, tex_coords / tex0_size);
 
     if (cycle_type == CT_COPY) {
         f_color = vec4(tex0.xyz, 1.0);

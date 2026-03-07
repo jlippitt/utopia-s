@@ -12,9 +12,14 @@ const vertex_src align(@alignOf(u32)) = @embedFile("rdp.vert").*;
 const fragment_src align(@alignOf(u32)) = @embedFile("rdp.frag").*;
 
 const max_command_len = 22;
+const default_perspective = 1024.0;
 
 pub const InitError = std.mem.Allocator.Error || sdl3.errors.Error;
 pub const RenderError = sdl3.errors.Error;
+
+pub const Options = struct {
+    perspective_enable: bool = false,
+};
 
 const Self = @This();
 
@@ -25,6 +30,7 @@ target: Target,
 tmem: Tmem,
 display_list: DisplayList,
 word_buf: std.ArrayListUnmanaged(u64),
+options: Options = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     const format_flags: sdl3.gpu.ShaderFormatFlags = .{ .spirv = true };
@@ -294,7 +300,7 @@ pub fn getRdramConst(self: *const Self) []const u8 {
 pub const Vertex = extern struct {
     pos: [3]f32 = @splat(0.0),
     color: [4]f32 = @splat(0.0),
-    tex_coords: [3]f32 = @splat(0.0),
+    tex_coords: [3]f32 = .{ 0.0, 0.0, default_perspective },
 };
 
 pub const Index = u16;
