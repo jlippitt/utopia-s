@@ -38,8 +38,8 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
     var yl: u32 = cmd.yl;
 
     if (cycle_type == .copy or cycle_type == .fill) {
-        xl += 1;
-        yl += 1;
+        xl += 4;
+        yl += 4;
     }
 
     const left = @as(f32, @floatFromInt(xh)) / 4.0;
