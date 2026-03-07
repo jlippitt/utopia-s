@@ -78,8 +78,8 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
 
         const sh = s - tile_x;
         const th = t - tile_y;
-        const sl = sh + (dsdx * (xl - xh));
-        const tl = th + (dtdy * (yl - yh));
+        const sl = sh + ((dsdx * (@as(i64, xl) - xh)));
+        const tl = th + ((dtdy * (@as(i64, yl) - yh)));
 
         const tex_left = @as(f32, @floatFromInt(sh)) / 4096.0;
         const tex_right = @as(f32, @floatFromInt(sl)) / 4096.0;
