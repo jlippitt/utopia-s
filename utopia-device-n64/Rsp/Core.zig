@@ -47,6 +47,8 @@ pub const BranchParams = struct {
     link: bool = false,
 };
 
+pub const Instruction = fn (self: *Self, word: u32) void;
+
 pc: u12 = 0,
 target_pc: u12 = 0,
 pipe_state: PipeState = .normal,
@@ -195,71 +197,83 @@ fn formatHex(value: anytype) [@typeInfo(@TypeOf(value)).int.bits >> 2]u8 {
 }
 
 fn dispatch(core: *Self, word: u32) void {
-    switch (@as(u6, @truncate(word >> 26))) {
-        0o00 => special(core, word),
-        0o01 => regImm(core, word),
-        0o02 => control.j(.{}, core, word),
-        0o03 => control.j(.{ .link = true }, core, word),
-        0o04 => control.branchBinary(.BEQ, .{}, core, word),
-        0o05 => control.branchBinary(.BNE, .{}, core, word),
-        0o06 => control.branchUnary(.BLEZ, .{}, core, word),
-        0o07 => control.branchUnary(.BGTZ, .{}, core, word),
-        0o10 => alu.iTypeArithmetic(.ADD, .signed, core, word),
-        0o11 => alu.iTypeArithmetic(.ADD, .unsigned, core, word),
-        0o12 => alu.iTypeArithmetic(.SLT, .signed, core, word),
-        0o13 => alu.iTypeArithmetic(.SLT, .unsigned, core, word),
-        0o14 => alu.iTypeLogic(.AND, core, word),
-        0o15 => alu.iTypeLogic(.OR, core, word),
-        0o16 => alu.iTypeLogic(.XOR, core, word),
-        0o17 => alu.lui(core, word),
-        0o20 => cp0.cop0(core, word),
-        0o22 => Cp2.cop2(core, word),
-        0o40 => memory.load(.LB, core, word),
-        0o41 => memory.load(.LH, core, word),
-        0o43 => memory.load(.LW, core, word),
-        0o44 => memory.load(.LBU, core, word),
-        0o45 => memory.load(.LHU, core, word),
-        0o47 => memory.load(.LWU, core, word),
-        0o50 => memory.store(.SB, core, word),
-        0o51 => memory.store(.SH, core, word),
-        0o53 => memory.store(.SW, core, word),
-        0o62 => Cp2.lwc2(core, word),
-        0o72 => Cp2.swc2(core, word),
-        else => |opcode| fw.log.todo("RSP opcode: {o:02}", .{opcode}),
-    }
+    const opcode: u6 = @truncate(word >> 26);
+
+    const instr: *const Instruction = if (opcode == 0)
+        special_table[@as(u6, @truncate(word))]
+    else if (opcode == 1)
+        regimm_table[@as(u5, @truncate(word >> 16))]
+    else
+        main_table[opcode];
+
+    instr(core, word);
 }
 
-fn special(core: *Self, word: u32) void {
-    switch (@as(u6, @truncate(word))) {
-        0o00 => shift.fixed(.SLL, core, word),
-        0o02 => shift.fixed(.SRL, core, word),
-        0o03 => shift.fixed(.SRA, core, word),
-        0o04 => shift.variable(.SLL, core, word),
-        0o06 => shift.variable(.SRL, core, word),
-        0o07 => shift.variable(.SRA, core, word),
-        0o10 => control.jr(core, word),
-        0o11 => control.jalr(core, word),
-        0o15 => control.break_(core, word),
-        0o40 => alu.rTypeArithmetic(.ADD, .signed, core, word),
-        0o41 => alu.rTypeArithmetic(.ADD, .unsigned, core, word),
-        0o42 => alu.rTypeArithmetic(.SUB, .signed, core, word),
-        0o43 => alu.rTypeArithmetic(.SUB, .unsigned, core, word),
-        0o44 => alu.rTypeLogic(.AND, core, word),
-        0o45 => alu.rTypeLogic(.OR, core, word),
-        0o46 => alu.rTypeLogic(.XOR, core, word),
-        0o47 => alu.rTypeLogic(.NOR, core, word),
-        0o52 => alu.rTypeArithmetic(.SLT, .signed, core, word),
-        0o53 => alu.rTypeArithmetic(.SLT, .unsigned, core, word),
-        else => |funct| fw.log.todo("RSP Special funct: {o:02}", .{funct}),
-    }
-}
+const main_table: [64]*const Instruction = blk: {
+    var ops: [64]*const Instruction = @splat(reserved);
+    ops[0o02] = control.j(.{});
+    ops[0o03] = control.j(.{ .link = true });
+    ops[0o04] = control.branchBinary(.BEQ, .{});
+    ops[0o05] = control.branchBinary(.BNE, .{});
+    ops[0o06] = control.branchUnary(.BLEZ, .{});
+    ops[0o07] = control.branchUnary(.BGTZ, .{});
+    ops[0o10] = alu.iTypeArithmetic(.ADD, .signed);
+    ops[0o11] = alu.iTypeArithmetic(.ADD, .unsigned);
+    ops[0o12] = alu.iTypeArithmetic(.SLT, .signed);
+    ops[0o13] = alu.iTypeArithmetic(.SLT, .unsigned);
+    ops[0o14] = alu.iTypeLogic(.AND);
+    ops[0o15] = alu.iTypeLogic(.OR);
+    ops[0o16] = alu.iTypeLogic(.XOR);
+    ops[0o17] = alu.lui;
+    ops[0o20] = cp0.cop0;
+    ops[0o22] = Cp2.cop2;
+    ops[0o40] = memory.load(.LB);
+    ops[0o41] = memory.load(.LH);
+    ops[0o43] = memory.load(.LW);
+    ops[0o44] = memory.load(.LBU);
+    ops[0o45] = memory.load(.LHU);
+    ops[0o47] = memory.load(.LWU);
+    ops[0o50] = memory.store(.SB);
+    ops[0o51] = memory.store(.SH);
+    ops[0o53] = memory.store(.SW);
+    ops[0o62] = Cp2.lwc2;
+    ops[0o72] = Cp2.swc2;
+    break :blk ops;
+};
 
-fn regImm(core: *Self, word: u32) void {
-    switch (@as(u5, @truncate(word >> 16))) {
-        0o00 => control.branchUnary(.BLTZ, .{}, core, word),
-        0o01 => control.branchUnary(.BGEZ, .{}, core, word),
-        0o20 => control.branchUnary(.BLTZ, .{ .link = true }, core, word),
-        0o21 => control.branchUnary(.BGEZ, .{ .link = true }, core, word),
-        else => |rt| fw.log.todo("RSP RegImm rt: {o:02}", .{rt}),
-    }
+const special_table: [64]*const Instruction = blk: {
+    var ops: [64]*const Instruction = @splat(reserved);
+    ops[0o00] = shift.fixed(.SLL);
+    ops[0o02] = shift.fixed(.SRL);
+    ops[0o03] = shift.fixed(.SRA);
+    ops[0o04] = shift.variable(.SLL);
+    ops[0o06] = shift.variable(.SRL);
+    ops[0o07] = shift.variable(.SRA);
+    ops[0o10] = control.jr;
+    ops[0o11] = control.jalr;
+    ops[0o15] = control.break_;
+    ops[0o40] = alu.rTypeArithmetic(.ADD, .signed);
+    ops[0o41] = alu.rTypeArithmetic(.ADD, .unsigned);
+    ops[0o42] = alu.rTypeArithmetic(.SUB, .signed);
+    ops[0o43] = alu.rTypeArithmetic(.SUB, .unsigned);
+    ops[0o44] = alu.rTypeLogic(.AND);
+    ops[0o45] = alu.rTypeLogic(.OR);
+    ops[0o46] = alu.rTypeLogic(.XOR);
+    ops[0o47] = alu.rTypeLogic(.NOR);
+    ops[0o52] = alu.rTypeArithmetic(.SLT, .signed);
+    ops[0o53] = alu.rTypeArithmetic(.SLT, .unsigned);
+    break :blk ops;
+};
+
+const regimm_table: [32]*const Instruction = blk: {
+    var ops: [32]*const Instruction = @splat(reserved);
+    ops[0o00] = control.branchUnary(.BLTZ, .{});
+    ops[0o01] = control.branchUnary(.BGEZ, .{});
+    ops[0o20] = control.branchUnary(.BLTZ, .{ .link = true });
+    ops[0o21] = control.branchUnary(.BGEZ, .{ .link = true });
+    break :blk ops;
+};
+
+fn reserved(core: *Self, word: u32) void {
+    fw.log.panic("Reserved instruction at {X:03}: {X:08}", .{ core.pc, word });
 }
