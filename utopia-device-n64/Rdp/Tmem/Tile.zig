@@ -1,3 +1,4 @@
+const std = @import("std");
 const Core = @import("../Core.zig");
 
 pub const Descriptor = packed struct(u64) {
@@ -73,4 +74,18 @@ pub fn width(self: *const Self) u32 {
 
 pub fn height(self: *const Self) u32 {
     return @as(u32, self.size.th >> 2) - self.y() + 1;
+}
+
+pub fn cacheKey(self: *const Self) u64 {
+    const hash_fields = .{
+        self.size.sh - self.size.sl,
+        self.size.th - self.size.tl,
+        self.desc.tmem_addr,
+        self.desc.format,
+        self.desc.size,
+    };
+
+    var l1_hasher = std.hash.Wyhash.init(0);
+    std.hash.autoHash(&l1_hasher, hash_fields);
+    return l1_hasher.final();
 }

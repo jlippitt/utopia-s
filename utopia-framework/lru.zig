@@ -2,30 +2,43 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const fw = @import("framework");
 
-pub fn Lru(comptime K: type, comptime V: type) type {
+pub fn Lru(comptime V: type) type {
     return struct {
         const Entry = struct {
             node: std.DoublyLinkedList.Node,
-            key: K,
+            key: u64,
             value: V,
         };
 
         const MapContext = struct {
-            pub fn hash(_: @This(), key: K) K {
+            pub fn hash(_: @This(), key: u64) u64 {
                 // Value passed in is already hashed
                 return key;
             }
 
-            pub fn eql(_: @This(), lhs: K, rhs: K) bool {
+            pub fn eql(_: @This(), lhs: u64, rhs: u64) bool {
                 return lhs == rhs;
             }
         };
 
-        const Map = std.HashMapUnmanaged(K, *std.DoublyLinkedList.Node, MapContext, 50);
+        const Map = std.HashMapUnmanaged(u64, *std.DoublyLinkedList.Node, MapContext, 50);
 
-        const GetOrPutResult = struct {
+        pub const GetOrPutResult = struct {
             value_ptr: *V,
             found_existing: bool,
+        };
+
+        pub const Iterator = struct {
+            inner: Map.ValueIterator,
+
+            pub fn next(self: *@This()) ?*V {
+                if (self.inner.next()) |node| {
+                    const entry: *Entry = @alignCast(@fieldParentPtr("node", node.*));
+                    return &entry.value;
+                }
+
+                return null;
+            }
         };
 
         const Self = @This();
@@ -66,7 +79,37 @@ pub fn Lru(comptime K: type, comptime V: type) type {
             allocator.free(self.entries);
         }
 
-        pub fn getOrPut(self: *Self, key: K) GetOrPutResult {
+        pub fn clear(self: *Self) void {
+            self.map.clearRetainingCapacity();
+        }
+
+        pub fn iterator(self: *Self) Iterator {
+            return .{ .inner = self.map.valueIterator() };
+        }
+
+        pub fn peek(self: *Self, key: u64) ?*V {
+            if (self.map.get(key)) |node| {
+                const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
+                std.debug.assert(entry.key == key);
+                return &entry.value;
+            }
+
+            return null;
+        }
+
+        pub fn get(self: *Self, key: u64) ?*V {
+            if (self.map.get(key)) |node| {
+                const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
+                std.debug.assert(entry.key == key);
+                self.list.remove(node);
+                self.list.append(node);
+                return &entry.value;
+            }
+
+            return null;
+        }
+
+        pub fn getOrPut(self: *Self, key: u64) GetOrPutResult {
             if (self.map.get(key)) |node| {
                 const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
                 std.debug.assert(entry.key == key);

@@ -2,7 +2,6 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const fw = @import("framework");
 const Decoder = @import("./Tmem/Decoder.zig");
-const TextureCache = @import("./Tmem/TextureCache.zig");
 
 pub const Tile = @import("./Tmem/Tile.zig");
 pub const Texture = @import("./Tmem/Texture.zig");
@@ -14,11 +13,16 @@ pub const data_size = data_len * 8;
 // 4bpp texture expands to 8 RGBA32 bytes per TMEM byte
 pub const max_texture_size = data_size * 8;
 
+const l1_cache_size = 256;
+const l2_cache_size = 1024;
+
 const Self = @This();
 
 data: *[data_len]u64,
+l1_cache: fw.lru.Lru(u64),
+l2_cache: fw.lru.Lru(Texture),
 decoder: Decoder,
-texture_cache: TextureCache,
+upload_buffer: sdl3.gpu.TransferBuffer,
 null_texture: Texture,
 image_width: u24 = 0,
 image_address: u24 = 0,
@@ -40,20 +44,19 @@ pub fn init(
     var null_texture: Texture = .{};
     try null_texture.activate(gpu, upload_buffer, 1, 1, &.{ 0, 0, 0, 0 });
 
-    var texture_pool = try TextureCache.init(arena, upload_buffer);
-    errdefer texture_pool.deinit(gpu);
-
     return .{
         .data = data[0..data_len],
+        .l1_cache = try .init(arena.allocator(), l1_cache_size, 0),
+        .l2_cache = try .init(arena.allocator(), l2_cache_size, .init()),
         .decoder = try .init(arena),
-        .texture_cache = texture_pool,
+        .upload_buffer = upload_buffer,
         .null_texture = null_texture,
     };
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     self.null_texture.deactivate(gpu);
-    self.texture_cache.deinit(gpu);
+    gpu.releaseTransferBuffer(self.upload_buffer);
 }
 
 pub fn getTile(self: *const Self, index: u3) Tile {
@@ -67,11 +70,24 @@ pub fn nullTexture(self: *Self) *Texture {
 pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlError}!*Texture {
     const tile = self.tiles[index];
 
+    const width = tile.width();
+    const height = tile.height();
+
+    const l1_result = self.l1_cache.getOrPut(tile.cacheKey());
+
+    if (l1_result.found_existing) {
+        const l2_key = l1_result.value_ptr.*;
+
+        if (self.l2_cache.get(l2_key)) |texture| {
+            return texture;
+        }
+    }
+
     const pixels = self.decoder.decode(tile, self.data, self.tlut_type) catch |err| {
         switch (err) {
             error.TextureTooBig => fw.log.warn("Texture too big: {} * {} * {}", .{
-                tile.width(),
-                tile.height(),
+                width,
+                height,
                 tile.bitsPerPixel(),
             }),
             error.FormatNotSupported => fw.log.warn("Texture format unsupported: {t} {t}", .{
@@ -83,7 +99,33 @@ pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlErro
         return self.nullTexture();
     };
 
-    return self.texture_cache.getOrInsert(gpu, tile.width(), tile.height(), pixels);
+    var l2_hasher = std.hash.Wyhash.init(0);
+    std.hash.autoHashStrat(&l2_hasher, .{ width, height, pixels }, .Deep);
+    const l2_key = l2_hasher.final();
+
+    l1_result.value_ptr.* = l2_key;
+
+    const l2_result = self.l2_cache.getOrPut(l2_key);
+    const texture = l2_result.value_ptr;
+
+    if (l2_result.found_existing) {
+        texture.ref();
+        return texture;
+    }
+
+    if (texture.hasRefs()) {
+        fw.log.panic("Texture cache full", .{});
+    }
+
+    if (texture.isActive()) {
+        texture.deactivate(gpu);
+    }
+
+    try texture.activate(gpu, self.upload_buffer, width, height, pixels);
+
+    texture.ref();
+
+    return texture;
 }
 
 pub fn setImageParams(self: *Self, address: u24, width: u24) void {
@@ -112,6 +154,8 @@ pub fn setTileSize(self: *Self, size: Tile.Size) void {
 }
 
 pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    self.invalidateL1Cache();
+
     // Note: Loading TLUT data does not update the size of stored tile
     var tile = self.tiles[size.tile];
     tile.size = size;
@@ -140,6 +184,8 @@ pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
 }
 
 pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    self.invalidateL1Cache();
+
     self.setTileSize(size);
 
     const tile = self.tiles[size.tile];
@@ -183,6 +229,8 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
 }
 
 pub fn loadBlock(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    self.invalidateL1Cache();
+
     // Loading block data does not update the size of stored tile
     const tile = self.tiles[size.tile];
 
@@ -258,4 +306,18 @@ pub fn loadBlock(self: *Self, rdram: []const u8, size: Tile.Size) void {
         tmem_addr - tmem_begin,
         dram_addr - dram_begin,
     });
+}
+
+fn invalidateL1Cache(self: *Self) void {
+    var iter = self.l1_cache.iterator();
+
+    while (iter.next()) |value_ptr| {
+        const l2_key = value_ptr.*;
+
+        if (self.l2_cache.peek(l2_key)) |texture| {
+            texture.unref();
+        }
+    }
+
+    self.l1_cache.clear();
 }
