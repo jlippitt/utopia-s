@@ -30,11 +30,8 @@ const MType = packed struct(u32) {
 };
 
 pub fn cop0(core: *Core, word: u32) void {
-    switch (@as(u5, @truncate(word >> 21))) {
-        0o00 => mfc0(core, word),
-        0o04 => mtc0(core, word),
-        else => |rs| fw.log.todo("RSP COP0 rs: {o:02}", .{rs}),
-    }
+    const instr = table[(@as(u5, @truncate(word >> 21)))];
+    instr(core, word);
 }
 
 fn mfc0(core: *Core, word: u32) void {
@@ -48,3 +45,10 @@ fn mtc0(core: *Core, word: u32) void {
     fw.log.trace("{X:03}: MTC0 {t}, {t}", .{ core.pc, args.rt, args.rd });
     core.getRsp().writeCp0Register(args.rd, core.get(args.rt));
 }
+
+const table: [32]*const Core.Instruction = blk: {
+    var ops: [32]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = mfc0;
+    ops[0o04] = mtc0;
+    break :blk ops;
+};

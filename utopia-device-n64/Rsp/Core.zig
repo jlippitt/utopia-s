@@ -182,6 +182,10 @@ pub fn link(self: *Self, reg: Register) void {
     self.set(reg, address);
 }
 
+pub fn reserved(core: *Self, word: u32) void {
+    fw.log.panic("Reserved instruction at {X:03}: {X:08}", .{ core.pc, word });
+}
+
 pub fn getRsp(self: *Self) *Rsp {
     return @alignCast(@fieldParentPtr("core", self));
 }
@@ -273,7 +277,3 @@ const regimm_table: [32]*const Instruction = blk: {
     ops[0o21] = control.branchUnary(.BGEZ, .{ .link = true });
     break :blk ops;
 };
-
-fn reserved(core: *Self, word: u32) void {
-    fw.log.panic("Reserved instruction at {X:03}: {X:08}", .{ core.pc, word });
-}
