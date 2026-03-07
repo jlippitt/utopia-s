@@ -15,33 +15,37 @@ pub fn cvt(
     comptime op: ConvertOp,
     comptime dst_fmt: Cp1.Format,
     comptime src_fmt: Cp1.Format,
-    core: *Core,
-    word: u32,
-) void {
-    const args: Cp1.RType = @bitCast(word);
+) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            Cp1.checkUsable(core);
 
-    fw.log.trace("{X:08}: {t}.{t}.{t} {t}, {t}", .{
-        core.pc,
-        op,
-        dst_fmt,
-        src_fmt,
-        args.fd,
-        args.fs,
-    });
+            const args: Cp1.RType = @bitCast(word);
 
-    const value = core.cp1.get(src_fmt, args.fs);
+            fw.log.trace("{X:08}: {t}.{t}.{t} {t}, {t}", .{
+                core.pc,
+                op,
+                dst_fmt,
+                src_fmt,
+                args.fd,
+                args.fs,
+            });
 
-    core.cp1.set(
-        dst_fmt,
-        args.fd,
-        std.math.lossyCast(dst_fmt.Type(), switch (comptime op) {
-            .CVT => value,
-            .ROUND => roundEven(value),
-            .TRUNC => @trunc(value),
-            .CEIL => @ceil(value),
-            .FLOOR => @floor(value),
-        }),
-    );
+            const value = core.cp1.get(src_fmt, args.fs);
+
+            core.cp1.set(
+                dst_fmt,
+                args.fd,
+                std.math.lossyCast(dst_fmt.Type(), switch (comptime op) {
+                    .CVT => value,
+                    .ROUND => roundEven(value),
+                    .TRUNC => @trunc(value),
+                    .CEIL => @ceil(value),
+                    .FLOOR => @floor(value),
+                }),
+            );
+        }
+    }.instr;
 }
 
 fn roundEven(value: anytype) @TypeOf(value) {

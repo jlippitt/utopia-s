@@ -141,116 +141,58 @@ fn fr(self: *const Self) bool {
     return core.cp0.fr();
 }
 
-pub fn cop1(core: *Core, word: u32) void {
+pub fn cop1(word: u32) *const Core.Instruction {
+    const rs: u5 = @truncate(word >> 21);
+
+    return switch (rs) {
+        0o10 => branch_table[@as(u5, @truncate(word >> 16))],
+        0o20 => single_table[@as(u6, @truncate(word))],
+        0o21 => double_table[@as(u6, @truncate(word))],
+        0o24 => word_table[@as(u6, @truncate(word))],
+        0o25 => long_table[@as(u6, @truncate(word))],
+        else => main_table[rs],
+    };
+}
+
+pub fn checkUsable(core: *Core) void {
     if (!core.cp0.cp1Usable()) {
         @branchHint(.unlikely);
         core.except(.{ .coprocessor_unusable = 1 });
         return;
     }
-
-    const rs: u5 = @truncate(word >> 21);
-
-    switch (rs) {
-        0o00 => mfc1(core, word),
-        0o01 => dmfc1(core, word),
-        0o02 => cfc1(core, word),
-        0o04 => mtc1(core, word),
-        0o05 => dmtc1(core, word),
-        0o06 => ctc1(core, word),
-        0o10 => branchOp(core, word),
-        0o20 => floatOp(.S, core, word),
-        0o21 => floatOp(.D, core, word),
-        0o24 => intOp(.W, core, word),
-        0o25 => intOp(.L, core, word),
-        else => fw.log.todo("CPU COP1 rs: {o:02}", .{rs}),
-    }
-}
-
-fn branchOp(core: *Core, word: u32) void {
-    switch (@as(u5, @truncate(word >> 16))) {
-        0o00 => compare.branch(.BC1F, .{}, core, word),
-        0o01 => compare.branch(.BC1T, .{}, core, word),
-        0o02 => compare.branch(.BC1F, .{ .likely = true }, core, word),
-        0o03 => compare.branch(.BC1T, .{ .likely = true }, core, word),
-        else => |rt| fw.log.todo("CPU COP1 branch op: {o:02}", .{rt}),
-    }
-}
-
-fn floatOp(comptime fmt: Format, core: *Core, word: u32) void {
-    switch (@as(u6, @truncate(word))) {
-        0o00 => arithmetic.binary(.ADD, fmt, core, word),
-        0o01 => arithmetic.binary(.SUB, fmt, core, word),
-        0o02 => arithmetic.binary(.MUL, fmt, core, word),
-        0o03 => arithmetic.binary(.DIV, fmt, core, word),
-        0o04 => arithmetic.unary(.SQRT, fmt, core, word),
-        0o05 => arithmetic.unary(.ABS, fmt, core, word),
-        0o06 => arithmetic.unary(.MOV, fmt, core, word),
-        0o07 => arithmetic.unary(.NEG, fmt, core, word),
-        0o10 => convert.cvt(.ROUND, .L, fmt, core, word),
-        0o11 => convert.cvt(.TRUNC, .L, fmt, core, word),
-        0o12 => convert.cvt(.CEIL, .L, fmt, core, word),
-        0o13 => convert.cvt(.FLOOR, .L, fmt, core, word),
-        0o14 => convert.cvt(.ROUND, .W, fmt, core, word),
-        0o15 => convert.cvt(.TRUNC, .W, fmt, core, word),
-        0o16 => convert.cvt(.CEIL, .W, fmt, core, word),
-        0o17 => convert.cvt(.FLOOR, .W, fmt, core, word),
-        0o40 => convert.cvt(.CVT, .S, fmt, core, word),
-        0o41 => convert.cvt(.CVT, .D, fmt, core, word),
-        0o44 => convert.cvt(.CVT, .W, fmt, core, word),
-        0o45 => convert.cvt(.CVT, .L, fmt, core, word),
-        0o60 => compare.c(.F, fmt, core, word),
-        0o61 => compare.c(.UN, fmt, core, word),
-        0o62 => compare.c(.EQ, fmt, core, word),
-        0o63 => compare.c(.UEQ, fmt, core, word),
-        0o64 => compare.c(.OLT, fmt, core, word),
-        0o65 => compare.c(.ULT, fmt, core, word),
-        0o66 => compare.c(.OLE, fmt, core, word),
-        0o67 => compare.c(.ULE, fmt, core, word),
-        0o70 => compare.c(.SF, fmt, core, word),
-        0o71 => compare.c(.NGLE, fmt, core, word),
-        0o72 => compare.c(.SEQ, fmt, core, word),
-        0o73 => compare.c(.NGL, fmt, core, word),
-        0o74 => compare.c(.LT, fmt, core, word),
-        0o75 => compare.c(.NGE, fmt, core, word),
-        0o76 => compare.c(.LE, fmt, core, word),
-        0o77 => compare.c(.NGT, fmt, core, word),
-        else => |funct| fw.log.todo("CPU COP1 float op: {o:02}", .{funct}),
-    }
-}
-
-fn intOp(comptime fmt: Format, core: *Core, word: u32) void {
-    switch (@as(u6, @truncate(word))) {
-        0o40 => convert.cvt(.CVT, .S, fmt, core, word),
-        0o41 => convert.cvt(.CVT, .D, fmt, core, word),
-        else => |funct| fw.log.todo("CPU COP1 int op: {o:02}", .{funct}),
-    }
 }
 
 fn mfc1(core: *Core, word: u32) void {
+    checkUsable(core);
     const args: MType(Register) = @bitCast(word);
     fw.log.trace("{X:08}: MFC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
     core.set(args.rt, fw.num.signExtend(u64, core.cp1.get(.W, args.fs)));
 }
 
 fn dmfc1(core: *Core, word: u32) void {
+    checkUsable(core);
     const args: MType(Register) = @bitCast(word);
     fw.log.trace("{X:08}: DMFC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
     core.set(args.rt, @bitCast(core.cp1.get(.L, args.fs)));
 }
 
 fn mtc1(core: *Core, word: u32) void {
+    checkUsable(core);
     const args: MType(Register) = @bitCast(word);
     fw.log.trace("{X:08}: MTC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
     core.cp1.set(.W, args.fs, fw.num.truncate(i32, core.get(args.rt)));
 }
 
 fn dmtc1(core: *Core, word: u32) void {
+    checkUsable(core);
     const args: MType(Register) = @bitCast(word);
     fw.log.trace("{X:08}: DMTC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
     core.cp1.set(.L, args.fs, @bitCast(core.get(args.rt)));
 }
 
 fn cfc1(core: *Core, word: u32) void {
+    checkUsable(core);
+
     const args: MType(ControlRegister) = @bitCast(word);
 
     fw.log.trace("{X:08}: CFC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
@@ -263,6 +205,8 @@ fn cfc1(core: *Core, word: u32) void {
 }
 
 fn ctc1(core: *Core, word: u32) void {
+    checkUsable(core);
+
     const args: MType(ControlRegister) = @bitCast(word);
 
     fw.log.trace("{X:08}: CTC1 {t}, {t}", .{ core.pc, args.rt, args.fs });
@@ -296,3 +240,77 @@ const Csr = packed struct(u32) {
     fs: bool = false,
     __: u7 = 0,
 };
+
+pub const main_table: [32]*const Core.Instruction = blk: {
+    var ops: [32]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = mfc1;
+    ops[0o01] = dmfc1;
+    ops[0o02] = cfc1;
+    ops[0o04] = mtc1;
+    ops[0o05] = dmtc1;
+    ops[0o06] = ctc1;
+    break :blk ops;
+};
+
+pub const branch_table: [32]*const Core.Instruction = blk: {
+    var ops: [32]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = compare.branch(.BC1F, .{});
+    ops[0o01] = compare.branch(.BC1T, .{});
+    ops[0o02] = compare.branch(.BC1F, .{ .likely = true });
+    ops[0o03] = compare.branch(.BC1T, .{ .likely = true });
+    break :blk ops;
+};
+
+fn floatTable(comptime fmt: Format) [64]*const Core.Instruction {
+    var ops: [64]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = arithmetic.binary(.ADD, fmt);
+    ops[0o01] = arithmetic.binary(.SUB, fmt);
+    ops[0o02] = arithmetic.binary(.MUL, fmt);
+    ops[0o03] = arithmetic.binary(.DIV, fmt);
+    ops[0o04] = arithmetic.unary(.SQRT, fmt);
+    ops[0o05] = arithmetic.unary(.ABS, fmt);
+    ops[0o06] = arithmetic.unary(.MOV, fmt);
+    ops[0o07] = arithmetic.unary(.NEG, fmt);
+    ops[0o10] = convert.cvt(.ROUND, .L, fmt);
+    ops[0o11] = convert.cvt(.TRUNC, .L, fmt);
+    ops[0o12] = convert.cvt(.CEIL, .L, fmt);
+    ops[0o13] = convert.cvt(.FLOOR, .L, fmt);
+    ops[0o14] = convert.cvt(.ROUND, .W, fmt);
+    ops[0o15] = convert.cvt(.TRUNC, .W, fmt);
+    ops[0o16] = convert.cvt(.CEIL, .W, fmt);
+    ops[0o17] = convert.cvt(.FLOOR, .W, fmt);
+    ops[0o40] = convert.cvt(.CVT, .S, fmt);
+    ops[0o41] = convert.cvt(.CVT, .D, fmt);
+    ops[0o44] = convert.cvt(.CVT, .W, fmt);
+    ops[0o45] = convert.cvt(.CVT, .L, fmt);
+    ops[0o60] = compare.c(.F, fmt);
+    ops[0o61] = compare.c(.UN, fmt);
+    ops[0o62] = compare.c(.EQ, fmt);
+    ops[0o63] = compare.c(.UEQ, fmt);
+    ops[0o64] = compare.c(.OLT, fmt);
+    ops[0o65] = compare.c(.ULT, fmt);
+    ops[0o66] = compare.c(.OLE, fmt);
+    ops[0o67] = compare.c(.ULE, fmt);
+    ops[0o70] = compare.c(.SF, fmt);
+    ops[0o71] = compare.c(.NGLE, fmt);
+    ops[0o72] = compare.c(.SEQ, fmt);
+    ops[0o73] = compare.c(.NGL, fmt);
+    ops[0o74] = compare.c(.LT, fmt);
+    ops[0o75] = compare.c(.NGE, fmt);
+    ops[0o76] = compare.c(.LE, fmt);
+    ops[0o77] = compare.c(.NGT, fmt);
+    return ops;
+}
+
+pub const single_table = floatTable(.S);
+pub const double_table = floatTable(.D);
+
+fn intTable(comptime fmt: Format) [64]*const Core.Instruction {
+    var ops: [64]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o40] = convert.cvt(.CVT, .S, fmt);
+    ops[0o41] = convert.cvt(.CVT, .D, fmt);
+    return ops;
+}
+
+pub const word_table = intTable(.W);
+pub const long_table = intTable(.L);

@@ -52,6 +52,8 @@ pub const BranchParams = struct {
     likely: bool = false,
 };
 
+pub const Instruction = fn (self: *Self, word: u32) void;
+
 pc: u32 = cold_reset_vector,
 target_pc: u32 = 0,
 pipe_state: PipeState = .normal,
@@ -86,7 +88,8 @@ pub fn step(self: *Self) void {
     const address = self.mapAddress(self.pc, false) orelse return;
     const word = self.getDevice().read(address);
 
-    dispatch(self, word);
+    const instr = decode(word);
+    instr(self, word);
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
@@ -216,6 +219,10 @@ pub fn except(self: *Self, exception: Exception) void {
     self.pipe_state = .except;
 }
 
+pub fn reserved(core: *Self, word: u32) void {
+    fw.log.panic("Reserved instruction at {X:03}: {X:08}", .{ core.pc, word });
+}
+
 pub fn getDevice(self: *Self) *Device {
     return @alignCast(@fieldParentPtr("cpu", self));
 }
@@ -224,139 +231,149 @@ pub fn getDeviceConst(self: *const Self) *const Device {
     return @alignCast(@fieldParentPtr("cpu", self));
 }
 
-fn dispatch(core: *Self, word: u32) void {
-    switch (@as(u6, @truncate(word >> 26))) {
-        0o00 => special(core, word),
-        0o01 => regImm(core, word),
-        0o02 => control.j(.{}, core, word),
-        0o03 => control.j(.{ .link = true }, core, word),
-        0o04 => control.branchBinary(.BEQ, .{}, core, word),
-        0o05 => control.branchBinary(.BNE, .{}, core, word),
-        0o06 => control.branchUnary(.BLEZ, .{}, core, word),
-        0o07 => control.branchUnary(.BGTZ, .{}, core, word),
-        0o10 => alu.iTypeArithmetic(.ADD, .signed, core, word),
-        0o11 => alu.iTypeArithmetic(.ADD, .unsigned, core, word),
-        0o12 => alu.iTypeArithmetic(.SLT, .signed, core, word),
-        0o13 => alu.iTypeArithmetic(.SLT, .unsigned, core, word),
-        0o14 => alu.iTypeLogic(.AND, core, word),
-        0o15 => alu.iTypeLogic(.OR, core, word),
-        0o16 => alu.iTypeLogic(.XOR, core, word),
-        0o17 => alu.lui(core, word),
-        0o20 => Cp0.cop0(core, word),
-        0o21 => Cp1.cop1(core, word),
-        0o22 => core.except(.{ .coprocessor_unusable = 2 }),
-        0o24 => control.branchBinary(.BEQ, .{ .likely = true }, core, word),
-        0o25 => control.branchBinary(.BNE, .{ .likely = true }, core, word),
-        0o26 => control.branchUnary(.BLEZ, .{ .likely = true }, core, word),
-        0o27 => control.branchUnary(.BGTZ, .{ .likely = true }, core, word),
-        0o30 => alu.iTypeArithmetic(.DADD, .signed, core, word),
-        0o31 => alu.iTypeArithmetic(.DADD, .unsigned, core, word),
-        0o32 => memory.load(.LDL, core, word),
-        0o33 => memory.load(.LDR, core, word),
-        0o40 => memory.load(.LB, core, word),
-        0o41 => memory.load(.LH, core, word),
-        0o42 => memory.load(.LWL, core, word),
-        0o43 => memory.load(.LW, core, word),
-        0o44 => memory.load(.LBU, core, word),
-        0o45 => memory.load(.LHU, core, word),
-        0o46 => memory.load(.LWR, core, word),
-        0o47 => memory.load(.LWU, core, word),
-        0o50 => memory.store(.SB, core, word),
-        0o51 => memory.store(.SH, core, word),
-        0o52 => memory.store(.SWL, core, word),
-        0o53 => memory.store(.SW, core, word),
-        0o54 => memory.store(.SDL, core, word),
-        0o55 => memory.store(.SDR, core, word),
-        0o56 => memory.store(.SWR, core, word),
-        0o57 => memory.cache(core, word),
-        0o60 => memory.load(.LL, core, word),
-        0o61 => Cp1.load(.LWC1, core, word),
-        0o64 => memory.load(.LLD, core, word),
-        0o65 => Cp1.load(.LDC1, core, word),
-        0o67 => memory.load(.LD, core, word),
-        0o70 => memory.store(.SC, core, word),
-        0o71 => Cp1.store(.SWC1, core, word),
-        0o74 => memory.store(.SCD, core, word),
-        0o75 => Cp1.store(.SDC1, core, word),
-        0o77 => memory.store(.SD, core, word),
-        else => |opcode| fw.log.todo("CPU opcode: {o:02}", .{opcode}),
-    }
+fn decode(word: u32) *const Instruction {
+    const opcode: u6 = @truncate(word >> 26);
+
+    return switch (opcode) {
+        0o00 => special_table[@as(u6, @truncate(word))],
+        0o01 => regimm_table[@as(u5, @truncate(word >> 16))],
+        0o20 => Cp0.cop0(word),
+        0o21 => Cp1.cop1(word),
+        else => main_table[opcode],
+    };
 }
 
-fn special(core: *Self, word: u32) void {
-    switch (@as(u6, @truncate(word))) {
-        0o00 => shift.fixed(.SLL, core, word),
-        0o02 => shift.fixed(.SRL, core, word),
-        0o03 => shift.fixed(.SRA, core, word),
-        0o04 => shift.variable(.SLL, core, word),
-        0o06 => shift.variable(.SRL, core, word),
-        0o07 => shift.variable(.SRA, core, word),
-        0o10 => control.jr(core, word),
-        0o11 => control.jalr(core, word),
-        0o14 => control.syscall(core, word),
-        0o15 => control.break_(core, word),
-        0o17 => control.sync(core, word),
-        0o20 => mul_div.mfhi(core, word),
-        0o21 => mul_div.mthi(core, word),
-        0o22 => mul_div.mflo(core, word),
-        0o23 => mul_div.mtlo(core, word),
-        0o24 => shift.variable(.DSLL, core, word),
-        0o26 => shift.variable(.DSRL, core, word),
-        0o27 => shift.variable(.DSRA, core, word),
-        0o30 => mul_div.mulDiv(.MULT, core, word),
-        0o31 => mul_div.mulDiv(.MULTU, core, word),
-        0o32 => mul_div.mulDiv(.DIV, core, word),
-        0o33 => mul_div.mulDiv(.DIVU, core, word),
-        0o34 => mul_div.mulDiv(.DMULT, core, word),
-        0o35 => mul_div.mulDiv(.DMULTU, core, word),
-        0o36 => mul_div.mulDiv(.DDIV, core, word),
-        0o37 => mul_div.mulDiv(.DDIVU, core, word),
-        0o40 => alu.rTypeArithmetic(.ADD, .signed, core, word),
-        0o41 => alu.rTypeArithmetic(.ADD, .unsigned, core, word),
-        0o42 => alu.rTypeArithmetic(.SUB, .signed, core, word),
-        0o43 => alu.rTypeArithmetic(.SUB, .unsigned, core, word),
-        0o44 => alu.rTypeLogic(.AND, core, word),
-        0o45 => alu.rTypeLogic(.OR, core, word),
-        0o46 => alu.rTypeLogic(.XOR, core, word),
-        0o47 => alu.rTypeLogic(.NOR, core, word),
-        0o52 => alu.rTypeArithmetic(.SLT, .signed, core, word),
-        0o53 => alu.rTypeArithmetic(.SLT, .unsigned, core, word),
-        0o54 => alu.rTypeArithmetic(.DADD, .signed, core, word),
-        0o55 => alu.rTypeArithmetic(.DADD, .unsigned, core, word),
-        0o56 => alu.rTypeArithmetic(.DSUB, .signed, core, word),
-        0o57 => alu.rTypeArithmetic(.DSUB, .unsigned, core, word),
-        0o60 => control.rTypeTrap(.TGE, .signed, core, word),
-        0o61 => control.rTypeTrap(.TGE, .unsigned, core, word),
-        0o62 => control.rTypeTrap(.TLT, .signed, core, word),
-        0o63 => control.rTypeTrap(.TLT, .unsigned, core, word),
-        0o64 => control.rTypeTrap(.TEQ, .signed, core, word),
-        0o66 => control.rTypeTrap(.TNE, .signed, core, word),
-        0o70 => shift.fixed(.DSLL, core, word),
-        0o72 => shift.fixed(.DSRL, core, word),
-        0o73 => shift.fixed(.DSRA, core, word),
-        0o74 => shift.fixed32(.DSLL, core, word),
-        0o76 => shift.fixed32(.DSRL, core, word),
-        0o77 => shift.fixed32(.DSRA, core, word),
-        else => |funct| fw.log.todo("CPU Special funct: {o:02}", .{funct}),
-    }
+fn cop2(self: *Self, word: u32) void {
+    _ = word;
+    self.except(.{ .coprocessor_unusable = 2 });
 }
 
-fn regImm(core: *Self, word: u32) void {
-    switch (@as(u5, @truncate(word >> 16))) {
-        0o00 => control.branchUnary(.BLTZ, .{}, core, word),
-        0o01 => control.branchUnary(.BGEZ, .{}, core, word),
-        0o02 => control.branchUnary(.BLTZ, .{ .likely = true }, core, word),
-        0o03 => control.branchUnary(.BGEZ, .{ .likely = true }, core, word),
-        0o10 => control.iTypeTrap(.TGE, .signed, core, word),
-        0o11 => control.iTypeTrap(.TGE, .unsigned, core, word),
-        0o12 => control.iTypeTrap(.TLT, .signed, core, word),
-        0o13 => control.iTypeTrap(.TLT, .unsigned, core, word),
-        0o14 => control.iTypeTrap(.TEQ, .signed, core, word),
-        0o16 => control.iTypeTrap(.TNE, .signed, core, word),
-        0o20 => control.branchUnary(.BLTZ, .{ .link = true }, core, word),
-        0o21 => control.branchUnary(.BGEZ, .{ .link = true }, core, word),
-        0o22 => control.branchUnary(.BLTZ, .{ .link = true, .likely = true }, core, word),
-        0o23 => control.branchUnary(.BGEZ, .{ .link = true, .likely = true }, core, word),
-        else => |rt| fw.log.todo("CPU RegImm rt: {o:02}", .{rt}),
-    }
-}
+const main_table: [64]*const Instruction = blk: {
+    var ops: [64]*const Instruction = @splat(reserved);
+    ops[0o02] = control.j(.{});
+    ops[0o03] = control.j(.{ .link = true });
+    ops[0o04] = control.branchBinary(.BEQ, .{});
+    ops[0o05] = control.branchBinary(.BNE, .{});
+    ops[0o06] = control.branchUnary(.BLEZ, .{});
+    ops[0o07] = control.branchUnary(.BGTZ, .{});
+    ops[0o10] = alu.iTypeArithmetic(.ADD, .signed);
+    ops[0o11] = alu.iTypeArithmetic(.ADD, .unsigned);
+    ops[0o12] = alu.iTypeArithmetic(.SLT, .signed);
+    ops[0o13] = alu.iTypeArithmetic(.SLT, .unsigned);
+    ops[0o14] = alu.iTypeLogic(.AND);
+    ops[0o15] = alu.iTypeLogic(.OR);
+    ops[0o16] = alu.iTypeLogic(.XOR);
+    ops[0o17] = alu.lui;
+    ops[0o22] = cop2;
+    ops[0o24] = control.branchBinary(.BEQ, .{ .likely = true });
+    ops[0o25] = control.branchBinary(.BNE, .{ .likely = true });
+    ops[0o26] = control.branchUnary(.BLEZ, .{ .likely = true });
+    ops[0o27] = control.branchUnary(.BGTZ, .{ .likely = true });
+    ops[0o30] = alu.iTypeArithmetic(.DADD, .signed);
+    ops[0o31] = alu.iTypeArithmetic(.DADD, .unsigned);
+    ops[0o32] = memory.load(.LDL);
+    ops[0o33] = memory.load(.LDR);
+    ops[0o40] = memory.load(.LB);
+    ops[0o41] = memory.load(.LH);
+    ops[0o42] = memory.load(.LWL);
+    ops[0o43] = memory.load(.LW);
+    ops[0o44] = memory.load(.LBU);
+    ops[0o45] = memory.load(.LHU);
+    ops[0o46] = memory.load(.LWR);
+    ops[0o47] = memory.load(.LWU);
+    ops[0o50] = memory.store(.SB);
+    ops[0o51] = memory.store(.SH);
+    ops[0o52] = memory.store(.SWL);
+    ops[0o53] = memory.store(.SW);
+    ops[0o54] = memory.store(.SDL);
+    ops[0o55] = memory.store(.SDR);
+    ops[0o56] = memory.store(.SWR);
+    ops[0o57] = memory.cache;
+    ops[0o60] = memory.load(.LL);
+    ops[0o61] = Cp1.load(.LWC1);
+    ops[0o64] = memory.load(.LLD);
+    ops[0o65] = Cp1.load(.LDC1);
+    ops[0o67] = memory.load(.LD);
+    ops[0o70] = memory.store(.SC);
+    ops[0o71] = Cp1.store(.SWC1);
+    ops[0o74] = memory.store(.SCD);
+    ops[0o75] = Cp1.store(.SDC1);
+    ops[0o77] = memory.store(.SD);
+    break :blk ops;
+};
+
+const special_table: [64]*const Instruction = blk: {
+    var ops: [64]*const Instruction = @splat(reserved);
+    ops[0o00] = shift.fixed(.SLL);
+    ops[0o02] = shift.fixed(.SRL);
+    ops[0o03] = shift.fixed(.SRA);
+    ops[0o04] = shift.variable(.SLL);
+    ops[0o06] = shift.variable(.SRL);
+    ops[0o07] = shift.variable(.SRA);
+    ops[0o10] = control.jr;
+    ops[0o11] = control.jalr;
+    ops[0o14] = control.syscall;
+    ops[0o15] = control.break_;
+    ops[0o17] = control.sync;
+    ops[0o20] = mul_div.mfhi;
+    ops[0o21] = mul_div.mthi;
+    ops[0o22] = mul_div.mflo;
+    ops[0o23] = mul_div.mtlo;
+    ops[0o24] = shift.variable(.DSLL);
+    ops[0o26] = shift.variable(.DSRL);
+    ops[0o27] = shift.variable(.DSRA);
+    ops[0o30] = mul_div.mulDiv(.MULT);
+    ops[0o31] = mul_div.mulDiv(.MULTU);
+    ops[0o32] = mul_div.mulDiv(.DIV);
+    ops[0o33] = mul_div.mulDiv(.DIVU);
+    ops[0o34] = mul_div.mulDiv(.DMULT);
+    ops[0o35] = mul_div.mulDiv(.DMULTU);
+    ops[0o36] = mul_div.mulDiv(.DDIV);
+    ops[0o37] = mul_div.mulDiv(.DDIVU);
+    ops[0o40] = alu.rTypeArithmetic(.ADD, .signed);
+    ops[0o41] = alu.rTypeArithmetic(.ADD, .unsigned);
+    ops[0o42] = alu.rTypeArithmetic(.SUB, .signed);
+    ops[0o43] = alu.rTypeArithmetic(.SUB, .unsigned);
+    ops[0o44] = alu.rTypeLogic(.AND);
+    ops[0o45] = alu.rTypeLogic(.OR);
+    ops[0o46] = alu.rTypeLogic(.XOR);
+    ops[0o47] = alu.rTypeLogic(.NOR);
+    ops[0o52] = alu.rTypeArithmetic(.SLT, .signed);
+    ops[0o53] = alu.rTypeArithmetic(.SLT, .unsigned);
+    ops[0o54] = alu.rTypeArithmetic(.DADD, .signed);
+    ops[0o55] = alu.rTypeArithmetic(.DADD, .unsigned);
+    ops[0o56] = alu.rTypeArithmetic(.DSUB, .signed);
+    ops[0o57] = alu.rTypeArithmetic(.DSUB, .unsigned);
+    ops[0o60] = control.rTypeTrap(.TGE, .signed);
+    ops[0o61] = control.rTypeTrap(.TGE, .unsigned);
+    ops[0o62] = control.rTypeTrap(.TLT, .signed);
+    ops[0o63] = control.rTypeTrap(.TLT, .unsigned);
+    ops[0o64] = control.rTypeTrap(.TEQ, .signed);
+    ops[0o66] = control.rTypeTrap(.TNE, .signed);
+    ops[0o70] = shift.fixed(.DSLL);
+    ops[0o72] = shift.fixed(.DSRL);
+    ops[0o73] = shift.fixed(.DSRA);
+    ops[0o74] = shift.fixed32(.DSLL);
+    ops[0o76] = shift.fixed32(.DSRL);
+    ops[0o77] = shift.fixed32(.DSRA);
+    break :blk ops;
+};
+
+const regimm_table: [32]*const Instruction = blk: {
+    var ops: [32]*const Instruction = @splat(reserved);
+    ops[0o00] = control.branchUnary(.BLTZ, .{});
+    ops[0o01] = control.branchUnary(.BGEZ, .{});
+    ops[0o02] = control.branchUnary(.BLTZ, .{ .likely = true });
+    ops[0o03] = control.branchUnary(.BGEZ, .{ .likely = true });
+    ops[0o10] = control.iTypeTrap(.TGE, .signed);
+    ops[0o11] = control.iTypeTrap(.TGE, .unsigned);
+    ops[0o12] = control.iTypeTrap(.TLT, .signed);
+    ops[0o13] = control.iTypeTrap(.TLT, .unsigned);
+    ops[0o14] = control.iTypeTrap(.TEQ, .signed);
+    ops[0o16] = control.iTypeTrap(.TNE, .signed);
+    ops[0o20] = control.branchUnary(.BLTZ, .{ .link = true });
+    ops[0o21] = control.branchUnary(.BGEZ, .{ .link = true });
+    ops[0o22] = control.branchUnary(.BLTZ, .{ .link = true, .likely = true });
+    ops[0o23] = control.branchUnary(.BGEZ, .{ .link = true, .likely = true });
+    break :blk ops;
+};

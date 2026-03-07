@@ -412,26 +412,14 @@ fn getDeviceConst(self: *const Self) *const Device {
     return core.getDeviceConst();
 }
 
-pub fn cop0(core: *Core, word: u32) void {
+pub fn cop0(word: u32) *const Core.Instruction {
     const rs: u5 = @truncate(word >> 21);
 
     if (rs >= 0o20) {
-        return switch (@as(u6, @truncate(word))) {
-            0o01 => Tlb.tlbr(core, word),
-            0o02 => Tlb.tlbwi(core, word),
-            0o10 => Tlb.tlbp(core, word),
-            0o30 => eret(core, word),
-            else => |funct| fw.log.todo("CPU COP0 funct: {o:02}", .{funct}),
-        };
+        return special_table[@as(u5, @truncate(word))];
     }
 
-    switch (rs) {
-        0o00 => mfc0(core, word),
-        0o01 => dmfc0(core, word),
-        0o04 => mtc0(core, word),
-        0o05 => dmtc0(core, word),
-        else => fw.log.todo("CPU COP0 rs: {o:02}", .{rs}),
-    }
+    return main_table[@as(u4, @truncate(rs))];
 }
 
 fn mfc0(core: *Core, word: u32) void {
@@ -559,4 +547,22 @@ const TagLo = packed struct(u32) {
     p_state: u2 = 0,
     p_tag_lo: u20 = 0,
     __1: u4 = 0,
+};
+
+const main_table: [16]*const Core.Instruction = blk: {
+    var ops: [16]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o00] = mfc0;
+    ops[0o01] = dmfc0;
+    ops[0o04] = mtc0;
+    ops[0o05] = dmtc0;
+    break :blk ops;
+};
+
+const special_table: [32]*const Core.Instruction = blk: {
+    var ops: [32]*const Core.Instruction = @splat(Core.reserved);
+    ops[0o01] = Tlb.tlbr;
+    ops[0o02] = Tlb.tlbwi;
+    ops[0o10] = Tlb.tlbp;
+    ops[0o30] = eret;
+    break :blk ops;
 };

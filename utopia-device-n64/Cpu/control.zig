@@ -6,20 +6,24 @@ const JumpParams = struct {
     link: bool = false,
 };
 
-pub fn j(comptime params: JumpParams, core: *Core, word: u32) void {
-    const target = (core.pc & 0xf000_0000) | ((@as(u32, word) << 2) & 0x0fff_fffc);
+pub fn j(comptime params: JumpParams) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const target = (core.pc & 0xf000_0000) | ((@as(u32, word) << 2) & 0x0fff_fffc);
 
-    fw.log.trace("{X:08}: J{s} 0x{X:08}", .{
-        core.pc,
-        if (params.link) "AL" else "",
-        target,
-    });
+            fw.log.trace("{X:08}: J{s} 0x{X:08}", .{
+                core.pc,
+                if (params.link) "AL" else "",
+                target,
+            });
 
-    if (comptime params.link) {
-        core.link(.RA);
-    }
+            if (comptime params.link) {
+                core.link(.RA);
+            }
 
-    core.jump(target);
+            core.jump(target);
+        }
+    }.instr;
 }
 
 pub fn jr(core: *Core, word: u32) void {
@@ -63,31 +67,33 @@ pub const UnaryBranchOp = enum {
 pub fn branchUnary(
     comptime op: UnaryBranchOp,
     comptime params: Core.BranchParams,
-    core: *Core,
-    word: u32,
-) void {
-    const args: Core.IType = @bitCast(word);
-    const offset = fw.num.signExtend(u32, args.imm) << 2;
+) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const args: Core.IType = @bitCast(word);
+            const offset = fw.num.signExtend(u32, args.imm) << 2;
 
-    fw.log.trace("{X:08}: {t}{s}{s} {t}, {d}", .{
-        core.pc,
-        op,
-        if (params.link) "AL" else "",
-        if (params.likely) "L" else "",
-        args.rs,
-        fw.num.signed(offset),
-    });
+            fw.log.trace("{X:08}: {t}{s}{s} {t}, {d}", .{
+                core.pc,
+                op,
+                if (params.link) "AL" else "",
+                if (params.likely) "L" else "",
+                args.rs,
+                fw.num.signed(offset),
+            });
 
-    const value: i64 = @bitCast(core.get(args.rs));
+            const value: i64 = @bitCast(core.get(args.rs));
 
-    const taken = switch (comptime op) {
-        .BLTZ => value < 0,
-        .BLEZ => value <= 0,
-        .BGEZ => value >= 0,
-        .BGTZ => value > 0,
-    };
+            const taken = switch (comptime op) {
+                .BLTZ => value < 0,
+                .BLEZ => value <= 0,
+                .BGEZ => value >= 0,
+                .BGTZ => value > 0,
+            };
 
-    core.branch(params, offset, taken);
+            core.branch(params, offset, taken);
+        }
+    }.instr;
 }
 
 pub const BinaryBranchOp = enum {
@@ -98,31 +104,45 @@ pub const BinaryBranchOp = enum {
 pub fn branchBinary(
     comptime op: BinaryBranchOp,
     comptime params: Core.BranchParams,
-    core: *Core,
-    word: u32,
-) void {
-    const args: Core.IType = @bitCast(word);
-    const offset = fw.num.signExtend(u32, args.imm) << 2;
+) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const args: Core.IType = @bitCast(word);
+            const offset = fw.num.signExtend(u32, args.imm) << 2;
 
-    fw.log.trace("{X:08}: {t}{s}{s} {t}, {t}, {d}", .{
-        core.pc,
-        op,
-        if (params.link) "AL" else "",
-        if (params.likely) "L" else "",
-        args.rs,
-        args.rt,
-        fw.num.signed(offset),
-    });
+            fw.log.trace("{X:08}: {t}{s}{s} {t}, {t}, {d}", .{
+                core.pc,
+                op,
+                if (params.link) "AL" else "",
+                if (params.likely) "L" else "",
+                args.rs,
+                args.rt,
+                fw.num.signed(offset),
+            });
 
-    const lhs = core.get(args.rs);
-    const rhs = core.get(args.rt);
+            const lhs = core.get(args.rs);
+            const rhs = core.get(args.rt);
 
-    const taken = switch (comptime op) {
-        .BEQ => lhs == rhs,
-        .BNE => lhs != rhs,
-    };
+            const taken = switch (comptime op) {
+                .BEQ => lhs == rhs,
+                .BNE => lhs != rhs,
+            };
 
-    core.branch(params, offset, taken);
+            core.branch(params, offset, taken);
+        }
+    }.instr;
+}
+
+pub fn syscall(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: SYSCALL", .{core.pc});
+    core.except(.syscall);
+}
+
+pub fn break_(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: BREAK", .{core.pc});
+    core.except(.breakpoint);
 }
 
 pub const TrapOp = enum {
@@ -152,59 +172,51 @@ pub const TrapOp = enum {
     }
 };
 
-pub fn syscall(core: *Core, word: u32) void {
-    _ = word;
-    fw.log.trace("{X:08}: SYSCALL", .{core.pc});
-    core.except(.syscall);
-}
-
-pub fn break_(core: *Core, word: u32) void {
-    _ = word;
-    fw.log.trace("{X:08}: BREAK", .{core.pc});
-    core.except(.breakpoint);
-}
-
 pub fn iTypeTrap(
     comptime op: TrapOp,
     comptime signedness: std.builtin.Signedness,
-    core: *Core,
-    word: u32,
-) void {
-    const args: Core.IType = @bitCast(word);
-    const offset = fw.num.signExtend(u64, args.imm);
+) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const args: Core.IType = @bitCast(word);
+            const offset = fw.num.signExtend(u64, args.imm);
 
-    fw.log.trace("{X:08}: {t}I{s} {t}, {}", .{
-        core.pc,
-        op,
-        if (signedness == .unsigned) "U" else "",
-        args.rs,
-        fw.num.signed(offset),
-    });
+            fw.log.trace("{X:08}: {t}I{s} {t}, {}", .{
+                core.pc,
+                op,
+                if (signedness == .unsigned) "U" else "",
+                args.rs,
+                fw.num.signed(offset),
+            });
 
-    if (op.apply(signedness, core.get(args.rs), offset)) {
-        core.except(.trap);
-    }
+            if (op.apply(signedness, core.get(args.rs), offset)) {
+                core.except(.trap);
+            }
+        }
+    }.instr;
 }
 
 pub fn rTypeTrap(
     comptime op: TrapOp,
     comptime signedness: std.builtin.Signedness,
-    core: *Core,
-    word: u32,
-) void {
-    const args: Core.IType = @bitCast(word);
+) Core.Instruction {
+    return struct {
+        fn instr(core: *Core, word: u32) void {
+            const args: Core.IType = @bitCast(word);
 
-    fw.log.trace("{X:08}: {t}{s} {t}, {t}", .{
-        core.pc,
-        op,
-        if (signedness == .unsigned) "U" else "",
-        args.rs,
-        args.rt,
-    });
+            fw.log.trace("{X:08}: {t}{s} {t}, {t}", .{
+                core.pc,
+                op,
+                if (signedness == .unsigned) "U" else "",
+                args.rs,
+                args.rt,
+            });
 
-    if (op.apply(signedness, core.get(args.rs), core.get(args.rt))) {
-        core.except(.trap);
-    }
+            if (op.apply(signedness, core.get(args.rs), core.get(args.rt))) {
+                core.except(.trap);
+            }
+        }
+    }.instr;
 }
 
 pub fn sync(core: *Core, word: u32) void {
