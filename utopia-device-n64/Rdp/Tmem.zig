@@ -111,6 +111,10 @@ pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlErro
     std.hash.autoHashStrat(&l2_hasher, .{ width, height, pixels }, .Deep);
     const l2_key = l2_hasher.final();
 
+    if (self.l2_cache.get(l1_result.value_ptr.*)) |texture| {
+        texture.unref();
+    }
+
     l1_result.value_ptr.* = l2_key;
 
     const l2_result = self.l2_cache.getOrPut(l2_key);
@@ -323,6 +327,8 @@ fn invalidateL1Cache(self: *Self) void {
         if (self.l2_cache.peek(key.*)) |texture| {
             texture.unref();
         }
+
+        key.* = 0;
     }
 
     self.l1_cache.clear();
