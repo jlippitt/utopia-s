@@ -161,6 +161,18 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         texture = try core.tmem.createTexture(core.gpu, cmd.tile);
     }
 
+    if (comptime attr.z_buffer) {
+        const z: i64 = fw.num.truncate(i32, args[arg_index] >> 32);
+        const dzdx: i64 = fw.num.truncate(i32, args[arg_index]);
+        const dzde: i64 = fw.num.truncate(i32, args[arg_index + 1] >> 32);
+        const dzdy: i64 = fw.num.truncate(i32, args[arg_index + 1]);
+        fw.log.debug("Z: {d}, DZDX: {d}, DZDE: {d}, DZDY: {d}", .{ z, dzdx, dzde, dzdy });
+
+        vertices[0].pos[2] = float(z + ((high_y * dzde) >> 16));
+        vertices[1].pos[2] = float(z + ((mid_y * dzde) >> 16) + ((mid_x * dzdx) >> 16));
+        vertices[2].pos[2] = float(z + ((low_y * dzde) >> 16));
+    }
+
     fw.log.debug("Vertices: {any}", .{vertices});
 
     if (!core.display_list.hasCapacity(DisplayList.triangle_size)) {

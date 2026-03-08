@@ -42,7 +42,7 @@ pub fn init(
     errdefer gpu.releaseTransferBuffer(upload_buffer);
 
     var null_texture: Texture = .{};
-    try null_texture.activate(gpu, upload_buffer, 1, 1, &.{ 0, 0, 0, 0 });
+    try null_texture.activate(gpu, upload_buffer, 1, 1, &.{ 0, 0, 0, 255 });
 
     return .{
         .data = data[0..data_len],
