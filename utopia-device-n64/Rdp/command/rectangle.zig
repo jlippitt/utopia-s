@@ -64,13 +64,13 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         const tex_coords: TexCoords = @bitCast(args[1]);
         fw.log.debug("Tex Coords: {any}", .{tex_coords});
 
-        const s = @as(i64, tex_coords.s) << 5;
-        const t = @as(i64, tex_coords.t) << 5;
-        var dsdx: i64 = tex_coords.dsdx;
-        const dtdy: i64 = tex_coords.dtdy;
+        const s = @as(i64, tex_coords.s) << 7;
+        const t = @as(i64, tex_coords.t) << 7;
+        var dsdx: i64 = tex_coords.dsdx << 2;
+        const dtdy: i64 = tex_coords.dtdy << 2;
 
         if (cycle_type == .copy) {
-            dsdx = @divTrunc(dsdx, 64 / tile.bitsPerPixel());
+            dsdx = @divTrunc(dsdx, 256 / tile.bitsPerPixel());
         }
 
         const tile_x = @as(i64, tile.x()) << 12;
@@ -78,8 +78,8 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
 
         const sh = s - tile_x;
         const th = t - tile_y;
-        const sl = sh + ((dsdx * (@as(i64, xl) - xh)));
-        const tl = th + ((dtdy * (@as(i64, yl) - yh)));
+        const sl = sh + ((dsdx * (@as(i64, xl) - xh)) >> 2);
+        const tl = th + ((dtdy * (@as(i64, yl) - yh)) >> 2);
 
         const tex_left = @as(f32, @floatFromInt(sh)) / 4096.0;
         const tex_right = @as(f32, @floatFromInt(sl)) / 4096.0;
