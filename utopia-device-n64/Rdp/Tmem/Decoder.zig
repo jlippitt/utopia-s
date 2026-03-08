@@ -35,13 +35,9 @@ pub fn decode(
     padded_width: u32,
     tlut_type: Tmem.TlutType,
 ) error{ TextureTooBig, FormatNotSupported }![]const u8 {
-    const width = tile.width();
-    const height = tile.height();
-    const bpp = tile.bitsPerPixel();
+    const dst_image_size = padded_width * tile.height() * 4;
 
-    const src_image_size = std.math.divCeil(u32, width * height * bpp, 8) catch unreachable;
-
-    if (src_image_size > Tmem.data_size) {
+    if (dst_image_size > Tmem.max_texture_size) {
         return error.TextureTooBig;
     }
 
@@ -55,8 +51,6 @@ pub fn decode(
 
     const format = tile.pixelFormat();
     const size = tile.pixelSize();
-
-    const dst_image_size = padded_width * height * 4;
 
     switch (format) {
         .rgba => switch (size) {
@@ -102,7 +96,7 @@ fn deinterleave(
                 word = std.math.rotl(u64, word, 32);
             }
 
-            self.deinterleave_buf[dst_index] = word;
+            self.deinterleave_buf[dst_index & 0x1ff] = word;
 
             dst_index += 1;
             src_index += 1;
