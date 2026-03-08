@@ -90,8 +90,8 @@ pub fn activate(
             .depth_stencil_format = .depth16_unorm,
         },
         .depth_stencil_state = .{
-            .compare = .less_or_equal,
-            .enable_depth_test = options.z_compare_enable,
+            .compare = if (options.z_compare_enable) .less_or_equal else .always,
+            .enable_depth_test = true,
             .enable_depth_write = options.z_update_enable,
         },
     });
