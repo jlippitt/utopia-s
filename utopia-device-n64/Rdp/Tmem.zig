@@ -175,7 +175,7 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
     const dram_begin = @as(u32, self.image_address) + dram_y_offset;
     var dram_addr = dram_begin;
 
-    const tmem_width = std.math.divCeil(u32, @min(tile.width(), self.image_width) * bpp, 64) catch unreachable;
+    const tmem_width = std.math.divCeil(u32, tile.width() * bpp, 64) catch unreachable;
     var tmem_addr = tile.tmemAddress();
 
     for (0..tile.height()) |line| {
@@ -314,10 +314,12 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
         }
     }
 
-    const width = tile.width();
+    // Width must be padded to the nearest TMEM word
+    const pixels_per_word = 64 / tile.bitsPerPixel();
+    const width = (std.math.divCeil(u32, tile.width(), pixels_per_word) catch unreachable) * pixels_per_word;
     const height = tile.height();
 
-    const pixels = self.decoder.decode(tile, self.data, self.tlut_type) catch |err| {
+    const pixels = self.decoder.decode(tile, self.data, width, self.tlut_type) catch |err| {
         switch (err) {
             error.TextureTooBig => fw.log.warn("Texture too big: {} * {} * {}", .{
                 width,

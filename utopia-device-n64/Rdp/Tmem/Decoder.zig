@@ -32,6 +32,7 @@ pub fn decode(
     self: *Self,
     tile: Tile,
     tmem_data: *const [Tmem.data_len]u64,
+    padded_width: u32,
     tlut_type: Tmem.TlutType,
 ) error{ TextureTooBig, FormatNotSupported }![]const u8 {
     const width = tile.width();
@@ -55,7 +56,7 @@ pub fn decode(
     const format = tile.pixelFormat();
     const size = tile.pixelSize();
 
-    const dst_image_size = width * height * 4;
+    const dst_image_size = padded_width * height * 4;
 
     switch (format) {
         .rgba => switch (size) {
