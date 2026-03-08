@@ -30,6 +30,7 @@ const FragmentState = extern struct {
     prim_color: fw.color.RgbaUnorm = .{},
     env_color: fw.color.RgbaUnorm = .{},
     cycle_type: CycleType = .one_cycle,
+    cvg_times_alpha: u32 = 0,
 };
 
 pub const DisplayGroup = struct {
@@ -250,6 +251,14 @@ pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
 
     self.frag_state.cycle_type = cycle_type;
     fw.log.debug("Cycle Type: {t}", .{cycle_type});
+}
+
+pub fn setCvgTimesAlpha(self: *Self, cvg_times_alpha: bool) void {
+    self.frag_state_changed = self.frag_state_changed or
+        self.frag_state.cvg_times_alpha != @intFromBool(cvg_times_alpha);
+
+    self.frag_state.cvg_times_alpha = @intFromBool(cvg_times_alpha);
+    fw.log.debug("CVG Times Alpha: {}", .{cvg_times_alpha});
 }
 
 pub fn setFillColor(self: *Self, fill_color: u32) void {

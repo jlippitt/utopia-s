@@ -54,6 +54,7 @@ pub fn setOtherModes(core: *Core, word: u64) error{SdlError}!void {
 
     core.display_list.setCycleType(@enumFromInt(cmd.cycle_type));
     core.display_list.setBlendMode(cmd.blend.parse());
+    core.display_list.setCvgTimesAlpha(cmd.cvg_times_alpha);
     core.tmem.setTlutType(cmd.tlut_type);
 
     core.options.perspective_enable = cmd.persp_tex_en;

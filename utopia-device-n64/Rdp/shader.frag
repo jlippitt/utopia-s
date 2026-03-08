@@ -81,6 +81,7 @@ layout (std140, set = 3, binding = 0) uniform UniformBlock {
     vec4 prim_color;
     vec4 env_color;
     uint cycle_type;
+    uint cvg_times_alpha;
 };
 
 layout (std140, set = 3, binding = 1) uniform Transform {
@@ -234,6 +235,8 @@ float transformAxis(TransformAxis axis, float size, float coord) {
 }
 
 void main() {
+    gl_SampleMask[0] = ~0;
+
     if (cycle_type == CT_FILL) {
         f_color = vec4(fill_colors[uint(v_pos_x) & 3].xyz, 1.0);
         return;
@@ -259,6 +262,11 @@ void main() {
     f_color = combine(combine_1, tex0, f_color);
 
     float combined_a = f_color.a;
+
+    if (cvg_times_alpha != 0 && combined_a < 0.5) {
+        gl_SampleMask[0] = 0;
+        return;
+    }
 
     f_color = blend(blend_0, combined_a, f_color.rgb);
 
