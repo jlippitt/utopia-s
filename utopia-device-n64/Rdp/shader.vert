@@ -10,7 +10,7 @@ layout (location = 2) out float v_pos_x;
 void main() {
     float x = (a_pos.x / 320.0) * 2.0 - 1.0;
     float y = (a_pos.y / 240.0) * -2.0 + 1.0;
-    float z = a_pos.z / 65536.0;
+    float z = a_pos.z / 131072.0;
 
     gl_Position = vec4(x, y, z, 1.0);
 

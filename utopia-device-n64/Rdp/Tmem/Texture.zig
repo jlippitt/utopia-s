@@ -1,6 +1,5 @@
 const std = @import("std");
 const sdl3 = @import("sdl3");
-const fw = @import("framework");
 
 const Self = @This();
 

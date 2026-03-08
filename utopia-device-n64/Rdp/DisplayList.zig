@@ -1,8 +1,9 @@
-const fw = @import("framework");
 const std = @import("std");
-const Core = @import("./Core.zig");
-const Tmem = @import("./Tmem.zig");
 const sdl3 = @import("sdl3");
+const fw = @import("framework");
+const Core = @import("./Core.zig");
+const Pipeline = @import("./Pipeline.zig");
+const Tmem = @import("./Tmem.zig");
 const fragment = @import("./fragment.zig");
 
 const max_display_groups = 256;
@@ -32,9 +33,10 @@ const FragmentState = extern struct {
 };
 
 pub const DisplayGroup = struct {
-    len: u32,
+    pipeline: *Pipeline,
     texture: *Tmem.Texture,
     frag_state: FragmentState,
+    len: u32,
 };
 
 const Self = @This();
@@ -48,12 +50,15 @@ index_upload_buffer: sdl3.gpu.TransferBuffer,
 vertex_upload_buffer: sdl3.gpu.TransferBuffer,
 frag_state: FragmentState = .{},
 frag_state_changed: bool = false,
+pipeline: *Pipeline,
+pipeline_changed: bool = false,
 fill_color: u32 = 0,
 pixel_size: Core.PixelSize = .@"32",
 
 pub fn init(
     arena: *std.heap.ArenaAllocator,
     gpu: sdl3.gpu.Device,
+    pipeline: *Pipeline,
 ) error{ OutOfMemory, SdlError }!Self {
     const index_buffer = try gpu.createBuffer(.{
         .size = index_buffer_size,
@@ -79,6 +84,8 @@ pub fn init(
     });
     errdefer gpu.releaseTransferBuffer(vertex_upload_buffer);
 
+    pipeline.ref();
+
     return .{
         .display_groups = try .initCapacity(arena.allocator(), max_display_groups),
         .indices = try .initCapacity(arena.allocator(), max_buffer_len),
@@ -87,11 +94,13 @@ pub fn init(
         .vertex_buffer = vertex_buffer,
         .index_upload_buffer = index_upload_buffer,
         .vertex_upload_buffer = vertex_upload_buffer,
+        .pipeline = pipeline,
     };
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     self.clear();
+    self.pipeline.unref();
     gpu.releaseTransferBuffer(self.vertex_upload_buffer);
     gpu.releaseTransferBuffer(self.index_upload_buffer);
     gpu.releaseBuffer(self.vertex_buffer);
@@ -120,6 +129,7 @@ pub fn getCycleType(self: *Self) CycleType {
 
 pub fn clear(self: *Self) void {
     for (self.display_groups.items) |display_group| {
+        display_group.pipeline.unref();
         display_group.texture.unref();
     }
 
@@ -169,6 +179,17 @@ pub fn pushRectangle(
         bottom_left,
         bottom_right,
     });
+}
+
+pub fn setPipeline(self: *Self, pipeline: *Pipeline) void {
+    if (pipeline == self.pipeline) {
+        return;
+    }
+
+    self.pipeline.unref();
+    self.pipeline = pipeline;
+    self.pipeline.ref();
+    self.pipeline_changed = true;
 }
 
 pub fn setCombineMode(self: *Self, combine: [2]fragment.CombineMode) void {
@@ -308,18 +329,23 @@ fn pushPrimitive(
     self.vertices.appendSliceAssumeCapacity(vertices);
 
     if (self.getCurrentDisplayGroup()) |display_group| {
-        if (texture == display_group.texture and !self.frag_state_changed) {
+        if (texture == display_group.texture and
+            !self.frag_state_changed and
+            !self.pipeline_changed)
+        {
             display_group.len += @intCast(indices.len);
             return;
         }
     }
 
+    self.pipeline.ref();
     texture.ref();
 
     self.display_groups.appendAssumeCapacity(.{
-        .len = @intCast(indices.len),
+        .pipeline = self.pipeline,
         .texture = texture,
         .frag_state = self.frag_state,
+        .len = @intCast(indices.len),
     });
 
     self.frag_state_changed = false;

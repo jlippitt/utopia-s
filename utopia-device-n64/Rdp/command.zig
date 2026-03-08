@@ -47,7 +47,7 @@ pub fn setPrimDepth(core: *Core, word: u64) void {
     fw.log.debug("Primitive Depth: {d}", .{core.options.prim_depth});
 }
 
-pub fn setOtherModes(core: *Core, word: u64) void {
+pub fn setOtherModes(core: *Core, word: u64) error{SdlError}!void {
     const cmd: SetOtherModes = @bitCast(word);
 
     fw.log.debug("SET_OTHER_MODES: {any}", .{cmd});
@@ -59,11 +59,17 @@ pub fn setOtherModes(core: *Core, word: u64) void {
     core.options.perspective_enable = cmd.persp_tex_en;
     fw.log.debug("Perspective Enable: {}", .{core.options.perspective_enable});
 
-    core.options.z_update_enable = cmd.z_update_en;
-    fw.log.debug("Z-Update Enable: {}", .{core.options.z_update_enable});
-
     core.options.z_source = cmd.z_source_sel;
     fw.log.debug("Z Source: {t}", .{core.options.z_source});
+
+    core.options.pipeline.z_compare_enable = cmd.z_compare_en;
+    fw.log.debug("Z Compare Enable: {}", .{core.options.pipeline.z_compare_enable});
+
+    core.options.pipeline.z_update_enable = cmd.z_update_en;
+    fw.log.debug("Z Update Enable: {}", .{core.options.pipeline.z_update_enable});
+
+    const pipeline = try core.pipeline_cache.create(core.gpu, core.options.pipeline);
+    core.display_list.setPipeline(pipeline);
 }
 
 pub fn loadTlut(core: *Core, word: u64) void {

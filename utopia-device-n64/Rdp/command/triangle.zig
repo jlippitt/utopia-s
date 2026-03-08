@@ -27,7 +27,7 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         try core.target.update(core.gpu, core.getRdram());
     }
 
-    core.target.markDirty(core.options.z_update_enable);
+    core.target.markDirty(core.options.pipeline.z_update_enable);
 
     const cmd: Triangle = @bitCast(args[0]);
     fw.log.debug("TRIANGLE: {any}", .{cmd});

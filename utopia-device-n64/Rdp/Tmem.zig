@@ -55,6 +55,12 @@ pub fn init(
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
+    var iter = self.l2_cache.iterator();
+
+    while (iter.next()) |texture| {
+        texture.deactivate(gpu);
+    }
+
     self.null_texture.deactivate(gpu);
     gpu.releaseTransferBuffer(self.upload_buffer);
 }
@@ -311,10 +317,8 @@ pub fn loadBlock(self: *Self, rdram: []const u8, size: Tile.Size) void {
 fn invalidateL1Cache(self: *Self) void {
     var iter = self.l1_cache.iterator();
 
-    while (iter.next()) |value_ptr| {
-        const l2_key = value_ptr.*;
-
-        if (self.l2_cache.peek(l2_key)) |texture| {
+    while (iter.next()) |key| {
+        if (self.l2_cache.peek(key.*)) |texture| {
             texture.unref();
         }
     }

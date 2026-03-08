@@ -4,12 +4,11 @@ const fw = @import("framework");
 const sdl3 = @import("sdl3");
 const Rdp = @import("../Rdp.zig");
 const DisplayList = @import("./DisplayList.zig");
+const Pipeline = @import("./Pipeline.zig");
+const PipelineCache = @import("./PipelineCache.zig");
 const Target = @import("./Target.zig");
 const Tmem = @import("./Tmem.zig");
 const command = @import("./command.zig");
-
-const vertex_src align(@alignOf(u32)) = @embedFile("rdp.vert").*;
-const fragment_src align(@alignOf(u32)) = @embedFile("rdp.frag").*;
 
 const max_command_len = 22;
 const default_perspective = 1024.0;
@@ -19,15 +18,15 @@ pub const RenderError = sdl3.errors.Error;
 
 pub const Options = struct {
     perspective_enable: bool = false,
-    z_update_enable: bool = false,
     z_source: ZSource = .per_pixel,
     prim_depth: f32 = 0.0,
+    pipeline: Pipeline.Options = .{},
 };
 
 const Self = @This();
 
 gpu: sdl3.gpu.Device,
-pipeline: sdl3.gpu.GraphicsPipeline,
+pipeline_cache: PipelineCache,
 sampler: sdl3.gpu.Sampler,
 target: Target,
 tmem: Tmem,
@@ -41,80 +40,8 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     const gpu = try sdl3.gpu.Device.init(format_flags, builtin.mode == .Debug, null);
     errdefer gpu.deinit();
 
-    const vertex_shader = try gpu.createShader(.{
-        .code = &vertex_src,
-        .entry_point = "main",
-        .format = format_flags,
-        .stage = .vertex,
-    });
-    defer gpu.releaseShader(vertex_shader);
-
-    const fragment_shader = try gpu.createShader(.{
-        .code = &fragment_src,
-        .entry_point = "main",
-        .format = format_flags,
-        .stage = .fragment,
-        .num_samplers = 1,
-        .num_uniform_buffers = 1,
-    });
-    defer gpu.releaseShader(fragment_shader);
-
-    const pipeline = try gpu.createGraphicsPipeline(.{
-        .vertex_shader = vertex_shader,
-        .fragment_shader = fragment_shader,
-        .vertex_input_state = .{
-            .vertex_buffer_descriptions = &.{
-                .{
-                    .slot = 0,
-                    .input_rate = .vertex,
-                    .pitch = @sizeOf(Vertex),
-                },
-            },
-            .vertex_attributes = &.{
-                .{
-                    .buffer_slot = 0,
-                    .location = 0,
-                    .format = .f32x3,
-                    .offset = @offsetOf(Vertex, "pos"),
-                },
-                .{
-                    .buffer_slot = 0,
-                    .location = 1,
-                    .format = .f32x4,
-                    .offset = @offsetOf(Vertex, "color"),
-                },
-                .{
-                    .buffer_slot = 0,
-                    .location = 2,
-                    .format = .f32x3,
-                    .offset = @offsetOf(Vertex, "tex_coords"),
-                },
-            },
-        },
-        .target_info = .{
-            .color_target_descriptions = &.{
-                .{
-                    .format = .r8g8b8a8_unorm,
-                    .blend_state = .{
-                        .enable_blend = true,
-                        .source_color = .src_alpha,
-                        .destination_color = .one_minus_src_alpha,
-                        .color_blend = .add,
-                        .source_alpha = .src_alpha,
-                        .destination_alpha = .one_minus_src_alpha,
-                        .alpha_blend = .add,
-                    },
-                },
-            },
-            .depth_stencil_format = .depth16_unorm,
-        },
-        .depth_stencil_state = .{
-            .compare = .less_or_equal,
-            .enable_depth_test = true,
-            .enable_depth_write = true,
-        },
-    });
-    errdefer gpu.releaseGraphicsPipeline(pipeline);
+    var pipeline_cache = try PipelineCache.init(arena, gpu, format_flags);
+    errdefer pipeline_cache.deinit(gpu);
 
     const sampler = try gpu.createSampler(.{
         .mag_filter = .linear,
@@ -132,7 +59,9 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     var tmem = try Tmem.init(arena, gpu);
     errdefer tmem.deinit(gpu);
 
-    var display_list = try DisplayList.init(arena, gpu);
+    const default_pipeline = try pipeline_cache.create(gpu, .{});
+
+    var display_list = try DisplayList.init(arena, gpu, default_pipeline);
     errdefer display_list.deinit(gpu);
 
     const word_buf = try std.ArrayListUnmanaged(u64).initCapacity(
@@ -142,7 +71,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 
     return .{
         .gpu = gpu,
-        .pipeline = pipeline,
+        .pipeline_cache = pipeline_cache,
         .sampler = sampler,
         .target = target,
         .tmem = tmem,
@@ -158,7 +87,7 @@ pub fn deinit(self: *Self) void {
     self.tmem.deinit(self.gpu);
     self.target.deinit(self.gpu);
     self.gpu.releaseSampler(self.sampler);
-    self.gpu.releaseGraphicsPipeline(self.pipeline);
+    self.pipeline_cache.deinit(self.gpu);
     self.gpu.deinit();
 }
 
@@ -206,7 +135,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x29 => try command.syncFull(self),
         0x2d => command.setScissor(self, word),
         0x2e => command.setPrimDepth(self, word),
-        0x2f => command.setOtherModes(self, word),
+        0x2f => try command.setOtherModes(self, word),
         0x30 => command.loadTlut(self, word),
         0x32 => command.setTileSize(self, word),
         0x33 => command.loadBlock(self, word),
@@ -264,8 +193,6 @@ pub fn render(self: *Self) RenderError!void {
         const render_pass = command_buffer.beginRenderPass(&.{color_target}, depth_target);
         defer render_pass.end();
 
-        render_pass.bindGraphicsPipeline(self.pipeline);
-
         render_pass.bindIndexBuffer(.{
             .buffer = self.display_list.getIndexBuffer(),
             .offset = 0,
@@ -283,6 +210,8 @@ pub fn render(self: *Self) RenderError!void {
         var index_offset: u32 = 0;
 
         for (display_groups) |display_group| {
+            render_pass.bindGraphicsPipeline(display_group.pipeline.getBinding());
+
             command_buffer.pushFragmentUniformData(0, std.mem.asBytes(&display_group.frag_state));
 
             render_pass.bindFragmentSamplers(0, &.{
@@ -320,7 +249,7 @@ pub fn getRdramConst(self: *const Self) []const u8 {
 }
 
 pub const Vertex = extern struct {
-    pos: [3]f32 = .{ 0.0, 0.0, 32768.0 },
+    pos: [3]f32 = .{ 0.0, 0.0, -32768.0 },
     color: [4]f32 = @splat(0.0),
     tex_coords: [3]f32 = .{ 0.0, 0.0, default_perspective },
 };
