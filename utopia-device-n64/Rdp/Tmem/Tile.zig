@@ -69,17 +69,17 @@ pub fn y(self: *const Self) u32 {
 }
 
 pub fn width(self: *const Self) u32 {
-    return @as(u32, self.size.sh >> 2) - self.x() + 1;
+    return (@as(u32, self.size.sh >> 2) -| self.x()) + 1;
 }
 
 pub fn height(self: *const Self) u32 {
-    return @as(u32, self.size.th >> 2) - self.y() + 1;
+    return (@as(u32, self.size.th >> 2) -| self.y()) + 1;
 }
 
 pub fn cacheKey(self: *const Self) u64 {
     const hash_fields = .{
-        self.size.sh - self.size.sl,
-        self.size.th - self.size.tl,
+        self.size.sh -| self.size.sl,
+        self.size.th -| self.size.tl,
         self.desc.tmem_addr,
         self.desc.format,
         self.desc.size,
