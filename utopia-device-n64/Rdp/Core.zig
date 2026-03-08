@@ -19,6 +19,7 @@ pub const RenderError = sdl3.errors.Error;
 
 pub const Options = struct {
     perspective_enable: bool = false,
+    z_update_enable: bool = false,
 };
 
 const Self = @This();
@@ -103,6 +104,12 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
                     },
                 },
             },
+            .depth_stencil_format = .depth16_unorm,
+        },
+        .depth_stencil_state = .{
+            .compare = .less_or_equal,
+            .enable_depth_test = true,
+            .enable_depth_write = true,
         },
     });
     errdefer gpu.releaseGraphicsPipeline(pipeline);
@@ -210,6 +217,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x3b => command.setEnvColor(self, word),
         0x3c => command.setCombineMode(self, word),
         0x3d => command.setTextureImage(self, word),
+        0x3e => command.setDepthImage(self, word),
         0x3f => command.setColorImage(self, word),
         else => |cmd| fw.log.debug("Unknown Command: {X:02}", .{cmd}),
     }
@@ -236,10 +244,21 @@ pub fn render(self: *Self) RenderError!void {
         .store = .store,
     };
 
+    const depth_target: sdl3.gpu.DepthStencilTargetInfo = .{
+        .texture = surface.depth_texture,
+        .clear_depth = 1.0,
+        .load = .clear,
+        .store = .store,
+        .clear_stencil = 0.0,
+        .stencil_load = .do_not_care,
+        .stencil_store = .do_not_care,
+        .cycle = true,
+    };
+
     const command_buffer = try self.gpu.acquireCommandBuffer();
 
     {
-        const render_pass = command_buffer.beginRenderPass(&.{color_target}, null);
+        const render_pass = command_buffer.beginRenderPass(&.{color_target}, depth_target);
         defer render_pass.end();
 
         render_pass.bindGraphicsPipeline(self.pipeline);
@@ -298,7 +317,7 @@ pub fn getRdramConst(self: *const Self) []const u8 {
 }
 
 pub const Vertex = extern struct {
-    pos: [3]f32 = @splat(0.0),
+    pos: [3]f32 = .{ 0.0, 0.0, 65536.0 },
     color: [4]f32 = @splat(0.0),
     tex_coords: [3]f32 = .{ 0.0, 0.0, default_perspective },
 };

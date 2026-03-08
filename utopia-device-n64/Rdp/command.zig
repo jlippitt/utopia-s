@@ -51,6 +51,9 @@ pub fn setOtherModes(core: *Core, word: u64) void {
 
     core.options.perspective_enable = cmd.persp_tex_en;
     fw.log.debug("Perspective Enable: {}", .{core.options.perspective_enable});
+
+    core.options.z_update_enable = cmd.z_update_en;
+    fw.log.debug("Z-Update Enable: {}", .{core.options.z_update_enable});
 }
 
 pub fn loadTlut(core: *Core, word: u64) void {
@@ -123,6 +126,12 @@ pub fn setTextureImage(core: *Core, word: u64) void {
     const cmd: SetImage = @bitCast(word);
     fw.log.debug("SET_TEXTURE_IMAGE: {any}", .{cmd});
     core.tmem.setImageParams(cmd.dram_addr, @as(u24, cmd.width + 1));
+}
+
+pub fn setDepthImage(core: *Core, word: u64) void {
+    const address: u24 = @truncate(word);
+    fw.log.debug("SET_DEPTH_IMAGE: {X:08}", .{address});
+    core.target.setDepthImageAddress(address);
 }
 
 pub fn setColorImage(core: *Core, word: u64) void {
