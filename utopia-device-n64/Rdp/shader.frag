@@ -249,7 +249,7 @@ void main() {
     vec4 tex0 = texture(tex0_sampler, vec2(tex0_x, tex0_y));
 
     if (cycle_type == CT_COPY) {
-        f_color = vec4(tex0.xyz, 1.0);
+        f_color = vec4(tex0);
         return;
     }
 
