@@ -16,6 +16,11 @@ pub const max_texture_size = data_size * 8;
 const l1_cache_size = 256;
 const l2_cache_size = 1024;
 
+pub const TextureDescriptor = struct {
+    texture: *Texture,
+    desc: Tile.Descriptor,
+};
+
 const Self = @This();
 
 data: *[data_len]u64,
@@ -71,73 +76,25 @@ pub fn getTile(self: *const Self, index: u3) Tile {
     return self.tiles[index];
 }
 
-pub fn nullTexture(self: *Self) *Texture {
-    return &self.null_texture;
+pub fn nullTexture(self: *Self) TextureDescriptor {
+    return .{
+        .texture = &self.null_texture,
+        .desc = .{},
+    };
 }
 
-pub fn createTexture(self: *Self, gpu: sdl3.gpu.Device, index: u3) error{SdlError}!*Texture {
+pub fn createTexture(
+    self: *Self,
+    gpu: sdl3.gpu.Device,
+    index: u3,
+) error{SdlError}!TextureDescriptor {
     const tile = self.tiles[index];
+    const texture = try self.resolveTexture(gpu, tile);
 
-    const width = tile.width();
-    const height = tile.height();
-
-    const l1_result = self.l1_cache.getOrPut(tile.cacheKey());
-
-    if (l1_result.found_existing) {
-        const l2_key = l1_result.value_ptr.*;
-
-        if (self.l2_cache.get(l2_key)) |texture| {
-            return texture;
-        }
-    }
-
-    const pixels = self.decoder.decode(tile, self.data, self.tlut_type) catch |err| {
-        switch (err) {
-            error.TextureTooBig => fw.log.warn("Texture too big: {} * {} * {}", .{
-                width,
-                height,
-                tile.bitsPerPixel(),
-            }),
-            error.FormatNotSupported => fw.log.warn("Texture format unsupported: {t} {t}", .{
-                tile.pixelFormat(),
-                tile.pixelSize(),
-            }),
-        }
-
-        return self.nullTexture();
+    return .{
+        .texture = texture,
+        .desc = tile.desc,
     };
-
-    var l2_hasher = std.hash.Wyhash.init(0);
-    std.hash.autoHashStrat(&l2_hasher, .{ width, height, pixels }, .Deep);
-    const l2_key = l2_hasher.final();
-
-    if (self.l2_cache.get(l1_result.value_ptr.*)) |texture| {
-        texture.unref();
-    }
-
-    l1_result.value_ptr.* = l2_key;
-
-    const l2_result = self.l2_cache.getOrPut(l2_key);
-    const texture = l2_result.value_ptr;
-
-    if (l2_result.found_existing) {
-        texture.ref();
-        return texture;
-    }
-
-    if (texture.hasRefs()) {
-        fw.log.panic("Texture cache full", .{});
-    }
-
-    if (texture.isActive()) {
-        texture.deactivate(gpu);
-    }
-
-    try texture.activate(gpu, self.upload_buffer, width, height, pixels);
-
-    texture.ref();
-
-    return texture;
 }
 
 pub fn setImageParams(self: *Self, address: u24, width: u24) void {
@@ -344,4 +301,67 @@ fn invalidateL1Cache(self: *Self) void {
     }
 
     self.l1_cache.clear();
+}
+
+fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}!*Texture {
+    const l1_result = self.l1_cache.getOrPut(tile.cacheKey());
+
+    if (l1_result.found_existing) {
+        const l2_key = l1_result.value_ptr.*;
+
+        if (self.l2_cache.get(l2_key)) |texture| {
+            return texture;
+        }
+    }
+
+    const width = tile.width();
+    const height = tile.height();
+
+    const pixels = self.decoder.decode(tile, self.data, self.tlut_type) catch |err| {
+        switch (err) {
+            error.TextureTooBig => fw.log.warn("Texture too big: {} * {} * {}", .{
+                width,
+                height,
+                tile.bitsPerPixel(),
+            }),
+            error.FormatNotSupported => fw.log.warn("Texture format unsupported: {t} {t}", .{
+                tile.pixelFormat(),
+                tile.pixelSize(),
+            }),
+        }
+
+        return &self.null_texture;
+    };
+
+    var l2_hasher = std.hash.Wyhash.init(0);
+    std.hash.autoHashStrat(&l2_hasher, .{ width, height, pixels }, .Deep);
+    const l2_key = l2_hasher.final();
+
+    if (self.l2_cache.get(l1_result.value_ptr.*)) |texture| {
+        texture.unref();
+    }
+
+    l1_result.value_ptr.* = l2_key;
+
+    const l2_result = self.l2_cache.getOrPut(l2_key);
+    const texture = l2_result.value_ptr;
+
+    if (l2_result.found_existing) {
+        texture.ref();
+        return texture;
+    }
+
+    if (texture.hasRefs()) {
+        fw.log.panic("Texture cache full", .{});
+    }
+
+    if (texture.isActive()) {
+        texture.deactivate(gpu);
+    }
+
+    try texture.activate(gpu, self.upload_buffer, width, height, pixels);
+
+    texture.ref();
+
+    return texture;
 }

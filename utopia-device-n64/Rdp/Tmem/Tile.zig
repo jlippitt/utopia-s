@@ -1,6 +1,17 @@
 const std = @import("std");
 const Core = @import("../Core.zig");
 
+pub const TransformAxis = extern struct {
+    clamp: u32,
+    mirror: u32,
+    mask: u32,
+    shift: u32,
+};
+
+pub const Transform = extern struct {
+    s: TransformAxis,
+    t: TransformAxis,
+};
 pub const Descriptor = packed struct(u64) {
     shift_s: u4 = 0,
     mask_s: u4 = 0,
@@ -19,6 +30,23 @@ pub const Descriptor = packed struct(u64) {
     size: Core.PixelSize = .@"4",
     format: Core.PixelFormat = .rgba,
     __2: u8 = 0,
+
+    pub fn transform(self: @This()) Transform {
+        return .{
+            .s = .{
+                .clamp = @intFromBool(self.clamp_s),
+                .mirror = @intFromBool(self.mirror_s),
+                .mask = self.mask_s,
+                .shift = self.shift_s,
+            },
+            .t = .{
+                .clamp = @intFromBool(self.clamp_t),
+                .mirror = @intFromBool(self.mirror_t),
+                .mask = self.mask_t,
+                .shift = self.shift_t,
+            },
+        };
+    }
 };
 
 pub const Size = packed struct(u64) {

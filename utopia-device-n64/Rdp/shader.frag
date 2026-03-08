@@ -61,6 +61,13 @@ struct BlendMode {
     uint b;
 };
 
+struct TransformAxis {
+    uint clamp;
+    uint mirror;
+    uint mask;
+    uint shift;
+};
+
 layout(set = 2, binding = 0) uniform sampler2D tex0_sampler;
 
 layout (std140, set = 3, binding = 0) uniform UniformBlock {
@@ -74,6 +81,11 @@ layout (std140, set = 3, binding = 0) uniform UniformBlock {
     vec4 prim_color;
     vec4 env_color;
     uint cycle_type;
+};
+
+layout (std140, set = 3, binding = 1) uniform Transform {
+    TransformAxis tex0_transform_x;
+    TransformAxis tex0_transform_y;
 };
 
 layout (location = 0) in vec4 v_color;
@@ -192,6 +204,35 @@ vec4 combine(CombineMode combine, vec4 tex0, vec4 combined) {
     );
 }
 
+float transformAxis(TransformAxis axis, float size, float coord) {
+    if (axis.shift < 11) {
+        coord /= float(int(1) << axis.shift);
+    } else {
+        coord *= float(int(1) << (16 - axis.shift));
+    }
+
+    if (axis.clamp != 0) {
+        coord = clamp(coord, 0.0, size - 0.25);
+    }
+
+    if (axis.mask != 0) {
+        float mask_bits = float(int(1) << axis.mask);
+        float base = mod(coord, mask_bits * 2.0);
+
+        if (base < 0.0) {
+            base = mask_bits * 2.0 + base;
+        }
+
+        coord = mod(base, mask_bits);
+
+        if (axis.mirror != 0 && base >= mask_bits) {
+            coord = mask_bits - coord;
+        }
+    }
+
+    return coord / size;
+}
+
 void main() {
     if (cycle_type == CT_FILL) {
         f_color = vec4(fill_colors[uint(v_pos_x) & 3].xyz, 1.0);
@@ -200,7 +241,9 @@ void main() {
 
     vec2 tex_coords = v_tex_coords.xy / (v_tex_coords.z / 1024.0);
     vec2 tex0_size = textureSize(tex0_sampler, 0);
-    vec4 tex0 = texture(tex0_sampler, tex_coords / tex0_size);
+    float tex0_x = transformAxis(tex0_transform_x, tex0_size.x, tex_coords.x);
+    float tex0_y = transformAxis(tex0_transform_y, tex0_size.y, tex_coords.y);
+    vec4 tex0 = texture(tex0_sampler, vec2(tex0_x, tex0_y));
 
     if (cycle_type == CT_COPY) {
         f_color = vec4(tex0.xyz, 1.0);

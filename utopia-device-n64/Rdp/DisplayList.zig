@@ -34,7 +34,7 @@ const FragmentState = extern struct {
 
 pub const DisplayGroup = struct {
     pipeline: *Pipeline,
-    texture: *Tmem.Texture,
+    tex0: Tmem.TextureDescriptor,
     frag_state: FragmentState,
     len: u32,
 };
@@ -130,7 +130,7 @@ pub fn getCycleType(self: *Self) CycleType {
 pub fn clear(self: *Self) void {
     for (self.display_groups.items) |display_group| {
         display_group.pipeline.unref();
-        display_group.texture.unref();
+        display_group.tex0.texture.unref();
     }
 
     self.display_groups.clearRetainingCapacity();
@@ -147,12 +147,12 @@ pub fn hasCapacity(self: *const Self, len: usize) bool {
 
 pub fn pushTriangle(
     self: *Self,
-    texture: *Tmem.Texture,
+    tex0: Tmem.TextureDescriptor,
     vertices: *const [3]Core.Vertex,
 ) void {
     const base_index = self.vertices.items.len;
 
-    self.pushPrimitive(texture, vertices, &.{
+    self.pushPrimitive(tex0, vertices, &.{
         @intCast(base_index),
         @intCast(base_index + 1),
         @intCast(base_index + 2),
@@ -161,7 +161,7 @@ pub fn pushTriangle(
 
 pub fn pushRectangle(
     self: *Self,
-    texture: *Tmem.Texture,
+    tex0: Tmem.TextureDescriptor,
     vertices: *const [4]Core.Vertex,
 ) void {
     const base_index = self.vertices.items.len;
@@ -171,7 +171,7 @@ pub fn pushRectangle(
     const top_right: Core.Index = @intCast(base_index + 2);
     const bottom_right: Core.Index = @intCast(base_index + 3);
 
-    self.pushPrimitive(texture, vertices, &.{
+    self.pushPrimitive(tex0, vertices, &.{
         top_left,
         bottom_left,
         top_right,
@@ -321,7 +321,7 @@ pub fn uploadBuffers(self: *Self, gpu: sdl3.gpu.Device) error{SdlError}!void {
 
 fn pushPrimitive(
     self: *Self,
-    texture: *Tmem.Texture,
+    tex0: Tmem.TextureDescriptor,
     vertices: []const Core.Vertex,
     indices: []const Core.Index,
 ) void {
@@ -329,7 +329,7 @@ fn pushPrimitive(
     self.vertices.appendSliceAssumeCapacity(vertices);
 
     if (self.getCurrentDisplayGroup()) |display_group| {
-        if (texture == display_group.texture and
+        if (std.meta.eql(tex0, display_group.tex0) and
             !self.frag_state_changed and
             !self.pipeline_changed)
         {
@@ -339,11 +339,11 @@ fn pushPrimitive(
     }
 
     self.pipeline.ref();
-    texture.ref();
+    tex0.texture.ref();
 
     self.display_groups.appendAssumeCapacity(.{
         .pipeline = self.pipeline,
-        .texture = texture,
+        .tex0 = tex0,
         .frag_state = self.frag_state,
         .len = @intCast(indices.len),
     });

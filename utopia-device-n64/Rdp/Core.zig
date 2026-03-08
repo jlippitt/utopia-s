@@ -212,11 +212,19 @@ pub fn render(self: *Self) RenderError!void {
         for (display_groups) |display_group| {
             render_pass.bindGraphicsPipeline(display_group.pipeline.getBinding());
 
-            command_buffer.pushFragmentUniformData(0, std.mem.asBytes(&display_group.frag_state));
+            command_buffer.pushFragmentUniformData(
+                0,
+                std.mem.asBytes(&display_group.frag_state),
+            );
+
+            command_buffer.pushFragmentUniformData(
+                1,
+                std.mem.asBytes(&display_group.tex0.desc.transform()),
+            );
 
             render_pass.bindFragmentSamplers(0, &.{
                 .{
-                    .texture = display_group.texture.getBinding(),
+                    .texture = display_group.tex0.texture.getBinding(),
                     .sampler = self.sampler,
                 },
             });
