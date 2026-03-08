@@ -166,6 +166,10 @@ pub fn setTileSize(self: *Self, size: Tile.Size) void {
 }
 
 pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    if (self.image_address >= rdram.len) {
+        return;
+    }
+
     self.invalidateL1Cache();
 
     // Note: Loading TLUT data does not update the size of stored tile
@@ -196,6 +200,10 @@ pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
 }
 
 pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    if (self.image_address >= rdram.len) {
+        return;
+    }
+
     self.invalidateL1Cache();
 
     self.setTileSize(size);
@@ -241,6 +249,10 @@ pub fn loadTile(self: *Self, rdram: []const u8, size: Tile.Size) void {
 }
 
 pub fn loadBlock(self: *Self, rdram: []const u8, size: Tile.Size) void {
+    if (self.image_address >= rdram.len) {
+        return;
+    }
+
     self.invalidateL1Cache();
 
     // Loading block data does not update the size of stored tile
