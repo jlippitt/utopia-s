@@ -82,6 +82,8 @@ layout (std140, set = 3, binding = 0) uniform UniformBlock {
     vec4 env_color;
     uint cycle_type;
     uint cvg_times_alpha;
+    uint color_on_cvg;
+    uint alpha_compare;
 };
 
 layout (std140, set = 3, binding = 1) uniform Transform {
@@ -264,6 +266,16 @@ void main() {
     float combined_a = f_color.a;
 
     if (cvg_times_alpha != 0 && combined_a < 0.5) {
+        gl_SampleMask[0] = 0;
+        return;
+    }
+
+    if (color_on_cvg != 0 && combined_a == 0.0) {
+        gl_SampleMask[0] = 0;
+        return;
+    }
+
+    if (alpha_compare != 0 && combined_a < blend_color.a) {
         gl_SampleMask[0] = 0;
         return;
     }

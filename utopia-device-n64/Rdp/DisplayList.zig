@@ -31,6 +31,8 @@ const FragmentState = extern struct {
     env_color: fw.color.RgbaUnorm = .{},
     cycle_type: CycleType = .one_cycle,
     cvg_times_alpha: u32 = 0,
+    color_on_cvg: u32 = 0,
+    alpha_compare: u32 = 0,
 };
 
 pub const DisplayGroup = struct {
@@ -259,6 +261,22 @@ pub fn setCvgTimesAlpha(self: *Self, cvg_times_alpha: bool) void {
 
     self.frag_state.cvg_times_alpha = @intFromBool(cvg_times_alpha);
     fw.log.debug("CVG Times Alpha: {}", .{cvg_times_alpha});
+}
+
+pub fn setColorOnCvg(self: *Self, color_on_cvg: bool) void {
+    self.frag_state_changed = self.frag_state_changed or
+        self.frag_state.color_on_cvg != @intFromBool(color_on_cvg);
+
+    self.frag_state.color_on_cvg = @intFromBool(color_on_cvg);
+    fw.log.debug("Color On CVG: {}", .{color_on_cvg});
+}
+
+pub fn setAlphaCompare(self: *Self, alpha_compare: bool) void {
+    self.frag_state_changed = self.frag_state_changed or
+        self.frag_state.alpha_compare != @intFromBool(alpha_compare);
+
+    self.frag_state.alpha_compare = @intFromBool(alpha_compare);
+    fw.log.debug("Alpha Compare: {}", .{alpha_compare});
 }
 
 pub fn setFillColor(self: *Self, fill_color: u32) void {
