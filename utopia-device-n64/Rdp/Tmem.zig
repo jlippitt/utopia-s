@@ -55,6 +55,8 @@ pub fn init(
 }
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
+    self.invalidateL1Cache();
+
     var iter = self.l2_cache.iterator();
 
     while (iter.next()) |texture| {
