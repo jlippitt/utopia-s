@@ -257,7 +257,7 @@ pub fn getRdramConst(self: *const Self) []const u8 {
 }
 
 pub const Vertex = extern struct {
-    pos: [3]f32 = .{ 0.0, 0.0, -32768.0 },
+    pos: [3]f32 = .{ 0.0, 0.0, -1.0 },
     color: [4]f32 = @splat(0.0),
     tex_coords: [3]f32 = .{ 0.0, 0.0, default_perspective },
 };
