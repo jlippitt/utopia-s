@@ -247,12 +247,12 @@ pub fn render(self: *Self) RenderError!void {
     const depth_target: sdl3.gpu.DepthStencilTargetInfo = .{
         .texture = surface.depth_texture,
         .clear_depth = 1.0,
-        .load = .clear,
+        .load = .load,
         .store = .store,
         .clear_stencil = 0.0,
         .stencil_load = .do_not_care,
         .stencil_store = .do_not_care,
-        .cycle = true,
+        .cycle = false,
     };
 
     const command_buffer = try self.gpu.acquireCommandBuffer();
@@ -317,7 +317,7 @@ pub fn getRdramConst(self: *const Self) []const u8 {
 }
 
 pub const Vertex = extern struct {
-    pos: [3]f32 = .{ 0.0, 0.0, 65536.0 },
+    pos: [3]f32 = .{ 0.0, 0.0, 32768.0 },
     color: [4]f32 = @splat(0.0),
     tex_coords: [3]f32 = .{ 0.0, 0.0, default_perspective },
 };
