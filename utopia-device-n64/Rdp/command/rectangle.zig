@@ -106,6 +106,12 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         texture = try core.tmem.createTexture(core.gpu, cmd.tile);
     }
 
+    if (core.options.z_source == .prim_depth) {
+        for (&vertices) |*vertex| {
+            vertex.pos[2] = core.options.prim_depth;
+        }
+    }
+
     fw.log.debug("Vertices: {any}", .{vertices});
 
     if (!core.display_list.hasCapacity(DisplayList.rectangle_size)) {

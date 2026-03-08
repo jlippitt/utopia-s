@@ -161,7 +161,11 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         texture = try core.tmem.createTexture(core.gpu, cmd.tile);
     }
 
-    if (comptime attr.z_buffer) {
+    if (core.options.z_source == .prim_depth) {
+        for (&vertices) |*vertex| {
+            vertex.pos[2] = core.options.prim_depth;
+        }
+    } else if (comptime attr.z_buffer) {
         const z: i64 = fw.num.truncate(i32, args[arg_index] >> 32);
         const dzdx: i64 = fw.num.truncate(i32, args[arg_index]);
         const dzde: i64 = fw.num.truncate(i32, args[arg_index + 1] >> 32);

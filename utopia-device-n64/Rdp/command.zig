@@ -40,6 +40,13 @@ pub fn setScissor(core: *Core, word: u64) void {
     core.target.setImageHeight(cmd.yl >> 2);
 }
 
+pub fn setPrimDepth(core: *Core, word: u64) void {
+    const depth: u32 = @truncate(word);
+    fw.log.debug("SET_PRIM_DEPTH: {X:08}", .{depth});
+    core.options.prim_depth = @floatFromInt((depth >> 16) & 0x7fff);
+    fw.log.debug("Primitive Depth: {d}", .{core.options.prim_depth});
+}
+
 pub fn setOtherModes(core: *Core, word: u64) void {
     const cmd: SetOtherModes = @bitCast(word);
 
@@ -54,6 +61,9 @@ pub fn setOtherModes(core: *Core, word: u64) void {
 
     core.options.z_update_enable = cmd.z_update_en;
     fw.log.debug("Z-Update Enable: {}", .{core.options.z_update_enable});
+
+    core.options.z_source = cmd.z_source_sel;
+    fw.log.debug("Z Source: {t}", .{core.options.z_source});
 }
 
 pub fn loadTlut(core: *Core, word: u64) void {
@@ -169,7 +179,7 @@ const SetScissor = packed struct(u64) {
 const SetOtherModes = packed struct(u64) {
     alpha_compare_en: bool,
     dither_alpha_en: bool,
-    z_source_sel: bool,
+    z_source_sel: Core.ZSource,
     antialias_en: bool,
     z_compare_en: bool,
     z_update_en: bool,

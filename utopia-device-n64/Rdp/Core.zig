@@ -20,6 +20,8 @@ pub const RenderError = sdl3.errors.Error;
 pub const Options = struct {
     perspective_enable: bool = false,
     z_update_enable: bool = false,
+    z_source: ZSource = .per_pixel,
+    prim_depth: f32 = 0.0,
 };
 
 const Self = @This();
@@ -203,6 +205,7 @@ pub fn step(self: *Self, word: u64) RenderError!void {
         0x28 => command.syncTile(self),
         0x29 => try command.syncFull(self),
         0x2d => command.setScissor(self, word),
+        0x2e => command.setPrimDepth(self, word),
         0x2f => command.setOtherModes(self, word),
         0x30 => command.loadTlut(self, word),
         0x32 => command.setTileSize(self, word),
@@ -338,4 +341,9 @@ pub const PixelFormat = enum(u3) {
     ia,
     i,
     _,
+};
+
+pub const ZSource = enum(u1) {
+    per_pixel,
+    prim_depth,
 };
