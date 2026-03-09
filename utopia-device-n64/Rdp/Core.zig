@@ -221,7 +221,7 @@ pub fn render(self: *Self) RenderError!void {
         for (display_groups) |display_group| {
             render_pass.bindGraphicsPipeline(display_group.pipeline.getBinding());
 
-            // render_pass.setScissor(display_group.scissor);
+            render_pass.setScissor(display_group.scissor);
 
             command_buffer.pushFragmentUniformData(
                 0,

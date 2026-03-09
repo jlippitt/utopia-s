@@ -1,9 +1,10 @@
 const sdl3 = @import("sdl3");
 const fw = @import("framework");
 
+pub const msaa = 4;
+
 const max_width = 1024;
 const max_height = 1024;
-const msaa = 4;
 
 const Self = @This();
 
