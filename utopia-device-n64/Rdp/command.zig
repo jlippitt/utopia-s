@@ -37,7 +37,15 @@ pub fn syncFull(core: *Core) Core.RenderError!void {
 pub fn setScissor(core: *Core, word: u64) void {
     const cmd: SetScissor = @bitCast(word);
     fw.log.debug("SET_SCISSOR: {any}", .{cmd});
+
     core.target.setImageHeight(cmd.yl >> 2);
+
+    core.scissor = .{
+        .x = cmd.xh >> 2,
+        .y = cmd.yh >> 2,
+        .w = (cmd.xl - cmd.xh) >> 2,
+        .h = (cmd.yl - cmd.yh) >> 2,
+    };
 }
 
 pub fn setPrimDepth(core: *Core, word: u64) void {

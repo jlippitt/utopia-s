@@ -31,6 +31,7 @@ sampler: sdl3.gpu.Sampler,
 target: Target,
 tmem: Tmem,
 display_list: DisplayList,
+scissor: sdl3.rect.Rect(i32),
 word_buf: std.ArrayListUnmanaged(u64),
 options: Options = .{},
 
@@ -76,6 +77,12 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .target = target,
         .tmem = tmem,
         .display_list = display_list,
+        .scissor = .{
+            .x = 0,
+            .y = 0,
+            .w = 0,
+            .h = 0,
+        },
         .word_buf = word_buf,
     };
 }
@@ -192,6 +199,8 @@ pub fn render(self: *Self) RenderError!void {
     {
         const render_pass = command_buffer.beginRenderPass(&.{color_target}, depth_target);
         defer render_pass.end();
+
+        render_pass.setScissor(self.scissor);
 
         render_pass.bindIndexBuffer(.{
             .buffer = self.display_list.getIndexBuffer(),
