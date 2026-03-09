@@ -5,14 +5,19 @@ const Cp0 = @import("./Cp0.zig");
 
 const size = 512;
 
+const Tag = packed struct(u32) {
+    invalid: bool = true,
+    __: u11 = 0,
+    p_tag: u20 = 0,
+};
+
 const Entry = struct {
     instr: *const Core.Instruction = Core.decode(0),
     word: u32 = 0,
 };
 
 const Line = struct {
-    valid: bool = false,
-    p_tag: u20 = 0,
+    tag: Tag = .{},
     data: [8]Entry = @splat(.{}),
 };
 
@@ -35,12 +40,11 @@ pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
 pub fn get(self: *Self, vaddr: u32, paddr: u32) Entry {
     const index: u9 = @truncate(vaddr >> 5);
     const line = &self.lines[index];
-    const p_tag: u20 = @truncate(paddr >> 12);
+    const tag = paddr & 0xffff_f000;
 
-    if (!line.valid or p_tag != line.p_tag) {
+    if (tag != @as(u32, @bitCast(line.tag))) {
         @branchHint(.unlikely);
-        line.p_tag = p_tag;
-        line.valid = true;
+        line.tag = @bitCast(tag);
 
         const device = self.getCore().getDevice();
         const base_address = paddr & ~@as(u32, 0x1f);
@@ -64,25 +68,25 @@ pub fn get(self: *Self, vaddr: u32, paddr: u32) Entry {
 pub fn invalidate(self: *Self, vaddr: u32) void {
     const index: u9 = @truncate(vaddr >> 5);
     const line = &self.lines[index];
-    line.valid = false;
+    line.tag.invalid = true;
     fw.log.trace("ICache Invalidate: {}", .{index});
 }
 
 pub fn indexStoreTag(self: *Self, vaddr: u32, tag_lo: Cp0.TagLo) void {
     const index: u9 = @truncate(vaddr >> 5);
     const line = &self.lines[index];
-    line.valid = (tag_lo.p_state & 0b10) != 0;
-    line.p_tag = tag_lo.p_tag_lo;
+    line.tag.invalid = (tag_lo.p_state & 0b10) == 0;
+    line.tag.p_tag = tag_lo.p_tag_lo;
     fw.log.trace("ICache Index Store Tag: {} <= {any}", .{ index, tag_lo });
 }
 
 pub fn hitInvalidate(self: *Self, vaddr: u32, paddr: u32) void {
     const index: u9 = @truncate(vaddr >> 5);
     const line = &self.lines[index];
-    const p_tag: u20 = @truncate(paddr >> 12);
+    const tag = paddr & 0xffff_f000;
 
-    if (p_tag == line.p_tag) {
-        line.valid = false;
+    if (tag == @as(u32, @bitCast(line.tag))) {
+        line.tag.invalid = true;
     }
 
     fw.log.trace("ICache Hit Invalidate: {}", .{index});
