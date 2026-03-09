@@ -18,6 +18,7 @@ pub const Surface = struct {
     color_address: u24,
     color_format: ColorImageFormat,
     depth_texture: sdl3.gpu.Texture,
+    depth_texture_msaa: sdl3.gpu.Texture,
     depth_address: u24 = 0,
     image_width: u32,
     image_height: u32,
@@ -76,6 +77,7 @@ pub fn init(gpu: sdl3.gpu.Device) error{SdlError}!Self {
 
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     if (self.surface) |surface| {
+        gpu.releaseTexture(surface.depth_texture_msaa);
         gpu.releaseTexture(surface.depth_texture);
         gpu.releaseTexture(surface.color_texture_msaa);
         gpu.releaseTexture(surface.color_texture);
@@ -149,6 +151,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
     try self.downloadImageData(gpu, rdram);
 
     if (self.surface) |surface| {
+        gpu.releaseTexture(surface.depth_texture_msaa);
         gpu.releaseTexture(surface.depth_texture);
         gpu.releaseTexture(surface.color_texture_msaa);
         gpu.releaseTexture(surface.color_texture);
@@ -181,12 +184,22 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
         .num_levels = 1,
     });
 
+    const depth_texture_msaa = try gpu.createTexture(.{
+        .format = .depth16_unorm,
+        .usage = .{ .depth_stencil_target = true },
+        .width = self.params.image_width * msaa,
+        .height = self.params.image_height * msaa,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+    });
+
     self.surface = .{
         .color_texture = color_texture,
         .color_texture_msaa = color_texture_msaa,
         .color_address = self.params.color_address,
         .color_format = self.params.color_format,
         .depth_texture = depth_texture,
+        .depth_texture_msaa = depth_texture_msaa,
         .depth_address = self.params.depth_address,
         .image_width = self.params.image_width,
         .image_height = self.params.image_height,
@@ -237,6 +250,38 @@ pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{S
         .filter = .linear,
         .cycle = true,
     });
+
+    if (self.depth_image_dirty) {
+        command_buffer.blitTexture(.{
+            .source = .{
+                .texture = surface.depth_texture_msaa,
+                .mip_level = 0,
+                .layer_or_depth_plane = 0,
+                .region = .{
+                    .x = 0,
+                    .y = 0,
+                    .w = surface.image_width * msaa,
+                    .h = surface.image_height * msaa,
+                },
+            },
+            .destination = .{
+                .texture = surface.depth_texture,
+                .mip_level = 0,
+                .layer_or_depth_plane = 0,
+                .region = .{
+                    .x = 0,
+                    .y = 0,
+                    .w = surface.image_width,
+                    .h = surface.image_height,
+                },
+            },
+            .load_op = .do_not_care,
+            .clear_color = .{},
+            .flip_mode = .{},
+            .filter = .nearest,
+            .cycle = true,
+        });
+    }
 
     {
         const copy_pass = command_buffer.beginCopyPass();
@@ -420,6 +465,36 @@ fn uploadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []const u8) error{S
         .clear_color = .{},
         .flip_mode = .{},
         .filter = .linear,
+        .cycle = true,
+    });
+
+    command_buffer.blitTexture(.{
+        .source = .{
+            .texture = surface.depth_texture,
+            .mip_level = 0,
+            .layer_or_depth_plane = 0,
+            .region = .{
+                .x = 0,
+                .y = 0,
+                .w = surface.image_width,
+                .h = surface.image_height,
+            },
+        },
+        .destination = .{
+            .texture = surface.depth_texture_msaa,
+            .mip_level = 0,
+            .layer_or_depth_plane = 0,
+            .region = .{
+                .x = 0,
+                .y = 0,
+                .w = surface.image_width * msaa,
+                .h = surface.image_height * msaa,
+            },
+        },
+        .load_op = .do_not_care,
+        .clear_color = .{},
+        .flip_mode = .{},
+        .filter = .nearest,
         .cycle = true,
     });
 

@@ -176,16 +176,16 @@ pub fn render(self: *Self) RenderError!void {
         .store = .store,
     };
 
-    // const depth_target: sdl3.gpu.DepthStencilTargetInfo = .{
-    //     .texture = surface.depth_texture,
-    //     .clear_depth = 1.0,
-    //     .load = .load,
-    //     .store = .store,
-    //     .clear_stencil = 0.0,
-    //     .stencil_load = .do_not_care,
-    //     .stencil_store = .do_not_care,
-    //     .cycle = false,
-    // };
+    const depth_target: sdl3.gpu.DepthStencilTargetInfo = .{
+        .texture = surface.depth_texture_msaa,
+        .clear_depth = 1.0,
+        .load = .load,
+        .store = .store,
+        .clear_stencil = 0.0,
+        .stencil_load = .do_not_care,
+        .stencil_store = .do_not_care,
+        .cycle = false,
+    };
 
     const vertex_state: VertexState = .{
         .dimensions = .{
@@ -197,7 +197,7 @@ pub fn render(self: *Self) RenderError!void {
     const command_buffer = try self.gpu.acquireCommandBuffer();
 
     {
-        const render_pass = command_buffer.beginRenderPass(&.{color_target}, null);
+        const render_pass = command_buffer.beginRenderPass(&.{color_target}, depth_target);
         defer render_pass.end();
 
         command_buffer.pushVertexUniformData(0, std.mem.asBytes(&vertex_state));
