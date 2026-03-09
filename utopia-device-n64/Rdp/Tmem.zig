@@ -339,7 +339,7 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
                 height,
                 tile.bitsPerPixel(),
             }),
-            error.FormatNotSupported => fw.log.warn("Texture format unsupported: {t} {t}", .{
+            error.FormatNotSupported => fw.log.debug("Texture format unsupported: {t} {t}", .{
                 tile.pixelFormat(),
                 tile.pixelSize(),
             }),
