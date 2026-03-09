@@ -101,7 +101,7 @@ fn computeOp(
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
             cp2.acc = @splat(0x8000);
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result) << @splat(1);
 
             break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
@@ -110,7 +110,7 @@ fn computeOp(
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
             cp2.acc = @splat(0x8000);
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result) << @splat(1);
 
             break :blk @truncate(clampUnsigned(cp2.acc) >> @splat(16));
         },
@@ -126,7 +126,7 @@ fn computeOp(
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.zeroExtend(@Vector(8, i32), rhs);
 
-            cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc = fw.num.signExtend(@Vector(8, u64), result);
 
             break :blk @truncate(cp2.acc >> @splat(16));
         },
@@ -134,7 +134,7 @@ fn computeOp(
             const result = fw.num.zeroExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            cp2.acc = fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc = fw.num.signExtend(@Vector(8, u64), result);
 
             break :blk @truncate(cp2.acc);
         },
@@ -142,7 +142,7 @@ fn computeOp(
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            cp2.acc = fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
+            cp2.acc = fw.num.signExtend(@Vector(8, u64), result) << @splat(16);
 
             break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
@@ -150,7 +150,7 @@ fn computeOp(
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result) << @splat(1);
 
             break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
@@ -158,7 +158,7 @@ fn computeOp(
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(1);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result) << @splat(1);
 
             break :blk @truncate(clampUnsigned(cp2.acc) >> @splat(16));
         },
@@ -174,7 +174,7 @@ fn computeOp(
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.zeroExtend(@Vector(8, i32), rhs);
 
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result);
 
             break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
@@ -182,7 +182,7 @@ fn computeOp(
             const result = fw.num.zeroExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result);
 
             break :blk @truncate(clampSigned(cp2.acc));
         },
@@ -190,7 +190,7 @@ fn computeOp(
             const result = fw.num.signExtend(@Vector(8, i32), lhs) *
                 fw.num.signExtend(@Vector(8, i32), rhs);
 
-            cp2.acc +%= fw.num.signExtend(@Vector(8, u48), result) << @splat(16);
+            cp2.acc +%= fw.num.signExtend(@Vector(8, u64), result) << @splat(16);
 
             break :blk @truncate(clampSigned(cp2.acc) >> @splat(16));
         },
@@ -412,27 +412,32 @@ fn select(
     return result;
 }
 
-fn clampSigned(acc: @Vector(8, u48)) @Vector(8, u48) {
+fn clampSigned(acc: @Vector(8, u64)) @Vector(8, u64) {
+    const truncated = fw.num.signed(acc) << @splat(16) >> @splat(16);
+
     return @bitCast(std.math.clamp(
-        @as(@Vector(8, i48), @bitCast(acc)),
-        @as(@Vector(8, i48), @splat(std.math.minInt(i32))),
-        @as(@Vector(8, i48), @splat(std.math.maxInt(i32))),
+        truncated,
+        @as(@Vector(8, i64), @splat(std.math.minInt(i32))),
+        @as(@Vector(8, i64), @splat(std.math.maxInt(i32))),
     ));
 }
 
-fn clampUnsigned(acc: @Vector(8, u48)) @Vector(8, u48) {
+fn clampUnsigned(acc: @Vector(8, u64)) @Vector(8, u64) {
+    const mask: @Vector(8, u64) = @splat(0x0000_ffff_ffff_ffff);
+    const truncated = acc & mask;
+
     const clipped = @select(
-        u48,
-        acc < @as(@Vector(8, u48), @splat(0x8000_0000)),
-        acc,
-        @as(@Vector(8, u48), @splat(std.math.maxInt(u48))),
+        u64,
+        truncated < @as(@Vector(8, u64), @splat(0x8000_0000)),
+        truncated,
+        @as(@Vector(8, u64), @splat(std.math.maxInt(u64))),
     );
 
     return @select(
-        u48,
-        acc < @as(@Vector(8, u48), @splat(0x8000_0000_0000)),
+        u64,
+        truncated < @as(@Vector(8, u64), @splat(0x8000_0000_0000)),
         clipped,
-        @as(@Vector(8, u48), @splat(0)),
+        @as(@Vector(8, u64), @splat(0)),
     );
 }
 

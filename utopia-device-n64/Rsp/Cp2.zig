@@ -37,7 +37,7 @@ fn MType(comptime T: type) type {
 }
 
 regs: [32]@Vector(8, u16) = @splat(@splat(0)),
-acc: @Vector(8, u48) = @splat(0),
+acc: @Vector(8, u64) = @splat(0),
 carry: @Vector(8, bool) = @splat(false),
 not_equal: @Vector(8, bool) = @splat(false),
 compare: @Vector(8, bool) = @splat(false),
@@ -87,7 +87,7 @@ pub fn setEl(self: *Self, comptime T: type, reg: Register, el: u4, value: T) voi
 }
 
 pub fn setAccLow(self: *Self, value: @Vector(8, u16)) void {
-    self.acc &= ~@as(@Vector(8, u48), @splat(0xffff));
+    self.acc &= ~@as(@Vector(8, u64), @splat(0xffff));
     self.acc |= value;
 }
 
