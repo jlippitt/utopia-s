@@ -38,6 +38,7 @@ const FragmentState = extern struct {
 
 pub const DisplayGroup = struct {
     pipeline: *Pipeline,
+    scissor: sdl3.rect.Rect(i32),
     tex: [2]Tmem.TextureDescriptor,
     frag_state: FragmentState,
     len: u32,
@@ -56,6 +57,8 @@ frag_state: FragmentState = .{},
 frag_state_changed: bool = false,
 pipeline: *Pipeline,
 pipeline_changed: bool = false,
+scissor: sdl3.rect.Rect(i32) = .{ .x = 0, .y = 0, .w = 0, .h = 0 },
+scissor_changed: bool = false,
 fill_color: u32 = 0,
 pixel_size: Core.PixelSize = .@"32",
 
@@ -195,6 +198,11 @@ pub fn setPipeline(self: *Self, pipeline: *Pipeline) void {
     self.pipeline = pipeline;
     self.pipeline.ref();
     self.pipeline_changed = true;
+}
+
+pub fn setScissor(self: *Self, scissor: sdl3.rect.Rect(i32)) void {
+    self.scissor = scissor;
+    self.scissor_changed = true;
 }
 
 pub fn setCombineMode(self: *Self, combine: [2]fragment.CombineMode) void {
@@ -368,7 +376,8 @@ fn pushPrimitive(
     if (self.getCurrentDisplayGroup()) |display_group| {
         if (std.meta.eql(tex, display_group.tex) and
             !self.frag_state_changed and
-            !self.pipeline_changed)
+            !self.pipeline_changed and
+            !self.scissor_changed)
         {
             display_group.len += @intCast(indices.len);
             return;
@@ -381,12 +390,15 @@ fn pushPrimitive(
 
     self.display_groups.appendAssumeCapacity(.{
         .pipeline = self.pipeline,
+        .scissor = self.scissor,
         .tex = tex,
         .frag_state = self.frag_state,
         .len = @intCast(indices.len),
     });
 
     self.frag_state_changed = false;
+    self.pipeline_changed = false;
+    self.scissor_changed = false;
 }
 
 fn getCurrentDisplayGroup(self: *Self) ?*DisplayGroup {

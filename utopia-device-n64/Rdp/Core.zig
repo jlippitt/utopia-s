@@ -31,7 +31,6 @@ sampler: sdl3.gpu.Sampler,
 target: Target,
 tmem: Tmem,
 display_list: DisplayList,
-scissor: sdl3.rect.Rect(i32),
 word_buf: std.ArrayListUnmanaged(u64),
 options: Options = .{},
 
@@ -77,12 +76,6 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .target = target,
         .tmem = tmem,
         .display_list = display_list,
-        .scissor = .{
-            .x = 0,
-            .y = 0,
-            .w = 0,
-            .h = 0,
-        },
         .word_buf = word_buf,
     };
 }
@@ -209,8 +202,6 @@ pub fn render(self: *Self) RenderError!void {
 
         command_buffer.pushVertexUniformData(0, std.mem.asBytes(&vertex_state));
 
-        render_pass.setScissor(self.scissor);
-
         render_pass.bindIndexBuffer(.{
             .buffer = self.display_list.getIndexBuffer(),
             .offset = 0,
@@ -229,6 +220,8 @@ pub fn render(self: *Self) RenderError!void {
 
         for (display_groups) |display_group| {
             render_pass.bindGraphicsPipeline(display_group.pipeline.getBinding());
+
+            render_pass.setScissor(display_group.scissor);
 
             command_buffer.pushFragmentUniformData(
                 0,

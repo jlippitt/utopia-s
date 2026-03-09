@@ -1,4 +1,5 @@
 const std = @import("std");
+const sdl3 = @import("sdl3");
 const fw = @import("framework");
 const Core = @import("./Core.zig");
 const Target = @import("./Target.zig");
@@ -40,12 +41,14 @@ pub fn setScissor(core: *Core, word: u64) void {
 
     core.target.setImageHeight(cmd.yl >> 2);
 
-    core.scissor = .{
+    const scissor: sdl3.rect.Rect(i32) = .{
         .x = cmd.xh >> 2,
         .y = cmd.yh >> 2,
         .w = (cmd.xl - cmd.xh) >> 2,
         .h = (cmd.yl - cmd.yh) >> 2,
     };
+
+    core.display_list.setScissor(scissor);
 }
 
 pub fn setPrimDepth(core: *Core, word: u64) void {
