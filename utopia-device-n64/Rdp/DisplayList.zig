@@ -30,6 +30,7 @@ const FragmentState = extern struct {
     prim_color: fw.color.RgbaUnorm = .{},
     env_color: fw.color.RgbaUnorm = .{},
     cycle_type: CycleType = .one_cycle,
+    alpha_cvg_select: u32 = 0,
     cvg_times_alpha: u32 = 0,
     color_on_cvg: u32 = 0,
     alpha_compare: u32 = 0,
@@ -253,6 +254,14 @@ pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
 
     self.frag_state.cycle_type = cycle_type;
     fw.log.debug("Cycle Type: {t}", .{cycle_type});
+}
+
+pub fn setAlphaCvgSelect(self: *Self, alpha_cvg_select: bool) void {
+    self.frag_state_changed = self.frag_state_changed or
+        self.frag_state.alpha_cvg_select != @intFromBool(alpha_cvg_select);
+
+    self.frag_state.alpha_cvg_select = @intFromBool(alpha_cvg_select);
+    fw.log.debug("AlphaCVGSelect: {}", .{alpha_cvg_select});
 }
 
 pub fn setCvgTimesAlpha(self: *Self, cvg_times_alpha: bool) void {
