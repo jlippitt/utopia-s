@@ -37,6 +37,8 @@ pub fn activate(
     fragment_shader: sdl3.gpu.Shader,
     options: Options,
 ) error{SdlError}!void {
+    _ = options;
+
     std.debug.assert(!self.hasRefs());
     std.debug.assert(!self.isActive());
 
@@ -87,13 +89,13 @@ pub fn activate(
                     },
                 },
             },
-            .depth_stencil_format = .depth16_unorm,
+            // .depth_stencil_format = .depth16_unorm,
         },
-        .depth_stencil_state = .{
-            .compare = if (options.z_compare_enable) .less_or_equal else .always,
-            .enable_depth_test = true,
-            .enable_depth_write = options.z_update_enable,
-        },
+        // .depth_stencil_state = .{
+        //     .compare = if (options.z_compare_enable) .less_or_equal else .always,
+        //     .enable_depth_test = true,
+        //     .enable_depth_write = options.z_update_enable,
+        // },
     });
 }
 

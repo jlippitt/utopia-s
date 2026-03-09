@@ -3,6 +3,7 @@ const fw = @import("framework");
 
 const max_width = 1024;
 const max_height = 1024;
+const msaa = 4;
 
 const Self = @This();
 
@@ -13,6 +14,7 @@ pub const ColorImageFormat = enum {
 
 pub const Surface = struct {
     color_texture: sdl3.gpu.Texture,
+    color_texture_msaa: sdl3.gpu.Texture,
     color_address: u24,
     color_format: ColorImageFormat,
     depth_texture: sdl3.gpu.Texture,
@@ -75,6 +77,7 @@ pub fn init(gpu: sdl3.gpu.Device) error{SdlError}!Self {
 pub fn deinit(self: *Self, gpu: sdl3.gpu.Device) void {
     if (self.surface) |surface| {
         gpu.releaseTexture(surface.depth_texture);
+        gpu.releaseTexture(surface.color_texture_msaa);
         gpu.releaseTexture(surface.color_texture);
     }
 
@@ -147,6 +150,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     if (self.surface) |surface| {
         gpu.releaseTexture(surface.depth_texture);
+        gpu.releaseTexture(surface.color_texture_msaa);
         gpu.releaseTexture(surface.color_texture);
     }
 
@@ -155,6 +159,15 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
         .usage = .{ .color_target = true },
         .width = self.params.image_width,
         .height = self.params.image_height,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+    });
+
+    const color_texture_msaa = try gpu.createTexture(.{
+        .format = .r8g8b8a8_unorm,
+        .usage = .{ .color_target = true },
+        .width = self.params.image_width * msaa,
+        .height = self.params.image_height * msaa,
         .layer_count_or_depth = 1,
         .num_levels = 1,
     });
@@ -170,6 +183,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     self.surface = .{
         .color_texture = color_texture,
+        .color_texture_msaa = color_texture_msaa,
         .color_address = self.params.color_address,
         .color_format = self.params.color_format,
         .depth_texture = depth_texture,
@@ -193,6 +207,36 @@ pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{S
     }
 
     const command_buffer = try gpu.acquireCommandBuffer();
+
+    command_buffer.blitTexture(.{
+        .source = .{
+            .texture = surface.color_texture_msaa,
+            .mip_level = 0,
+            .layer_or_depth_plane = 0,
+            .region = .{
+                .x = 0,
+                .y = 0,
+                .w = surface.image_width * msaa,
+                .h = surface.image_height * msaa,
+            },
+        },
+        .destination = .{
+            .texture = surface.color_texture,
+            .mip_level = 0,
+            .layer_or_depth_plane = 0,
+            .region = .{
+                .x = 0,
+                .y = 0,
+                .w = surface.image_width,
+                .h = surface.image_height,
+            },
+        },
+        .load_op = .do_not_care,
+        .clear_color = .{},
+        .flip_mode = .{},
+        .filter = .linear,
+        .cycle = true,
+    });
 
     {
         const copy_pass = command_buffer.beginCopyPass();
@@ -348,6 +392,36 @@ fn uploadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []const u8) error{S
             true,
         );
     }
+
+    command_buffer.blitTexture(.{
+        .source = .{
+            .texture = surface.color_texture,
+            .mip_level = 0,
+            .layer_or_depth_plane = 0,
+            .region = .{
+                .x = 0,
+                .y = 0,
+                .w = surface.image_width,
+                .h = surface.image_height,
+            },
+        },
+        .destination = .{
+            .texture = surface.color_texture_msaa,
+            .mip_level = 0,
+            .layer_or_depth_plane = 0,
+            .region = .{
+                .x = 0,
+                .y = 0,
+                .w = surface.image_width * msaa,
+                .h = surface.image_height * msaa,
+            },
+        },
+        .load_op = .do_not_care,
+        .clear_color = .{},
+        .flip_mode = .{},
+        .filter = .linear,
+        .cycle = true,
+    });
 
     try command_buffer.submit();
 
