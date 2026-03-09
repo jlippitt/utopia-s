@@ -10,9 +10,6 @@ pub const TlutType = Decoder.TlutType;
 pub const data_len = 512;
 pub const data_size = data_len * 8;
 
-// 4bpp texture expands to 8 RGBA32 bytes per TMEM byte
-pub const max_texture_size = data_size * 8;
-
 const l1_cache_size = 256;
 const l2_cache_size = 1024;
 
@@ -41,7 +38,7 @@ pub fn init(
     const data = try arena.allocator().alloc(u64, data_len);
 
     const upload_buffer = try gpu.createTransferBuffer(.{
-        .size = max_texture_size,
+        .size = Decoder.decode_buf_len,
         .usage = .upload,
     });
     errdefer gpu.releaseTransferBuffer(upload_buffer);

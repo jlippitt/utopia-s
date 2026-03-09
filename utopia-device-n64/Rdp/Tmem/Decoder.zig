@@ -6,6 +6,16 @@ const Tile = @import("./Tile.zig");
 
 const tlut_begin = 256;
 
+// 4bpp texture expands to 8 RGBA32 bytes per TMEM byte
+const max_texture_size = Tmem.data_size * 8;
+
+// Add some overhead for oversized textures
+const overhead = 16;
+
+pub const decode_buf_len = max_texture_size * overhead;
+
+const deinterleave_buf_len = Tmem.data_len * overhead;
+
 pub const TlutType = enum(u1) {
     rgba,
     ia,
@@ -15,16 +25,16 @@ pub const TlutDecodeFn = fn ([2]u8, void) [4]u8;
 
 const Self = @This();
 
-deinterleave_buf: *[Tmem.data_len]u64,
-decode_buf: *[Tmem.max_texture_size]u8,
+deinterleave_buf: *[deinterleave_buf_len]u64,
+decode_buf: *[decode_buf_len]u8,
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
-    const deinterleave_buf = try arena.allocator().alloc(u64, Tmem.data_len);
-    const decode_buf = try arena.allocator().alloc(u8, Tmem.max_texture_size);
+    const deinterleave_buf = try arena.allocator().alloc(u64, deinterleave_buf_len);
+    const decode_buf = try arena.allocator().alloc(u8, decode_buf_len);
 
     return .{
-        .deinterleave_buf = deinterleave_buf[0..Tmem.data_len],
-        .decode_buf = decode_buf[0..Tmem.max_texture_size],
+        .deinterleave_buf = deinterleave_buf[0..deinterleave_buf_len],
+        .decode_buf = decode_buf[0..decode_buf_len],
     };
 }
 
@@ -37,7 +47,7 @@ pub fn decode(
 ) error{ TextureTooBig, FormatNotSupported }![]const u8 {
     const dst_image_size = padded_width * tile.height() * 4;
 
-    if (dst_image_size > Tmem.max_texture_size) {
+    if (dst_image_size > decode_buf_len) {
         return error.TextureTooBig;
     }
 
@@ -97,7 +107,7 @@ fn deinterleave(
                 word = std.math.rotl(u64, word, 32);
             }
 
-            self.deinterleave_buf[dst_index & 0x1ff] = word;
+            self.deinterleave_buf[dst_index] = word;
 
             dst_index += 1;
             src_index += 1;
