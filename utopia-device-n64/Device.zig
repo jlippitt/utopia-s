@@ -167,8 +167,6 @@ pub fn deinit(self: *Self) void {
 pub fn runFrame(self: *Self) fw.RenderError!void {
     while (true) {
         self.cpu.step();
-        self.rsp.step();
-
         self.clock.addCycles(4);
 
         while (self.clock.nextEvent()) |event| {
@@ -177,6 +175,7 @@ pub fn runFrame(self: *Self) fw.RenderError!void {
             switch (event) {
                 .cpu_interrupt => self.cpu.handleInterruptEvent(),
                 .cpu_timer => self.cpu.handleTimerEvent(),
+                .rsp_run => self.rsp.handleRunEvent(),
                 .ai_sample => self.ai.handleSampleEvent(),
                 .vi_new_line => if (try self.vi.handleNewLineEvent()) {
                     return;

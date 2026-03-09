@@ -7,10 +7,14 @@ const Core = @import("./Rsp/Core.zig");
 const mem_size = 8192;
 const bank_size = mem_size / 2;
 
+const cycles_per_step = 3;
+const cycles_per_run = 6000;
+
 const Self = @This();
 
 core: Core,
 mem: *align(16) [mem_size]u8,
+time_remaining: i64 = 0,
 sp_addr: u13 = 0,
 dram_addr: u24 = 0,
 dma: Dma = .{},
@@ -32,16 +36,35 @@ pub fn getDmemConst(self: *const Self) *align(16) const [bank_size]u8 {
     return self.mem[0..bank_size];
 }
 
-pub fn step(self: *Self) void {
-    if (self.status.halted) {
-        return;
+pub fn handleRunEvent(self: *Self) void {
+    // If in single step mode, break the loop after the first instruction.
+    // Otherwise, run for a set number of cycles before handing control back.
+    self.time_remaining = if (self.status.sstep) cycles_per_step else cycles_per_run;
+
+    var time_elapsed: u64 = 0;
+
+    {
+        fw.log.pushContext("rsp");
+        defer fw.log.popContext();
+
+        fw.log.trace("[Timeslice: {d}]", .{self.getDeviceConst().clock.getCycles()});
+
+        // Run until the timeslice expires or a sync point is hit
+        while (self.time_remaining > 0) {
+            self.core.step();
+            time_elapsed += cycles_per_step;
+            self.time_remaining -= cycles_per_step;
+        }
     }
 
-    fw.log.pushContext("rsp");
-    defer fw.log.popContext();
-
-    self.core.step();
+    // After the loop is broken (possibly after first instruction - see above),
+    // halted flag becomes set if sstep is set
     self.status.halted = self.status.halted or self.status.sstep;
+
+    // If not halted, schedule a new timeslice
+    if (!self.status.halted) {
+        self.getDevice().clock.schedule(.rsp_run, time_elapsed);
+    }
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -149,6 +172,7 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
             self.transferDma(.write);
         },
         4 => {
+            const was_halted = self.status.halted;
             const masked_value = value & mask;
 
             register.setFlag(&self.status, "halted", masked_value, 0);
@@ -174,6 +198,10 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
             }
 
             fw.log.debug("SP_STATUS: {any}", .{self.status});
+
+            if (!self.status.halted and was_halted) {
+                self.getDevice().clock.schedule(.rsp_run, 0);
+            }
         },
         5, 6 => {}, // Read-only
         7 => {
@@ -234,6 +262,8 @@ pub fn writeDataAlignedMasked(
 }
 
 pub fn readCp0Register(self: *Self, reg: Core.Cp0Register) u32 {
+    self.time_remaining = 0;
+
     if (@intFromEnum(reg) >= @intFromEnum(Core.Cp0Register.DPC_START)) {
         return self.getDevice().rdp.readRegister(@truncate(@intFromEnum(reg)));
     }
@@ -242,6 +272,8 @@ pub fn readCp0Register(self: *Self, reg: Core.Cp0Register) u32 {
 }
 
 pub fn writeCp0Register(self: *Self, reg: Core.Cp0Register, value: u32) void {
+    self.time_remaining = 0;
+
     if (@intFromEnum(reg) >= @intFromEnum(Core.Cp0Register.DPC_START)) {
         self.getDevice().rdp.writeRegister(
             @truncate(@intFromEnum(reg)),
@@ -259,6 +291,7 @@ pub fn writeCp0Register(self: *Self, reg: Core.Cp0Register, value: u32) void {
 }
 
 pub fn break_(self: *Self) void {
+    self.time_remaining = 0;
     self.status.broke = true;
     self.status.halted = true;
 
@@ -332,6 +365,10 @@ fn transferDma(self: *Self, comptime direction: DmaDirection) void {
 }
 
 fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("rsp", self));
+}
+
+fn getDeviceConst(self: *const Self) *const Device {
     return @alignCast(@fieldParentPtr("rsp", self));
 }
 
