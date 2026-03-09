@@ -464,7 +464,7 @@ fn uploadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []const u8) error{S
         .load_op = .do_not_care,
         .clear_color = .{},
         .flip_mode = .{},
-        .filter = .linear,
+        .filter = .nearest,
         .cycle = true,
     });
 
