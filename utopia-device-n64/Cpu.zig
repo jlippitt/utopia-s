@@ -64,6 +64,7 @@ regs: [32]u64 = @splat(0),
 lo: u64 = 0,
 hi: u64 = 0,
 ll_bit: bool = false,
+busy_wait: bool = false,
 cp0: Cp0 = .init(),
 cp1: Cp1 = .init(),
 
@@ -93,19 +94,22 @@ pub fn step(self: *Self) void {
     const vaddr = self.pc;
     const paddr, const cache = self.mapAddress(vaddr, false) orelse return;
 
-    if (cache) {
+    const instr, const word = if (cache) blk: {
         @branchHint(.likely);
         const entry = self.icache.get(vaddr, paddr);
-        entry.instr(self, entry.word);
-    } else {
+        break :blk .{ entry.instr, entry.word };
+    } else blk: {
         const word = self.getDevice().read(paddr);
         const instr = decode(word);
-        instr(self, word);
-    }
+        break :blk .{ instr, word };
+    };
+
+    instr(self, word);
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
         self.pc = self.target_pc;
+        self.busy_wait = false;
     } else if (self.pipe_state != .except) {
         @branchHint(.likely);
         self.pc +%= 4;
@@ -190,6 +194,10 @@ pub fn jump(self: *Self, target: u32) void {
 
     self.target_pc = target;
     self.pipe_state = .branch;
+
+    if (target == self.pc) {
+        self.busy_wait = true;
+    }
 }
 
 pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bool) void {
@@ -207,6 +215,10 @@ pub fn branch(self: *Self, comptime params: BranchParams, offset: u32, taken: bo
         fw.log.trace("  Branch taken", .{});
         self.target_pc = self.pc +% offset +% 4;
         self.pipe_state = .branch;
+
+        if (fw.num.signed(offset) == -4) {
+            self.busy_wait = true;
+        }
         return;
     }
 

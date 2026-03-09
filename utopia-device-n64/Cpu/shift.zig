@@ -29,13 +29,22 @@ pub fn fixed(comptime op: ShiftOp) Core.Instruction {
         fn instr(core: *Core, word: u32) void {
             const args: Core.RType = @bitCast(word);
 
-            fw.log.trace("{X:08}: {t} {t}, {t}, {d}", .{
-                core.pc,
-                op,
-                args.rd,
-                args.rt,
-                args.sa,
-            });
+            if ((comptime op == .SLL) and word == 0) {
+                fw.log.trace("{X:08}: NOP", .{core.pc});
+
+                if (core.busy_wait) {
+                    @branchHint(.unlikely);
+                    core.getDevice().clock.fastForward();
+                }
+            } else {
+                fw.log.trace("{X:08}: {t} {t}, {t}, {d}", .{
+                    core.pc,
+                    op,
+                    args.rd,
+                    args.rt,
+                    args.sa,
+                });
+            }
 
             core.set(args.rd, op.apply(core.get(args.rt), args.sa));
         }

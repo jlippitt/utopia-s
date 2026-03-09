@@ -30,6 +30,11 @@ pub fn addCycles(self: *Self, cycles: u64) void {
     self.cycles += cycles;
 }
 
+pub fn fastForward(self: *Self) void {
+    fw.log.debug("Fast forward: {} => {}", .{ self.cycles, self.next_event_cycle });
+    self.cycles = self.next_event_cycle;
+}
+
 pub fn schedule(self: *Self, event_type: EventType, delta: u64) void {
     if (self.scheduled_events[@intFromEnum(event_type)] != std.math.maxInt(u64)) {
         fw.log.panic("Event already scheduled: {t}", .{event_type});
