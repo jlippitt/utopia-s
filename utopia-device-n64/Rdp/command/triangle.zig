@@ -104,7 +104,7 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         }
     }
 
-    var texture: Tmem.TextureDescriptor = core.tmem.nullTexture();
+    var texture: [2]Tmem.TextureDescriptor = core.tmem.nullTexture();
 
     if (comptime attr.texture) {
         const coords: TexCoords = @bitCast(args[arg_index + 0]);

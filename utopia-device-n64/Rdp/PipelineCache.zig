@@ -33,8 +33,8 @@ pub fn init(
         .entry_point = "main",
         .format = format_flags,
         .stage = .fragment,
-        .num_samplers = 1,
-        .num_uniform_buffers = 2,
+        .num_samplers = 2,
+        .num_uniform_buffers = 3,
     });
     errdefer gpu.releaseShader(fragment_shader);
 

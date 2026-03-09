@@ -56,7 +56,7 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
     vertices[3].pos[0] = right;
     vertices[3].pos[1] = bottom;
 
-    var texture: Tmem.TextureDescriptor = core.tmem.nullTexture();
+    var texture: [2]Tmem.TextureDescriptor = core.tmem.nullTexture();
 
     if (comptime rect_type != .fill) {
         const tile = core.tmem.getTile(cmd.tile);

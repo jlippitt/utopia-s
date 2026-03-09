@@ -73,24 +73,33 @@ pub fn getTile(self: *const Self, index: u3) Tile {
     return self.tiles[index];
 }
 
-pub fn nullTexture(self: *Self) TextureDescriptor {
-    return .{
+pub fn nullTexture(self: *Self) [2]TextureDescriptor {
+    return @splat(.{
         .texture = &self.null_texture,
         .desc = .{},
-    };
+    });
 }
 
 pub fn createTexture(
     self: *Self,
     gpu: sdl3.gpu.Device,
     index: u3,
-) error{SdlError}!TextureDescriptor {
-    const tile = self.tiles[index];
-    const texture = try self.resolveTexture(gpu, tile);
+) error{SdlError}![2]TextureDescriptor {
+    const tile0 = self.tiles[index];
+    const texture0 = try self.resolveTexture(gpu, tile0);
+
+    const tile1 = self.tiles[index +% 1];
+    const texture1 = try self.resolveTexture(gpu, tile1);
 
     return .{
-        .texture = texture,
-        .desc = tile.desc,
+        .{
+            .texture = texture0,
+            .desc = tile0.desc,
+        },
+        .{
+            .texture = texture1,
+            .desc = tile1.desc,
+        },
     };
 }
 

@@ -232,17 +232,29 @@ pub fn render(self: *Self) RenderError!void {
 
             command_buffer.pushFragmentUniformData(
                 0,
-                std.mem.asBytes(&display_group.frag_state),
+                std.mem.asBytes(&display_group.tex[0].desc.transform()),
             );
 
             command_buffer.pushFragmentUniformData(
                 1,
-                std.mem.asBytes(&display_group.tex0.desc.transform()),
+                std.mem.asBytes(&display_group.tex[1].desc.transform()),
+            );
+
+            command_buffer.pushFragmentUniformData(
+                2,
+                std.mem.asBytes(&display_group.frag_state),
             );
 
             render_pass.bindFragmentSamplers(0, &.{
                 .{
-                    .texture = display_group.tex0.texture.getBinding(),
+                    .texture = display_group.tex[0].texture.getBinding(),
+                    .sampler = self.sampler,
+                },
+            });
+
+            render_pass.bindFragmentSamplers(1, &.{
+                .{
+                    .texture = display_group.tex[1].texture.getBinding(),
                     .sampler = self.sampler,
                 },
             });

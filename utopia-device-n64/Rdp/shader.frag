@@ -69,8 +69,19 @@ struct TransformAxis {
 };
 
 layout(set = 2, binding = 0) uniform sampler2D tex0_sampler;
+layout(set = 2, binding = 1) uniform sampler2D tex1_sampler;
 
-layout (std140, set = 3, binding = 0) uniform FragState {
+layout (std140, set = 3, binding = 0) uniform Transform0 {
+    TransformAxis tex0_transform_x;
+    TransformAxis tex0_transform_y;
+};
+
+layout (std140, set = 3, binding = 1) uniform Transform1 {
+    TransformAxis tex1_transform_x;
+    TransformAxis tex1_transform_y;
+};
+
+layout (std140, set = 3, binding = 2) uniform FragState {
     CombineMode combine_0;
     CombineMode combine_1;
     BlendMode blend_0;
@@ -85,11 +96,6 @@ layout (std140, set = 3, binding = 0) uniform FragState {
     uint cvg_times_alpha;
     uint color_on_cvg;
     uint alpha_compare;
-};
-
-layout (std140, set = 3, binding = 1) uniform Transform {
-    TransformAxis tex0_transform_x;
-    TransformAxis tex0_transform_y;
 };
 
 layout (location = 0) in vec4 v_color;
@@ -142,11 +148,11 @@ vec4 blend(BlendMode blend, float combined_a, vec3 pixel_rgb) {
     return vec4(p * a + m * b, 1.0);
 }
 
-vec3 combineRgbInput(uint input_type, vec4 tex0, vec4 combined) {
+vec3 combineRgbInput(uint input_type, vec4 tex0, vec4 tex1, vec4 combined) {
     switch (input_type) {
         case CI_COMBINED_RGB: return combined.rgb;
         case CI_TEXEL0_RGB: return tex0.rgb;
-        case CI_TEXEL1_RGB: return vec3(1.0); // TODO
+        case CI_TEXEL1_RGB: return tex1.rgb;
         case CI_PRIM_RGB: return prim_color.rgb;
         case CI_SHADE_RGB: return v_color.rgb;
         case CI_ENV_RGB: return env_color.rgb;
@@ -154,7 +160,7 @@ vec3 combineRgbInput(uint input_type, vec4 tex0, vec4 combined) {
         case CI_KEY_SCALE: return vec3(1.0); // TODO
         case CI_COMBINED_ALPHA: return vec3(combined.a);
         case CI_TEXEL0_ALPHA: return vec3(tex0.a);
-        case CI_TEXEL1_ALPHA: return vec3(1.0); // TODO
+        case CI_TEXEL1_ALPHA: return vec3(tex1.a);
         case CI_PRIM_ALPHA: return vec3(prim_color.a);
         case CI_SHADE_ALPHA: return vec3(v_color.a);
         case CI_ENV_ALPHA: return vec3(env_color.a);
@@ -169,11 +175,11 @@ vec3 combineRgbInput(uint input_type, vec4 tex0, vec4 combined) {
     }
 }
 
-float combineAlphaInput(uint input_type, float tex0_a, float combined_a) {
+float combineAlphaInput(uint input_type, float tex0_a, float tex1_a, float combined_a) {
     switch (input_type) {
         case CI_COMBINED_ALPHA: return combined_a;
         case CI_TEXEL0_ALPHA: return tex0_a;
-        case CI_TEXEL1_ALPHA: return 1.0; // TODO
+        case CI_TEXEL1_ALPHA: return tex1_a;
         case CI_PRIM_ALPHA: return prim_color.a;
         case CI_SHADE_ALPHA: return v_color.a;
         case CI_ENV_ALPHA: return env_color.a;
@@ -185,26 +191,26 @@ float combineAlphaInput(uint input_type, float tex0_a, float combined_a) {
     }
 }
 
-vec3 combineRgb(CombineEquation combine, vec4 tex0, vec4 combined) {
-    vec3 sub_a = combineRgbInput(combine.sub_a, tex0, combined);
-    vec3 sub_b = combineRgbInput(combine.sub_b, tex0, combined);
-    vec3 mul = combineRgbInput(combine.mul, tex0, combined);
-    vec3 add = combineRgbInput(combine.add, tex0, combined);
+vec3 combineRgb(CombineEquation combine, vec4 tex0, vec4 tex1, vec4 combined) {
+    vec3 sub_a = combineRgbInput(combine.sub_a, tex0, tex1, combined);
+    vec3 sub_b = combineRgbInput(combine.sub_b, tex0, tex1, combined);
+    vec3 mul = combineRgbInput(combine.mul, tex0, tex1, combined);
+    vec3 add = combineRgbInput(combine.add, tex0, tex1, combined);
     return (sub_a - sub_b) * mul + add;
 }
 
-float combineAlpha(CombineEquation combine, float tex0_a, float combined_a) {
-    float sub_a = combineAlphaInput(combine.sub_a, tex0_a, combined_a);
-    float sub_b = combineAlphaInput(combine.sub_b, tex0_a, combined_a);
-    float mul = combineAlphaInput(combine.mul, tex0_a, combined_a);
-    float add = combineAlphaInput(combine.add, tex0_a, combined_a);
+float combineAlpha(CombineEquation combine, float tex0_a, float tex1_a, float combined_a) {
+    float sub_a = combineAlphaInput(combine.sub_a, tex0_a, tex1_a, combined_a);
+    float sub_b = combineAlphaInput(combine.sub_b, tex0_a, tex1_a, combined_a);
+    float mul = combineAlphaInput(combine.mul, tex0_a, tex1_a, combined_a);
+    float add = combineAlphaInput(combine.add, tex0_a, tex1_a, combined_a);
     return (sub_a - sub_b) * mul + add;
 }
 
-vec4 combine(CombineMode combine, vec4 tex0, vec4 combined) {
+vec4 combine(CombineMode combine, vec4 tex0, vec4 tex1, vec4 combined) {
     return vec4(
-        combineRgb(combine.rgb, tex0, combined),
-        combineAlpha(combine.a, tex0.a, combined.a)
+        combineRgb(combine.rgb, tex0, tex1, combined),
+        combineAlpha(combine.a, tex0.a, tex1.a, combined.a)
     );
 }
 
@@ -246,10 +252,16 @@ void main() {
     }
 
     vec2 tex_coords = v_tex_coords.xy / (v_tex_coords.z / 1024.0);
+
     vec2 tex0_size = textureSize(tex0_sampler, 0);
     float tex0_x = transformAxis(tex0_transform_x, tex0_size.x, tex_coords.x);
     float tex0_y = transformAxis(tex0_transform_y, tex0_size.y, tex_coords.y);
     vec4 tex0 = texture(tex0_sampler, vec2(tex0_x, tex0_y));
+
+    vec2 tex1_size = textureSize(tex1_sampler, 0);
+    float tex1_x = transformAxis(tex1_transform_x, tex1_size.x, tex_coords.x);
+    float tex1_y = transformAxis(tex1_transform_y, tex1_size.y, tex_coords.y);
+    vec4 tex1 = texture(tex1_sampler, vec2(tex1_x, tex1_y));
 
     if (cycle_type == CT_COPY) {
         f_color = vec4(tex0);
@@ -259,10 +271,10 @@ void main() {
     f_color = vec4(0.0);
 
     if (cycle_type == CT_TWO_CYCLE) {
-        f_color = combine(combine_0, tex0, f_color);
+        f_color = combine(combine_0, tex0, tex1, f_color);
     }
 
-    f_color = combine(combine_1, tex0, f_color);
+    f_color = combine(combine_1, tex0, tex1, f_color);
 
     float combined_a = f_color.a;
 
