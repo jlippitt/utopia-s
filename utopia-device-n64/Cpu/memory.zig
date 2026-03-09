@@ -42,7 +42,7 @@ pub fn load(comptime op: LoadOp) Core.Instruction {
             });
 
             const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
-            const paddr = core.mapAddress(vaddr, false) orelse return;
+            const paddr, _ = core.mapAddress(vaddr, false) orelse return;
 
             if ((paddr & op.alignMask()) != 0) {
                 @branchHint(.cold);
@@ -157,7 +157,7 @@ pub fn store(comptime op: StoreOp) Core.Instruction {
             });
 
             const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
-            const paddr = core.mapAddress(vaddr, true) orelse return;
+            const paddr, _ = core.mapAddress(vaddr, true) orelse return;
 
             if ((paddr & op.alignMask()) != 0) {
                 @branchHint(.cold);
@@ -225,7 +225,27 @@ pub fn store(comptime op: StoreOp) Core.Instruction {
 }
 
 pub fn cache(core: *Core, word: u32) void {
-    _ = word;
-    fw.log.trace("{X:08}: CACHE", .{core.pc});
-    // TODO
+    const args: Core.IType = @bitCast(word);
+    const offset = fw.num.signExtend(u32, args.imm);
+    const op = @intFromEnum(args.rt);
+
+    fw.log.trace("{X:08}: CACHE 0b{b:05}, {d}({t})", .{
+        core.pc,
+        op,
+        fw.num.signed(offset),
+        args.rs,
+    });
+
+    const vaddr = @as(u32, @truncate(core.get(args.rs))) +% offset;
+    const paddr, _ = core.mapAddress(vaddr, false) orelse return;
+
+    switch (op & 0b11) {
+        0b00 => switch (op >> 2) {
+            0b000 => core.icache.invalidate(vaddr),
+            0b010 => core.icache.indexStoreTag(vaddr, core.cp0.getTagLo()),
+            0b100 => core.icache.hitInvalidate(vaddr, paddr),
+            else => fw.log.panic("Unimplemented ICache op: {b:03}", .{op >> 2}),
+        },
+        else => fw.log.trace("Unimplemented cache op: {b:05}", .{op}),
+    }
 }

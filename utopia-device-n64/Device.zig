@@ -135,7 +135,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.InitError!fw.Dev
     const self = try arena.allocator().create(Self);
 
     self.* = .{
-        .cpu = .init(),
+        .cpu = try .init(&arena),
         .clock = clock,
         .rdram = rdram[0..rdram_size],
         .rsp = try .init(&arena),

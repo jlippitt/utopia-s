@@ -53,7 +53,7 @@ pub fn init() Self {
     return .{};
 }
 
-pub fn mapAddress(self: *const Self, vaddr: u32, asid: u8, store: bool) Error!u32 {
+pub fn mapAddress(self: *const Self, vaddr: u32, asid: u8, store: bool) Error!struct { u32, bool } {
     for (self.entries) |entry| {
         const entry_hi = entry.entry_hi;
         const page = @as(u32, entry_hi.vpn2) << 13;
@@ -78,7 +78,10 @@ pub fn mapAddress(self: *const Self, vaddr: u32, asid: u8, store: bool) Error!u3
             return error.TlbModification;
         }
 
-        return (@as(u32, entry_lo.pfn) << 12) | (vaddr & ~mask & ~selector_bit);
+        return .{
+            (@as(u32, entry_lo.pfn) << 12) | (vaddr & ~mask & ~selector_bit),
+            entry_lo.cache != 0b010,
+        };
     }
 
     return error.TlbMiss;

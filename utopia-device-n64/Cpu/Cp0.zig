@@ -92,6 +92,13 @@ pub const Exception = union(ExceptionType) {
     }
 };
 
+pub const TagLo = packed struct(u32) {
+    __0: u6 = 0,
+    p_state: u2 = 0,
+    p_tag_lo: u20 = 0,
+    __1: u4 = 0,
+};
+
 pub const Self = @This();
 
 index: Tlb.Index = .{},
@@ -128,6 +135,10 @@ pub fn fr(self: *const Self) bool {
     return self.status.fr;
 }
 
+pub fn getTagLo(self: *const Self) TagLo {
+    return self.tag_lo;
+}
+
 pub fn setIndex(self: *Self, index: Tlb.Index) void {
     self.index = index;
     fw.log.trace("  Index: {any}", .{self.index});
@@ -161,7 +172,7 @@ pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
     self.checkPendingInterrupts();
 }
 
-pub fn mapAddress(self: *const Self, vaddr: u32, store: bool) Tlb.Error!u32 {
+pub fn mapAddress(self: *const Self, vaddr: u32, store: bool) Tlb.Error!struct { u32, bool } {
     return self.tlb.mapAddress(vaddr, self.entry_hi.asid, store);
 }
 
@@ -540,13 +551,6 @@ const XContext = packed struct(u64) {
     bad_vpn2: u27 = 0,
     region: u2 = 0,
     pte_base: u31 = 0,
-};
-
-const TagLo = packed struct(u32) {
-    __0: u6 = 0,
-    p_state: u2 = 0,
-    p_tag_lo: u20 = 0,
-    __1: u4 = 0,
 };
 
 const main_table: [16]*const Core.Instruction = blk: {

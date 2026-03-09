@@ -1,7 +1,9 @@
+const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 const Cp0 = @import("./Cpu/Cp0.zig");
 const Cp1 = @import("./Cpu/Cp1.zig");
+const ICache = @import("./Cpu/ICache.zig");
 const alu = @import("./Cpu/alu.zig");
 const control = @import("./Cpu/control.zig");
 const memory = @import("./Cpu/memory.zig");
@@ -57,6 +59,7 @@ pub const Instruction = fn (self: *Self, word: u32) void;
 pc: u32 = cold_reset_vector,
 target_pc: u32 = 0,
 pipe_state: PipeState = .normal,
+icache: ICache,
 regs: [32]u64 = @splat(0),
 lo: u64 = 0,
 hi: u64 = 0,
@@ -64,8 +67,10 @@ ll_bit: bool = false,
 cp0: Cp0 = .init(),
 cp1: Cp1 = .init(),
 
-pub fn init() Self {
-    return .{};
+pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    return .{
+        .icache = try .init(arena),
+    };
 }
 
 pub fn clearInterrupt(self: *Self, interrupt: Interrupt) void {
@@ -85,11 +90,18 @@ pub fn handleTimerEvent(self: *Self) void {
 }
 
 pub fn step(self: *Self) void {
-    const address = self.mapAddress(self.pc, false) orelse return;
-    const word = self.getDevice().read(address);
+    const vaddr = self.pc;
+    const paddr, const cache = self.mapAddress(vaddr, false) orelse return;
 
-    const instr = decode(word);
-    instr(self, word);
+    if (cache) {
+        @branchHint(.likely);
+        const entry = self.icache.get(vaddr, paddr);
+        entry.instr(self, entry.word);
+    } else {
+        const word = self.getDevice().read(paddr);
+        const instr = decode(word);
+        instr(self, word);
+    }
 
     if (self.pipe_state == .delay) {
         @branchHint(.unlikely);
@@ -120,10 +132,14 @@ pub fn set(self: *Self, reg: Register, value: u64) void {
     }
 }
 
-pub fn mapAddress(self: *Self, vaddr: u32, store: bool) ?u32 {
+pub fn mapAddress(self: *Self, vaddr: u32, store: bool) ?struct { u32, bool } {
     if ((vaddr & 0xc000_0000) == 0x8000_0000) {
         @branchHint(.likely);
-        return vaddr & 0x1fff_ffff;
+
+        return .{
+            vaddr & 0x1fff_ffff,
+            (vaddr & 0x2000_0000) == 0,
+        };
     }
 
     return self.cp0.mapAddress(vaddr, store) catch |err| {
@@ -231,7 +247,7 @@ pub fn getDeviceConst(self: *const Self) *const Device {
     return @alignCast(@fieldParentPtr("cpu", self));
 }
 
-fn decode(word: u32) *const Instruction {
+pub fn decode(word: u32) *const Instruction {
     const opcode: u6 = @truncate(word >> 26);
 
     return switch (opcode) {
