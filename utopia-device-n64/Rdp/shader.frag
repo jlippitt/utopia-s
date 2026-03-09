@@ -258,15 +258,15 @@ void main() {
     float tex0_y = transformAxis(tex0_transform_y, tex0_size.y, tex_coords.y);
     vec4 tex0 = texture(tex0_sampler, vec2(tex0_x, tex0_y));
 
-    vec2 tex1_size = textureSize(tex1_sampler, 0);
-    float tex1_x = transformAxis(tex1_transform_x, tex1_size.x, tex_coords.x);
-    float tex1_y = transformAxis(tex1_transform_y, tex1_size.y, tex_coords.y);
-    vec4 tex1 = texture(tex1_sampler, vec2(tex1_x, tex1_y));
-
     if (cycle_type == CT_COPY) {
         f_color = vec4(tex0);
         return;
     }
+
+    vec2 tex1_size = textureSize(tex1_sampler, 0);
+    float tex1_x = transformAxis(tex1_transform_x, tex1_size.x, tex_coords.x);
+    float tex1_y = transformAxis(tex1_transform_y, tex1_size.y, tex_coords.y);
+    vec4 tex1 = texture(tex1_sampler, vec2(tex1_x, tex1_y));
 
     f_color = vec4(0.0);
 
