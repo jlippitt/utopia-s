@@ -194,11 +194,20 @@ pub fn render(self: *Self) RenderError!void {
         .cycle = false,
     };
 
+    const vertex_state: VertexState = .{
+        .dimensions = .{
+            @floatFromInt(surface.image_width),
+            @floatFromInt(surface.image_height),
+        },
+    };
+
     const command_buffer = try self.gpu.acquireCommandBuffer();
 
     {
         const render_pass = command_buffer.beginRenderPass(&.{color_target}, depth_target);
         defer render_pass.end();
+
+        command_buffer.pushVertexUniformData(0, std.mem.asBytes(&vertex_state));
 
         render_pass.setScissor(self.scissor);
 
@@ -292,4 +301,8 @@ pub const PixelFormat = enum(u3) {
 pub const ZSource = enum(u1) {
     per_pixel,
     prim_depth,
+};
+
+const VertexState = extern struct {
+    dimensions: [2]f32,
 };

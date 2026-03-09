@@ -24,6 +24,7 @@ pub fn init(
         .entry_point = "main",
         .format = format_flags,
         .stage = .vertex,
+        .num_uniform_buffers = 1,
     });
     errdefer gpu.releaseShader(vertex_shader);
 

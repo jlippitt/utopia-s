@@ -70,7 +70,7 @@ struct TransformAxis {
 
 layout(set = 2, binding = 0) uniform sampler2D tex0_sampler;
 
-layout (std140, set = 3, binding = 0) uniform UniformBlock {
+layout (std140, set = 3, binding = 0) uniform FragState {
     CombineMode combine_0;
     CombineMode combine_1;
     BlendMode blend_0;

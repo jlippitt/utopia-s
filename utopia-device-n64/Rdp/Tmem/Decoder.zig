@@ -69,6 +69,7 @@ pub fn decode(
             else => return error.FormatNotSupported,
         },
         .i => switch (size) {
+            .@"16" => self.decodeFormat(intensity16, tile, tmem_width, {}),
             .@"8" => self.decodeFormat(intensity8, tile, tmem_width, {}),
             .@"4" => self.decodeFormat(intensity4, tile, tmem_width, {}),
             else => return error.FormatNotSupported,
@@ -220,6 +221,21 @@ pub const ia4 = struct {
             intensity,
             intensity,
             alpha,
+        };
+    }
+};
+
+pub const intensity16 = struct {
+    const Options = void;
+    const dst_chunk_size = 4;
+    const src_chunk_size = 2;
+
+    fn decode(src: [2]u8, _: Options) [4]u8 {
+        return .{
+            src[0],
+            src[1],
+            src[0],
+            if ((src[1] & 1) != 0) 0xff else 0,
         };
     }
 };
