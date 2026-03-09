@@ -70,7 +70,7 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         const dtdy: i64 = tex_coords.dtdy << 2;
 
         if (cycle_type == .copy) {
-            dsdx = @divTrunc(dsdx, 64 / tile.bitsPerPixel());
+            dsdx = @divTrunc(dsdx, 4);
         }
 
         const tile_x = @as(i64, tile.x()) << 12;

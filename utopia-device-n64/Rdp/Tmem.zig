@@ -304,6 +304,13 @@ fn invalidateL1Cache(self: *Self) void {
 }
 
 fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}!*Texture {
+    fw.log.debug("Texture: {}x{} ({t} {t})", .{
+        tile.width(),
+        tile.height(),
+        tile.pixelFormat(),
+        tile.pixelSize(),
+    });
+
     const l1_result = self.l1_cache.getOrPut(tile.cacheKey());
 
     if (l1_result.found_existing) {
