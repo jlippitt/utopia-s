@@ -160,7 +160,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     const color_texture = try gpu.createTexture(.{
         .format = .r8g8b8a8_unorm,
-        .usage = .{ .color_target = true },
+        .usage = .{ .color_target = true, .sampler = true },
         .width = self.params.image_width,
         .height = self.params.image_height,
         .layer_count_or_depth = 1,
@@ -169,7 +169,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     const color_texture_msaa = try gpu.createTexture(.{
         .format = .r8g8b8a8_unorm,
-        .usage = .{ .color_target = true },
+        .usage = .{ .color_target = true, .sampler = true },
         .width = self.params.image_width * msaa,
         .height = self.params.image_height * msaa,
         .layer_count_or_depth = 1,
@@ -178,7 +178,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     const depth_texture = try gpu.createTexture(.{
         .format = .depth16_unorm,
-        .usage = .{ .depth_stencil_target = true },
+        .usage = .{ .depth_stencil_target = true, .sampler = true },
         .width = self.params.image_width,
         .height = self.params.image_height,
         .layer_count_or_depth = 1,
@@ -187,7 +187,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     const depth_texture_msaa = try gpu.createTexture(.{
         .format = .depth16_unorm,
-        .usage = .{ .depth_stencil_target = true },
+        .usage = .{ .depth_stencil_target = true, .sampler = true },
         .width = self.params.image_width * msaa,
         .height = self.params.image_height * msaa,
         .layer_count_or_depth = 1,

@@ -40,7 +40,7 @@ options: Options = .{},
 pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     const format_flags: sdl3.gpu.ShaderFormatFlags = .{ .spirv = true };
 
-    const gpu = try sdl3.gpu.Device.init(format_flags, builtin.mode == .Debug, null);
+    const gpu = try sdl3.gpu.Device.init(format_flags, false, null);
     errdefer gpu.deinit();
 
     var pipeline_cache = try PipelineCache.init(arena, gpu, format_flags);
