@@ -55,7 +55,7 @@ pub fn main() !void {
 
     var fps_counter = try FpsCounter.init();
     var timer = try std.time.Timer.start();
-    var delay_time: u64 = 0;
+    var delay_time: i64 = 0;
 
     outer: while (true) {
         while (sdl3.events.poll()) |event| {
@@ -99,13 +99,14 @@ pub fn main() !void {
             try audio.setSampleRate(audio_state.sample_rate);
             try audio.queueAudioData(audio_state.sample_data);
 
-            const expected_duration = ((@as(u64, audio_state.sample_data.len) * std.time.ns_per_s) /
-                (audio_state.sample_rate)) + delay_time;
+            const expected_duration = (@as(u64, audio_state.sample_data.len) * std.time.ns_per_s) /
+                (audio_state.sample_rate);
             const actual_duration = timer.lap();
-            delay_time = expected_duration -| actual_duration;
+            delay_time += @intCast(expected_duration);
+            delay_time -= @intCast(actual_duration);
 
             if (delay_time > 0) {
-                sdl3.timer.delayNanoseconds(delay_time);
+                sdl3.timer.delayNanoseconds(@intCast(delay_time));
             }
         }
 
