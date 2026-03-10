@@ -2,6 +2,7 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const utopia = @import("utopia");
 const cli = @import("./cli.zig");
+const VideoDevice = @import("./VideoDevice.zig");
 const FpsCounter = @import("./FpsCounter.zig");
 const logger = @import("./logger.zig");
 
@@ -29,23 +30,11 @@ pub fn main() !void {
     try sdl3.init(.everything);
     defer sdl3.quit(.everything);
 
-    const app_name = "Utopia-S";
-
     var device = try device_args.initDevice(allocator);
     defer device.deinit();
 
-    var src_size = device.getVideoState().resolution;
-
-    const init_size = try getBestSize(src_size, null);
-
-    const window = try sdl3.video.Window.init(app_name, init_size.x, init_size.y, .{});
-    defer window.deinit();
-
-    const renderer = try sdl3.render.Renderer.init(window, null);
-    defer renderer.deinit();
-
-    var texture = try resizeWindow(window, renderer, src_size);
-    defer texture.deinit();
+    var video = try VideoDevice.init(device.getVideoState().resolution);
+    defer video.deinit();
 
     const gamepad_ids = try sdl3.gamepad.getGamepads();
 
@@ -65,10 +54,7 @@ pub fn main() !void {
         while (sdl3.events.poll()) |event| {
             switch (event) {
                 .quit => break :outer,
-                .window_display_changed => {
-                    texture.deinit();
-                    texture = try resizeWindow(window, renderer, src_size);
-                },
+                .window_display_changed => try video.onWindowDisplayChanged(),
                 .key_down => |key| if (key.scancode) |scancode| {
                     switch (scancode) {
                         .escape => break :outer,
@@ -96,17 +82,8 @@ pub fn main() !void {
 
         {
             const video_state = device.getVideoState();
-            const resolution = video_state.resolution;
-
-            if (resolution.x != src_size.x or resolution.y != src_size.y) {
-                texture.deinit();
-                texture = try resizeWindow(window, renderer, resolution);
-                src_size = resolution;
-            }
-
-            try texture.update(null, video_state.pixel_data.ptr, src_size.x * 4);
-            try renderer.renderTexture(texture, null, null);
-            try renderer.present();
+            try video.setResolution(video_state.resolution);
+            try video.update(video_state.pixel_data);
         }
 
         if (!app_args.no_fps_limit) {
@@ -121,59 +98,13 @@ pub fn main() !void {
             }
         }
 
-        {
-            const fps = fps_counter.update();
-            var buf: [64]u8 = undefined;
-            const title = try std.fmt.bufPrintZ(&buf, "{s} (FPS: {d:.2})", .{ app_name, fps });
-            try window.setTitle(title);
-        }
+        try video.setFps(fps_counter.update());
     }
 }
 
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
     logger.deinit();
     std.debug.defaultPanic(msg, first_trace_addr);
-}
-
-fn resizeWindow(
-    window: sdl3.video.Window,
-    renderer: sdl3.render.Renderer,
-    src_size: utopia.Resolution,
-) !sdl3.render.Texture {
-    const display = try window.getDisplayForWindow();
-    const dst_size = try getBestSize(src_size, display);
-
-    try window.setSize(dst_size.x, dst_size.y);
-    try window.setPosition(.{ .centered = display }, .{ .centered = display });
-
-    return try renderer.createTexture(
-        .packed_xbgr_8_8_8_8,
-        .streaming,
-        src_size.x,
-        src_size.y,
-    );
-}
-
-fn getBestSize(
-    min_size: utopia.Resolution,
-    active_display: ?sdl3.video.Display,
-) !utopia.Resolution {
-    const display = active_display orelse (try sdl3.video.getDisplays())[0];
-    const bounds = try display.getUsableBounds();
-
-    const max_size: utopia.Resolution = .{
-        .x = @intCast(bounds.w),
-        .y = @intCast(bounds.h),
-    };
-
-    const x_scale = max_size.x / min_size.x;
-    const y_scale = max_size.y / min_size.y;
-    const scale = @min(x_scale, y_scale);
-
-    return .{
-        .x = min_size.x * scale,
-        .y = min_size.y * scale,
-    };
 }
 
 fn sdlError(err: ?[:0]const u8) void {
