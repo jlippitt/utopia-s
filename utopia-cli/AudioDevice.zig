@@ -21,6 +21,15 @@ pub fn init(sample_rate: u32) error{SdlError}!Self {
     const stream = try device.openStream(spec, void, null, null);
     errdefer stream.deinit();
 
+    // Add approx 50ms of silence at the start of the queue to help reduce popping
+    const silence = &[1]i16{0} ** 256;
+    var total_samples: u32 = 0;
+
+    while (total_samples < (sample_rate / 10)) {
+        try stream.putData(std.mem.sliceAsBytes(silence));
+        total_samples += silence.len;
+    }
+
     return .{
         .stream = stream,
         .sample_rate = sample_rate,
