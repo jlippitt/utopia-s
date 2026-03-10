@@ -44,6 +44,12 @@ pub const DisplayGroup = struct {
     len: u32,
 };
 
+const Changed = packed struct(u3) {
+    pipeline: bool = false,
+    scissor: bool = false,
+    frag_state: bool = false,
+};
+
 const Self = @This();
 
 display_groups: std.ArrayList(DisplayGroup),
@@ -54,11 +60,9 @@ vertex_buffer: sdl3.gpu.Buffer,
 index_upload_buffer: sdl3.gpu.TransferBuffer,
 vertex_upload_buffer: sdl3.gpu.TransferBuffer,
 frag_state: FragmentState = .{},
-frag_state_changed: bool = false,
 pipeline: *Pipeline,
-pipeline_changed: bool = false,
 scissor: sdl3.rect.Rect(i32) = .{ .x = 0, .y = 0, .w = 0, .h = 0 },
-scissor_changed: bool = false,
+changed: Changed = .{},
 fill_color: u32 = 0,
 pixel_size: Core.PixelSize = .@"32",
 
@@ -197,16 +201,16 @@ pub fn setPipeline(self: *Self, pipeline: *Pipeline) void {
     self.pipeline.unref();
     self.pipeline = pipeline;
     self.pipeline.ref();
-    self.pipeline_changed = true;
+    self.changed.pipeline = true;
 }
 
 pub fn setScissor(self: *Self, scissor: sdl3.rect.Rect(i32)) void {
     self.scissor = scissor;
-    self.scissor_changed = true;
+    self.changed.scissor = true;
 }
 
 pub fn setCombineMode(self: *Self, combine: [2]fragment.CombineMode) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(combine, self.frag_state.combine);
 
     self.frag_state.combine = combine;
@@ -217,7 +221,7 @@ pub fn setCombineMode(self: *Self, combine: [2]fragment.CombineMode) void {
 }
 
 pub fn setBlendMode(self: *Self, blend: [2]fragment.BlendMode) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(blend, self.frag_state.blend);
 
     self.frag_state.blend = blend;
@@ -226,7 +230,7 @@ pub fn setBlendMode(self: *Self, blend: [2]fragment.BlendMode) void {
 }
 
 pub fn setFogColor(self: *Self, fog_color: fw.color.RgbaUnorm) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(fog_color, self.frag_state.fog_color);
 
     self.frag_state.fog_color = fog_color;
@@ -234,7 +238,7 @@ pub fn setFogColor(self: *Self, fog_color: fw.color.RgbaUnorm) void {
 }
 
 pub fn setBlendColor(self: *Self, blend_color: fw.color.RgbaUnorm) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(blend_color, self.frag_state.blend_color);
 
     self.frag_state.blend_color = blend_color;
@@ -242,7 +246,7 @@ pub fn setBlendColor(self: *Self, blend_color: fw.color.RgbaUnorm) void {
 }
 
 pub fn setPrimColor(self: *Self, prim_color: fw.color.RgbaUnorm) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(prim_color, self.frag_state.prim_color);
 
     self.frag_state.prim_color = prim_color;
@@ -250,7 +254,7 @@ pub fn setPrimColor(self: *Self, prim_color: fw.color.RgbaUnorm) void {
 }
 
 pub fn setEnvColor(self: *Self, env_color: fw.color.RgbaUnorm) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(env_color, self.frag_state.env_color);
 
     self.frag_state.env_color = env_color;
@@ -258,7 +262,7 @@ pub fn setEnvColor(self: *Self, env_color: fw.color.RgbaUnorm) void {
 }
 
 pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         cycle_type != self.frag_state.cycle_type;
 
     self.frag_state.cycle_type = cycle_type;
@@ -266,7 +270,7 @@ pub fn setCycleType(self: *Self, cycle_type: CycleType) void {
 }
 
 pub fn setAlphaCvgSelect(self: *Self, alpha_cvg_select: bool) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         self.frag_state.alpha_cvg_select != @intFromBool(alpha_cvg_select);
 
     self.frag_state.alpha_cvg_select = @intFromBool(alpha_cvg_select);
@@ -274,7 +278,7 @@ pub fn setAlphaCvgSelect(self: *Self, alpha_cvg_select: bool) void {
 }
 
 pub fn setCvgTimesAlpha(self: *Self, cvg_times_alpha: bool) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         self.frag_state.cvg_times_alpha != @intFromBool(cvg_times_alpha);
 
     self.frag_state.cvg_times_alpha = @intFromBool(cvg_times_alpha);
@@ -282,7 +286,7 @@ pub fn setCvgTimesAlpha(self: *Self, cvg_times_alpha: bool) void {
 }
 
 pub fn setColorOnCvg(self: *Self, color_on_cvg: bool) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         self.frag_state.color_on_cvg != @intFromBool(color_on_cvg);
 
     self.frag_state.color_on_cvg = @intFromBool(color_on_cvg);
@@ -290,7 +294,7 @@ pub fn setColorOnCvg(self: *Self, color_on_cvg: bool) void {
 }
 
 pub fn setAlphaCompare(self: *Self, alpha_compare: bool) void {
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         self.frag_state.alpha_compare != @intFromBool(alpha_compare);
 
     self.frag_state.alpha_compare = @intFromBool(alpha_compare);
@@ -374,11 +378,7 @@ fn pushPrimitive(
     self.vertices.appendSliceAssumeCapacity(vertices);
 
     if (self.getCurrentDisplayGroup()) |display_group| {
-        if (std.meta.eql(tex, display_group.tex) and
-            !self.frag_state_changed and
-            !self.pipeline_changed and
-            !self.scissor_changed)
-        {
+        if (std.meta.eql(tex, display_group.tex) and @as(u3, @bitCast(self.changed)) == 0) {
             display_group.len += @intCast(indices.len);
             return;
         }
@@ -396,9 +396,7 @@ fn pushPrimitive(
         .len = @intCast(indices.len),
     });
 
-    self.frag_state_changed = false;
-    self.pipeline_changed = false;
-    self.scissor_changed = false;
+    self.changed = .{};
 }
 
 fn getCurrentDisplayGroup(self: *Self) ?*DisplayGroup {
@@ -434,7 +432,7 @@ fn updateFillColor(self: *Self) void {
         .@"32" => fill_colors = @splat(.fromRgba32Uint(self.fill_color)),
     }
 
-    self.frag_state_changed = self.frag_state_changed or
+    self.changed.frag_state = self.changed.frag_state or
         !std.meta.eql(self.frag_state.fill_colors, fill_colors);
 
     self.frag_state.fill_colors = @bitCast(fill_colors);
