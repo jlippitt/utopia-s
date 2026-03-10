@@ -77,6 +77,9 @@ pub fn setOtherModes(core: *Core, word: u64) error{SdlError}!void {
     core.options.z_source = cmd.z_source_sel;
     fw.log.debug("Z Source: {t}", .{core.options.z_source});
 
+    core.options.z_mode = cmd.z_mode;
+    fw.log.debug("Z Mode: {t}", .{core.options.z_mode});
+
     core.options.pipeline.z_compare_enable = cmd.z_compare_en;
     fw.log.debug("Z Compare Enable: {}", .{core.options.pipeline.z_compare_enable});
 
@@ -207,7 +210,7 @@ const SetOtherModes = packed struct(u64) {
     image_read_en: bool,
     color_on_cvg: bool,
     cvg_dest: u2,
-    z_mode: u2,
+    z_mode: Core.ZMode,
     cvg_times_alpha: bool,
     alpha_cvg_select: bool,
     force_blend: bool,

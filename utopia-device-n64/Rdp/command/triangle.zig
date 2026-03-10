@@ -161,9 +161,11 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         texture = try core.tmem.createTexture(core.gpu, cmd.tile);
     }
 
+    const bias = if (core.options.z_mode == .decal) Core.decal_bias else 0.0;
+
     if (core.options.z_source == .prim_depth) {
         for (&vertices) |*vertex| {
-            vertex.pos[2] = core.options.prim_depth;
+            vertex.pos[2] = core.options.prim_depth + bias;
         }
     } else if (comptime attr.z_buffer) {
         const z: i64 = fw.num.truncate(i32, args[arg_index] >> 32);
@@ -172,9 +174,9 @@ pub fn drawTriangle(comptime attr: TriangleAttributes, core: *Core) !?void {
         const dzdy: i64 = fw.num.truncate(i32, args[arg_index + 1]);
         fw.log.debug("Z: {d}, DZDX: {d}, DZDE: {d}, DZDY: {d}", .{ z, dzdx, dzde, dzdy });
 
-        vertices[0].pos[2] = float(z + ((high_y * dzde) >> 16));
-        vertices[1].pos[2] = float(z + ((mid_y * dzde) >> 16) + ((mid_x * dzdx) >> 16));
-        vertices[2].pos[2] = float(z + ((low_y * dzde) >> 16));
+        vertices[0].pos[2] = float(z + ((high_y * dzde) >> 16)) + bias;
+        vertices[1].pos[2] = float(z + ((mid_y * dzde) >> 16) + ((mid_x * dzdx) >> 16)) + bias;
+        vertices[2].pos[2] = float(z + ((low_y * dzde) >> 16)) + bias;
     }
 
     fw.log.debug("Vertices: {any}", .{vertices});

@@ -107,8 +107,10 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
     }
 
     if (core.options.z_source == .prim_depth) {
+        const bias = if (core.options.z_mode == .decal) Core.decal_bias else 0.0;
+
         for (&vertices) |*vertex| {
-            vertex.pos[2] = core.options.prim_depth;
+            vertex.pos[2] = core.options.prim_depth + bias;
         }
     }
 

@@ -16,9 +16,12 @@ const default_perspective = 1024.0;
 pub const InitError = std.mem.Allocator.Error || sdl3.errors.Error;
 pub const RenderError = sdl3.errors.Error;
 
+pub const decal_bias: f32 = -10.0;
+
 pub const Options = struct {
     perspective_enable: bool = false,
     z_source: ZSource = .per_pixel,
+    z_mode: ZMode = .@"opaque",
     prim_depth: f32 = 0.0,
     pipeline: Pipeline.Options = .{},
 };
@@ -306,6 +309,13 @@ pub const PixelFormat = enum(u3) {
 pub const ZSource = enum(u1) {
     per_pixel,
     prim_depth,
+};
+
+pub const ZMode = enum(u2) {
+    @"opaque",
+    interpenetrating,
+    transparent,
+    decal,
 };
 
 const VertexState = extern struct {
