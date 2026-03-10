@@ -5,8 +5,8 @@ const Clock = @import("./Clock.zig");
 
 const max_sample_rate = 48000;
 
-// Allow for 2 channels and 2 frames worth of data
-const sample_buffer_size = max_sample_rate * 4;
+// Allow for 2 frames worth of data
+const sample_buffer_size = max_sample_rate * 2;
 
 const Self = @This();
 
@@ -19,10 +19,10 @@ sample_rate: u32,
 cycles_per_sample: u64,
 dma_active: Dma = .{},
 dma_pending: Dma = .{},
-sample_buffer: std.ArrayList(i16),
+sample_buffer: std.ArrayList(fw.Sample),
 
 pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) error{OutOfMemory}!Self {
-    const sample_buffer = try std.ArrayList(i16).initCapacity(
+    const sample_buffer = try std.ArrayList(fw.Sample).initCapacity(
         arena.allocator(),
         sample_buffer_size,
     );
@@ -154,7 +154,7 @@ pub fn handleSampleEvent(self: *Self) void {
 
         const left = fw.mem.readBe(i16, rdram, self.dma_active.dram_addr);
         const right = fw.mem.readBe(i16, rdram, self.dma_active.dram_addr +% 2);
-        self.sample_buffer.appendSliceAssumeCapacity(&.{ left, right });
+        self.sample_buffer.appendAssumeCapacity(.{ left, right });
 
         self.dma_active.dram_addr +%= 4;
         self.dma_active.len -= 4;
@@ -171,7 +171,7 @@ pub fn handleSampleEvent(self: *Self) void {
             }
         }
     } else {
-        self.sample_buffer.appendSliceAssumeCapacity(&.{ 0, 0 });
+        self.sample_buffer.appendAssumeCapacity(.{ 0, 0 });
     }
 
     self.getDevice().clock.schedule(.ai_sample, self.cycles_per_sample);

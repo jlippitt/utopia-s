@@ -11,6 +11,7 @@ pub const Device = fw.Device;
 pub const InitError = fw.InitError;
 pub const Resolution = fw.Resolution;
 pub const VideoState = fw.VideoState;
+pub const Sample = fw.Sample;
 pub const AudioState = fw.AudioState;
 pub const ControllerState = fw.ControllerState;
 pub const ButtonState = fw.ButtonState;

@@ -100,7 +100,7 @@ pub fn main() !void {
             try audio.queueAudioData(audio_state.sample_data);
 
             const expected_duration = ((@as(u64, audio_state.sample_data.len) * std.time.ns_per_s) /
-                (audio_state.sample_rate * 2)) + delay_time;
+                (audio_state.sample_rate)) + delay_time;
             const actual_duration = timer.lap();
             delay_time = expected_duration -| actual_duration;
 
