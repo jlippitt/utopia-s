@@ -88,6 +88,9 @@ pub fn setOtherModes(core: *Core, word: u64) error{SdlError}!void {
 
     const pipeline = try core.pipeline_cache.create(core.gpu, core.options.pipeline);
     core.display_list.setPipeline(pipeline);
+
+    const sampler = if (cmd.sample_type) core.sampler_linear else core.sampler_nearest;
+    core.display_list.setSampler(sampler);
 }
 
 pub fn loadTlut(core: *Core, word: u64) void {

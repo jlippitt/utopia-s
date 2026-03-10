@@ -30,7 +30,8 @@ const Self = @This();
 
 gpu: sdl3.gpu.Device,
 pipeline_cache: PipelineCache,
-sampler: sdl3.gpu.Sampler,
+sampler_nearest: sdl3.gpu.Sampler,
+sampler_linear: sdl3.gpu.Sampler,
 target: Target,
 tmem: Tmem,
 display_list: DisplayList,
@@ -46,7 +47,17 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     var pipeline_cache = try PipelineCache.init(arena, gpu, format_flags);
     errdefer pipeline_cache.deinit(gpu);
 
-    const sampler = try gpu.createSampler(.{
+    const sampler_nearest = try gpu.createSampler(.{
+        .mag_filter = .nearest,
+        .min_filter = .nearest,
+        .mipmap_mode = .nearest,
+        .address_mode_u = .clamp_to_edge,
+        .address_mode_v = .clamp_to_edge,
+        .address_mode_w = .clamp_to_edge,
+    });
+    errdefer gpu.releaseSampler(sampler_nearest);
+
+    const sampler_linear = try gpu.createSampler(.{
         .mag_filter = .linear,
         .min_filter = .nearest,
         .mipmap_mode = .nearest,
@@ -54,7 +65,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
         .address_mode_v = .clamp_to_edge,
         .address_mode_w = .clamp_to_edge,
     });
-    errdefer gpu.releaseSampler(sampler);
+    errdefer gpu.releaseSampler(sampler_linear);
 
     var target = try Target.init(gpu);
     errdefer target.deinit(gpu);
@@ -64,7 +75,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 
     const default_pipeline = try pipeline_cache.create(gpu, .{});
 
-    var display_list = try DisplayList.init(arena, gpu, default_pipeline);
+    var display_list = try DisplayList.init(arena, gpu, default_pipeline, sampler_nearest);
     errdefer display_list.deinit(gpu);
 
     const word_buf = try std.ArrayListUnmanaged(u64).initCapacity(
@@ -75,7 +86,8 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     return .{
         .gpu = gpu,
         .pipeline_cache = pipeline_cache,
-        .sampler = sampler,
+        .sampler_nearest = sampler_nearest,
+        .sampler_linear = sampler_linear,
         .target = target,
         .tmem = tmem,
         .display_list = display_list,
@@ -89,7 +101,8 @@ pub fn deinit(self: *Self) void {
     self.display_list.deinit(self.gpu);
     self.tmem.deinit(self.gpu);
     self.target.deinit(self.gpu);
-    self.gpu.releaseSampler(self.sampler);
+    self.gpu.releaseSampler(self.sampler_linear);
+    self.gpu.releaseSampler(self.sampler_nearest);
     self.pipeline_cache.deinit(self.gpu);
     self.gpu.deinit();
 }
@@ -244,14 +257,14 @@ pub fn render(self: *Self) RenderError!void {
             render_pass.bindFragmentSamplers(0, &.{
                 .{
                     .texture = display_group.tex[0].texture.getBinding(),
-                    .sampler = self.sampler,
+                    .sampler = display_group.sampler,
                 },
             });
 
             render_pass.bindFragmentSamplers(1, &.{
                 .{
                     .texture = display_group.tex[1].texture.getBinding(),
-                    .sampler = self.sampler,
+                    .sampler = display_group.sampler,
                 },
             });
 
