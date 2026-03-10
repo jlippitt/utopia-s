@@ -19,10 +19,10 @@ sample_rate: u32,
 cycles_per_sample: u64,
 dma_active: Dma = .{},
 dma_pending: Dma = .{},
-sample_buffer: std.ArrayList(u16),
+sample_buffer: std.ArrayList(i16),
 
 pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) error{OutOfMemory}!Self {
-    const sample_buffer = try std.ArrayList(u16).initCapacity(
+    const sample_buffer = try std.ArrayList(i16).initCapacity(
         arena.allocator(),
         sample_buffer_size,
     );
@@ -152,8 +152,8 @@ pub fn handleSampleEvent(self: *Self) void {
     if (self.dma_enable and self.dma_active.len != 0) {
         const rdram = self.getDeviceConst().rdram;
 
-        const left = fw.mem.readBe(u16, rdram, self.dma_active.dram_addr);
-        const right = fw.mem.readBe(u16, rdram, self.dma_active.dram_addr +% 2);
+        const left = fw.mem.readBe(i16, rdram, self.dma_active.dram_addr);
+        const right = fw.mem.readBe(i16, rdram, self.dma_active.dram_addr +% 2);
         self.sample_buffer.appendSliceAssumeCapacity(&.{ left, right });
 
         self.dma_active.dram_addr +%= 4;

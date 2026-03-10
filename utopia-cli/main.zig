@@ -3,6 +3,7 @@ const sdl3 = @import("sdl3");
 const utopia = @import("utopia");
 const cli = @import("./cli.zig");
 const VideoDevice = @import("./VideoDevice.zig");
+const AudioDevice = @import("./AudioDevice.zig");
 const FpsCounter = @import("./FpsCounter.zig");
 const logger = @import("./logger.zig");
 
@@ -36,6 +37,9 @@ pub fn main() !void {
     var video = try VideoDevice.init(device.getVideoState().resolution);
     defer video.deinit();
 
+    var audio = try AudioDevice.init(device.getAudioState().sample_rate);
+    defer audio.deinit();
+
     const gamepad_ids = try sdl3.gamepad.getGamepads();
 
     const gamepad: ?sdl3.gamepad.Gamepad = if (gamepad_ids.len > 0)
@@ -45,8 +49,11 @@ pub fn main() !void {
 
     defer if (gamepad) |pad| pad.deinit();
 
-    var fps_counter = try FpsCounter.init();
     var controller_state: utopia.ControllerState = .{};
+
+    try audio.play();
+
+    var fps_counter = try FpsCounter.init();
     var timer = try std.time.Timer.start();
     var delay_time: u64 = 0;
 
@@ -88,6 +95,10 @@ pub fn main() !void {
 
         if (!app_args.no_fps_limit) {
             const audio_state = device.getAudioState();
+
+            try audio.setSampleRate(audio_state.sample_rate);
+            try audio.queueAudioData(audio_state.sample_data);
+
             const expected_duration = ((@as(u64, audio_state.sample_data.len) * std.time.ns_per_s) /
                 (audio_state.sample_rate * 2)) + delay_time;
             const actual_duration = timer.lap();
