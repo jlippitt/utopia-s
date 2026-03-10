@@ -130,7 +130,7 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.InitError!fw.Dev
 
     var clock = Clock.init();
     const vi = try VideoInterface.init(&arena, &clock);
-    const ai = AudioInterface.init(&clock);
+    const ai = try AudioInterface.init(&arena, &clock);
 
     const self = try arena.allocator().create(Self);
 
@@ -153,8 +153,8 @@ pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.InitError!fw.Dev
     return fw.Device.init(self, .{
         .deinit = deinit,
         .runFrame = runFrame,
-        .getScreenSize = getScreenSize,
-        .getPixels = getPixels,
+        .getVideoState = getVideoState,
+        .getAudioState = getAudioState,
         .updateControllerState = updateControllerState,
     });
 }
@@ -165,6 +165,8 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn runFrame(self: *Self) fw.RenderError!void {
+    self.ai.clearSampleBuffer();
+
     while (true) {
         self.cpu.step();
         self.clock.addCycles(4);
@@ -185,12 +187,12 @@ pub fn runFrame(self: *Self) fw.RenderError!void {
     }
 }
 
-pub fn getScreenSize(self: *const Self) fw.ScreenSize {
-    return self.vi.getScreenSize();
+pub fn getVideoState(self: *const Self) fw.VideoState {
+    return self.vi.getVideoState();
 }
 
-pub fn getPixels(self: *const Self) []const u8 {
-    return self.vi.getPixels();
+pub fn getAudioState(self: *const Self) fw.AudioState {
+    return self.ai.getAudioState();
 }
 
 pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {

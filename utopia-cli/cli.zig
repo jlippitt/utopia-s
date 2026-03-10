@@ -2,7 +2,9 @@ const std = @import("std");
 const clap = @import("clap");
 const utopia = @import("utopia");
 
-const AppArgs = struct {};
+const AppArgs = struct {
+    no_fps_limit: bool,
+};
 
 pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs } {
     var iter = try std.process.ArgIterator.initWithAllocator(allocator);
@@ -32,7 +34,8 @@ fn parseAppArgs(
     };
 
     const params = comptime clap.parseParamsComptime(
-        \\-h, --help    Display this help and exit
+        \\-n, --no-fps-limit Disable FPS limiter (also disables audio)
+        \\-h, --help         Display this help and exit
         \\<device>
         \\
     );
@@ -55,7 +58,9 @@ fn parseAppArgs(
         return null;
     }
 
-    const app_args: AppArgs = .{};
+    const app_args: AppArgs = .{
+        .no_fps_limit = res.args.@"no-fps-limit" != 0,
+    };
 
     const device_type = res.positionals[0] orelse {
         try clap.helpToFile(.stderr(), clap.Help, &params, .{});

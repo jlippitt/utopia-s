@@ -29,9 +29,19 @@ pub const RenderError = error{
     SdlError,
 };
 
-pub const ScreenSize = struct {
+pub const Resolution = struct {
     x: u32,
     y: u32,
+};
+
+pub const VideoState = struct {
+    resolution: Resolution,
+    pixel_data: []const u8,
+};
+
+pub const AudioState = struct {
+    sample_rate: u32,
+    sample_data: []const u16,
 };
 
 pub const ControllerState = struct {
@@ -84,8 +94,8 @@ pub fn Interface(comptime Self: type) type {
     return struct {
         deinit: *const fn (self: *Self) void,
         runFrame: *const fn (self: *Self) RenderError!void,
-        getScreenSize: *const fn (self: *const Self) ScreenSize,
-        getPixels: *const fn (self: *const Self) []const u8,
+        getVideoState: *const fn (self: *const Self) VideoState,
+        getAudioState: *const fn (self: *const Self) AudioState,
         updateControllerState: *const fn (self: *Self, state: *const ControllerState) void,
     };
 }
@@ -113,14 +123,14 @@ pub const Device = struct {
                 return @call(.always_inline, iface.runFrame, .{self});
             }
 
-            fn getScreenSizeImpl(ptr: *const anyopaque) ScreenSize {
+            fn getVideoStateImpl(ptr: *const anyopaque) VideoState {
                 const self: *const Inner = @ptrCast(@alignCast(ptr));
-                return @call(.always_inline, iface.getScreenSize, .{self});
+                return @call(.always_inline, iface.getVideoState, .{self});
             }
 
-            fn getPixelsImpl(ptr: *const anyopaque) []const u8 {
+            fn getAudioStateImpl(ptr: *const anyopaque) AudioState {
                 const self: *const Inner = @ptrCast(@alignCast(ptr));
-                return @call(.always_inline, iface.getPixels, .{self});
+                return @call(.always_inline, iface.getAudioState, .{self});
             }
 
             fn updateControllerStateImpl(ptr: *anyopaque, state: *const ControllerState) void {
@@ -131,8 +141,8 @@ pub const Device = struct {
             const vtable = Interface(anyopaque){
                 .deinit = deinitImpl,
                 .runFrame = runFrameImpl,
-                .getScreenSize = getScreenSizeImpl,
-                .getPixels = getPixelsImpl,
+                .getVideoState = getVideoStateImpl,
+                .getAudioState = getAudioStateImpl,
                 .updateControllerState = updateControllerStateImpl,
             };
         };
@@ -151,12 +161,12 @@ pub const Device = struct {
         return self.vtable.runFrame(self.ptr);
     }
 
-    pub fn getScreenSize(self: Self) ScreenSize {
-        return self.vtable.getScreenSize(self.ptr);
+    pub fn getVideoState(self: Self) VideoState {
+        return self.vtable.getVideoState(self.ptr);
     }
 
-    pub fn getPixels(self: Self) []const u8 {
-        return self.vtable.getPixels(self.ptr);
+    pub fn getAudioState(self: Self) AudioState {
+        return self.vtable.getAudioState(self.ptr);
     }
 
     pub fn updateControllerState(self: *Self, state: *const ControllerState) void {

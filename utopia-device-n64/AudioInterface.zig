@@ -1,8 +1,12 @@
+const std = @import("std");
+const fw = @import("framework");
 const Device = @import("./Device.zig");
 const Clock = @import("./Clock.zig");
-const fw = @import("framework");
 
 const max_sample_rate = 48000;
+
+// Allow for 2 channels and 2 frames worth of data
+const sample_buffer_size = max_sample_rate * 4;
 
 const Self = @This();
 
@@ -11,18 +15,39 @@ dma_enable: bool = false,
 status: Status = .{},
 dacrate: u14 = 0,
 bitrate: u4 = 0,
-cycles_per_sample: u64 = 0,
+sample_rate: u32,
+cycles_per_sample: u64,
 dma_active: Dma = .{},
 dma_pending: Dma = .{},
+sample_buffer: std.ArrayList(u16),
 
-pub fn init(clock: *Clock) Self {
-    const cycles_per_sample = cyclesPerSample(0);
+pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) error{OutOfMemory}!Self {
+    const sample_buffer = try std.ArrayList(u16).initCapacity(
+        arena.allocator(),
+        sample_buffer_size,
+    );
+
+    const sample_rate, const cycles_per_sample = calcSampleRates(0);
+    fw.log.debug("Sample Rate: {}", .{sample_rate});
     fw.log.debug("Cycles Per Sample: {}", .{cycles_per_sample});
     clock.schedule(.ai_sample, cycles_per_sample);
 
     return .{
+        .sample_buffer = sample_buffer,
+        .sample_rate = sample_rate,
         .cycles_per_sample = cycles_per_sample,
     };
+}
+
+pub fn getAudioState(self: *const Self) fw.AudioState {
+    return .{
+        .sample_rate = self.sample_rate,
+        .sample_data = self.sample_buffer.items,
+    };
+}
+
+pub fn clearSampleBuffer(self: *Self) void {
+    self.sample_buffer.clearRetainingCapacity();
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -97,12 +122,16 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 
             fw.log.debug("AI_DACRATE: {}", .{self.dacrate});
 
-            const cycles_per_sample = cyclesPerSample(self.dacrate);
+            const prev_cycles_per_sample = self.cycles_per_sample;
+            const sample_rate, const cycles_per_sample = calcSampleRates(self.dacrate);
 
-            if (cycles_per_sample != self.cycles_per_sample) {
-                self.cycles_per_sample = cycles_per_sample;
-                fw.log.debug("Cycles Per Sample: {}", .{self.cycles_per_sample});
-                self.getDevice().clock.reschedule(.ai_sample, cycles_per_sample);
+            self.sample_rate = sample_rate;
+            fw.log.debug("Sample Rate: {}", .{self.sample_rate});
+            self.cycles_per_sample = cycles_per_sample;
+            fw.log.debug("Cycles Per Sample: {}", .{self.cycles_per_sample});
+
+            if (self.cycles_per_sample != prev_cycles_per_sample) {
+                self.getDevice().clock.reschedule(.ai_sample, self.cycles_per_sample);
             }
         },
         5 => {
@@ -121,9 +150,14 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 
 pub fn handleSampleEvent(self: *Self) void {
     if (self.dma_enable and self.dma_active.len != 0) {
-        // TODO: Read sample from RDRAM into buffer
+        const rdram = self.getDeviceConst().rdram;
+
+        const left = fw.mem.readBe(u16, rdram, self.dma_active.dram_addr);
+        const right = fw.mem.readBe(u16, rdram, self.dma_active.dram_addr +% 2);
+        self.sample_buffer.appendSliceAssumeCapacity(&.{ left, right });
+
         self.dma_active.dram_addr +%= 4;
-        self.dma_active.len -%= 4;
+        self.dma_active.len -= 4;
 
         if (self.dma_active.len == 0) {
             self.dma_active = self.dma_pending;
@@ -136,6 +170,8 @@ pub fn handleSampleEvent(self: *Self) void {
                 fw.log.debug("AI DMA Complete", .{});
             }
         }
+    } else {
+        self.sample_buffer.appendSliceAssumeCapacity(&.{ 0, 0 });
     }
 
     self.getDevice().clock.schedule(.ai_sample, self.cycles_per_sample);
@@ -145,13 +181,22 @@ fn getDevice(self: *Self) *Device {
     return @alignCast(@fieldParentPtr("ai", self));
 }
 
-fn cyclesPerSample(dac_rate: u14) u64 {
+fn getDeviceConst(self: *const Self) *const Device {
+    return @alignCast(@fieldParentPtr("ai", self));
+}
+
+fn calcSampleRates(dacrate: u14) struct { u32, u64 } {
     const sample_rate = @min(
-        Device.video_dac_rate / (@as(f64, @floatFromInt(dac_rate)) + 1.0),
+        Device.video_dac_rate / (@as(f64, @floatFromInt(dacrate)) + 1.0),
         max_sample_rate,
     );
 
-    return @intFromFloat(Device.clock_rate / sample_rate);
+    const cycles_per_sample = Device.clock_rate / sample_rate;
+
+    return .{
+        @intFromFloat(sample_rate),
+        @intFromFloat(cycles_per_sample),
+    };
 }
 
 const Status = packed struct(u32) {

@@ -24,8 +24,6 @@ pub fn main() !void {
 
     const app_args, const device_args = try cli.parse(allocator) orelse return;
 
-    _ = app_args;
-
     sdl3.errors.error_callback = sdlError;
 
     try sdl3.init(.everything);
@@ -36,7 +34,7 @@ pub fn main() !void {
     var device = try device_args.initDevice(allocator);
     defer device.deinit();
 
-    var src_size = device.getScreenSize();
+    var src_size = device.getVideoState().resolution;
 
     const init_size = try getBestSize(src_size, null);
 
@@ -60,6 +58,8 @@ pub fn main() !void {
 
     var fps_counter = try FpsCounter.init();
     var controller_state: utopia.ControllerState = .{};
+    var timer = try std.time.Timer.start();
+    var delay_time: u64 = 0;
 
     outer: while (true) {
         while (sdl3.events.poll()) |event| {
@@ -94,23 +94,39 @@ pub fn main() !void {
 
         try device.runFrame();
 
-        const new_size = device.getScreenSize();
+        {
+            const video_state = device.getVideoState();
+            const resolution = video_state.resolution;
 
-        if (new_size.x != src_size.x or new_size.y != src_size.y) {
-            texture.deinit();
-            texture = try resizeWindow(window, renderer, new_size);
-            src_size = new_size;
+            if (resolution.x != src_size.x or resolution.y != src_size.y) {
+                texture.deinit();
+                texture = try resizeWindow(window, renderer, resolution);
+                src_size = resolution;
+            }
+
+            try texture.update(null, video_state.pixel_data.ptr, src_size.x * 4);
+            try renderer.renderTexture(texture, null, null);
+            try renderer.present();
         }
 
-        try texture.update(null, device.getPixels().ptr, src_size.x * 4);
-        try renderer.renderTexture(texture, null, null);
-        try renderer.present();
+        if (!app_args.no_fps_limit) {
+            const audio_state = device.getAudioState();
+            const expected_duration = ((@as(u64, audio_state.sample_data.len) * std.time.ns_per_s) /
+                (audio_state.sample_rate * 2)) + delay_time;
+            const actual_duration = timer.lap();
+            delay_time = expected_duration -| actual_duration;
 
-        const fps = fps_counter.update();
+            if (delay_time > 0) {
+                sdl3.timer.delayNanoseconds(delay_time);
+            }
+        }
 
-        var buf: [64]u8 = undefined;
-        const title = try std.fmt.bufPrintZ(&buf, "{s} (FPS: {d:.2})", .{ app_name, fps });
-        try window.setTitle(title);
+        {
+            const fps = fps_counter.update();
+            var buf: [64]u8 = undefined;
+            const title = try std.fmt.bufPrintZ(&buf, "{s} (FPS: {d:.2})", .{ app_name, fps });
+            try window.setTitle(title);
+        }
     }
 }
 
@@ -122,7 +138,7 @@ fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
 fn resizeWindow(
     window: sdl3.video.Window,
     renderer: sdl3.render.Renderer,
-    src_size: utopia.ScreenSize,
+    src_size: utopia.Resolution,
 ) !sdl3.render.Texture {
     const display = try window.getDisplayForWindow();
     const dst_size = try getBestSize(src_size, display);
@@ -139,13 +155,13 @@ fn resizeWindow(
 }
 
 fn getBestSize(
-    min_size: utopia.ScreenSize,
+    min_size: utopia.Resolution,
     active_display: ?sdl3.video.Display,
-) !utopia.ScreenSize {
+) !utopia.Resolution {
     const display = active_display orelse (try sdl3.video.getDisplays())[0];
     const bounds = try display.getUsableBounds();
 
-    const max_size: utopia.ScreenSize = .{
+    const max_size: utopia.Resolution = .{
         .x = @intCast(bounds.w),
         .y = @intCast(bounds.h),
     };

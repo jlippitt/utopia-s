@@ -27,7 +27,7 @@ v_burst: Range = .{},
 x_scale: Scale = .{},
 y_scale: Scale = .{},
 cycles_per_line: u64 = 0,
-screen_size: fw.ScreenSize = .{
+resolution: fw.Resolution = .{
     .x = default_width,
     .y = default_height,
 },
@@ -36,7 +36,7 @@ pixels: *[pixel_array_size]u8,
 pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) !Self {
     const pixels = try arena.allocator().alloc(u8, pixel_array_size);
 
-    const cycles_per_line = cyclesPerLine(default_h_total);
+    const cycles_per_line = calcCyclesPerLine(default_h_total);
     fw.log.debug("Cycles Per Line: {}", .{cycles_per_line});
     clock.schedule(.vi_new_line, cycles_per_line);
 
@@ -46,12 +46,11 @@ pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) !Self {
     };
 }
 
-pub fn getScreenSize(self: *const Self) fw.ScreenSize {
-    return self.screen_size;
-}
-
-pub fn getPixels(self: *const Self) []const u8 {
-    return self.pixels;
+pub fn getVideoState(self: *const Self) fw.VideoState {
+    return .{
+        .resolution = self.resolution,
+        .pixel_data = self.pixels,
+    };
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -105,7 +104,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
             fw.num.writeMasked(u32, @ptrCast(&self.h_total), value, mask);
             fw.log.debug("H_TOTAL: {any}", .{self.h_total});
 
-            const cycles_per_line = cyclesPerLine(self.h_total.h_total);
+            const cycles_per_line = calcCyclesPerLine(self.h_total.h_total);
 
             if (cycles_per_line != self.cycles_per_line) {
                 self.cycles_per_line = cycles_per_line;
@@ -173,7 +172,7 @@ fn render(self: *Self) void {
 
     if (dst_width != 0 and dst_height != 0) {
         color_mode = self.ctrl.color_mode;
-        self.screen_size = .{ .x = dst_width, .y = dst_height };
+        self.resolution = .{ .x = dst_width, .y = dst_height };
     }
 
     fw.log.debug("Rendering Frame: {d}x{d} ({t})", .{
@@ -246,7 +245,7 @@ fn getDeviceConst(self: *Self) *const Device {
     return @alignCast(@fieldParentPtr("vi", self));
 }
 
-fn cyclesPerLine(h_total: u12) u64 {
+fn calcCyclesPerLine(h_total: u12) u64 {
     return @intFromFloat(
         @as(f64, @floatFromInt(
             Device.clock_rate * (@as(u64, h_total) + 1),

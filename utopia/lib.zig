@@ -8,8 +8,10 @@ pub const log = struct {
 };
 
 pub const Device = fw.Device;
-pub const DeviceError = fw.InitError;
-pub const ScreenSize = fw.ScreenSize;
+pub const InitError = fw.InitError;
+pub const Resolution = fw.Resolution;
+pub const VideoState = fw.VideoState;
+pub const AudioState = fw.AudioState;
 pub const ControllerState = fw.ControllerState;
 pub const ButtonState = fw.ButtonState;
 pub const AxisState = fw.AxisState;
@@ -23,7 +25,7 @@ pub const DeviceArgs = union(DeviceType) {
 
     n64: N64.Args,
 
-    pub fn initDevice(self: Self, allocator: std.mem.Allocator) DeviceError!Device {
+    pub fn initDevice(self: Self, allocator: std.mem.Allocator) InitError!Device {
         return switch (self) {
             .n64 => |device_args| try N64.init(allocator, device_args),
         };
