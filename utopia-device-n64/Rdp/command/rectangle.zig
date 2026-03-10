@@ -81,7 +81,10 @@ pub fn drawRectangle(comptime rect_type: RectangleType, core: *Core) !?void {
         const sl = sh + ((dsdx * (@as(i64, xl) - xh)) >> 2);
         const tl = th + ((dtdy * (@as(i64, yl) - yh)) >> 2);
 
-        const offset: f32 = if (core.display_list.getSampleType() == .linear) 0.5 else 0;
+        const offset: f32 = if (cycle_type != .copy and core.display_list.getSampleType() == .linear)
+            0.5
+        else
+            0;
 
         const tex_left = @as(f32, @floatFromInt(sh)) / 4096.0 + offset;
         const tex_right = @as(f32, @floatFromInt(sl)) / 4096.0 + offset;
