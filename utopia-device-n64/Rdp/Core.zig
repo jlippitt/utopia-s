@@ -75,7 +75,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
 
     const default_pipeline = try pipeline_cache.create(gpu, .{});
 
-    var display_list = try DisplayList.init(arena, gpu, default_pipeline, sampler_nearest);
+    var display_list = try DisplayList.init(arena, gpu, default_pipeline);
     errdefer display_list.deinit(gpu);
 
     const word_buf = try std.ArrayListUnmanaged(u64).initCapacity(
@@ -254,17 +254,22 @@ pub fn render(self: *Self) RenderError!void {
                 std.mem.asBytes(&display_group.frag_state),
             );
 
+            const sampler = switch (display_group.sample_type) {
+                .nearest => self.sampler_nearest,
+                .linear => self.sampler_linear,
+            };
+
             render_pass.bindFragmentSamplers(0, &.{
                 .{
                     .texture = display_group.tex[0].texture.getBinding(),
-                    .sampler = display_group.sampler,
+                    .sampler = sampler,
                 },
             });
 
             render_pass.bindFragmentSamplers(1, &.{
                 .{
                     .texture = display_group.tex[1].texture.getBinding(),
-                    .sampler = display_group.sampler,
+                    .sampler = sampler,
                 },
             });
 

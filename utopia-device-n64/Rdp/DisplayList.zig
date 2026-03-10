@@ -39,7 +39,7 @@ const FragmentState = extern struct {
 pub const DisplayGroup = struct {
     pipeline: *Pipeline,
     scissor: sdl3.rect.Rect(i32),
-    sampler: sdl3.gpu.Sampler,
+    sample_type: sdl3.gpu.Filter,
     tex: [2]Tmem.TextureDescriptor,
     frag_state: FragmentState,
     len: u32,
@@ -48,7 +48,7 @@ pub const DisplayGroup = struct {
 const Changed = packed struct(u4) {
     pipeline: bool = false,
     scissor: bool = false,
-    sampler: bool = false,
+    sample_type: bool = false,
     frag_state: bool = false,
 };
 
@@ -64,7 +64,7 @@ vertex_upload_buffer: sdl3.gpu.TransferBuffer,
 frag_state: FragmentState = .{},
 pipeline: *Pipeline,
 scissor: sdl3.rect.Rect(i32) = .{ .x = 0, .y = 0, .w = 0, .h = 0 },
-sampler: sdl3.gpu.Sampler,
+sample_type: sdl3.gpu.Filter = .nearest,
 changed: Changed = .{},
 fill_color: u32 = 0,
 pixel_size: Core.PixelSize = .@"32",
@@ -73,7 +73,6 @@ pub fn init(
     arena: *std.heap.ArenaAllocator,
     gpu: sdl3.gpu.Device,
     pipeline: *Pipeline,
-    sampler: sdl3.gpu.Sampler,
 ) error{ OutOfMemory, SdlError }!Self {
     const index_buffer = try gpu.createBuffer(.{
         .size = index_buffer_size,
@@ -110,7 +109,6 @@ pub fn init(
         .index_upload_buffer = index_upload_buffer,
         .vertex_upload_buffer = vertex_upload_buffer,
         .pipeline = pipeline,
-        .sampler = sampler,
     };
 }
 
@@ -141,6 +139,10 @@ pub fn getVertexBuffer(self: *const Self) sdl3.gpu.Buffer {
 
 pub fn getCycleType(self: *Self) CycleType {
     return self.frag_state.cycle_type;
+}
+
+pub fn getSampleType(self: *Self) sdl3.gpu.Filter {
+    return self.sample_type;
 }
 
 pub fn clear(self: *Self) void {
@@ -209,13 +211,10 @@ pub fn setPipeline(self: *Self, pipeline: *Pipeline) void {
     self.changed.pipeline = true;
 }
 
-pub fn setSampler(self: *Self, sampler: sdl3.gpu.Sampler) void {
-    if (sampler == self.sampler) {
-        return;
-    }
-
-    self.sampler = sampler;
-    self.changed.sampler = true;
+pub fn setSampleType(self: *Self, sample_type: sdl3.gpu.Filter) void {
+    self.changed.sample_type = self.changed.sample_type or sample_type != self.sample_type;
+    self.sample_type = sample_type;
+    fw.log.debug("Sample Type: {t}", .{self.sample_type});
 }
 
 pub fn setScissor(self: *Self, scissor: sdl3.rect.Rect(i32)) void {
@@ -405,7 +404,7 @@ fn pushPrimitive(
     self.display_groups.appendAssumeCapacity(.{
         .pipeline = self.pipeline,
         .scissor = self.scissor,
-        .sampler = self.sampler,
+        .sample_type = self.sample_type,
         .tex = tex,
         .frag_state = self.frag_state,
         .len = @intCast(indices.len),
