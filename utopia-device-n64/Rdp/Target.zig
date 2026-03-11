@@ -152,7 +152,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
             self.params.color_format == surface.color_format and
             self.params.depth_address == surface.depth_address and
             self.params.image_width == surface.image_width and
-            self.params.image_height == surface.image_height)
+            self.params.image_height <= surface.image_height)
         {
             return;
         }
