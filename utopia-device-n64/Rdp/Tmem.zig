@@ -139,7 +139,10 @@ pub fn loadTlut(self: *Self, rdram: []const u8, size: Tile.Size) void {
     var tile = self.tiles[size.tile];
     tile.size = size;
 
-    const dram_addr: u32 = self.image_address;
+    const dram_x_offset = std.math.divCeil(u32, tile.x() * 16, 8) catch unreachable;
+    const dram_width = std.math.divCeil(u32, @as(u32, self.image_width) * 16, 8) catch unreachable;
+    const dram_y_offset = tile.y() * dram_width;
+    const dram_addr: u32 = self.image_address + dram_y_offset + dram_x_offset;
     const tmem_addr = tile.tmemAddress();
 
     const width = tile.width() * tile.height();
