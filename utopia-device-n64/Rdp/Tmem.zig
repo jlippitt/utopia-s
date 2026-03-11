@@ -323,6 +323,10 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
         return l1_result.value_ptr.*.?;
     }
 
+    if (l1_result.value_ptr.*) |texture| {
+        texture.unref();
+    }
+
     // Width must be padded to the nearest TMEM word
     const pixels_per_word = 64 / tile.bitsPerPixel();
     const width = (std.math.divCeil(u32, tile.width(), pixels_per_word) catch unreachable) * pixels_per_word;
@@ -350,10 +354,6 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
     var l2_hasher = std.hash.Wyhash.init(0);
     std.hash.autoHashStrat(&l2_hasher, .{ width, height, pixels }, .Deep);
     const l2_key = l2_hasher.final();
-
-    if (l1_result.value_ptr.*) |texture| {
-        texture.unref();
-    }
 
     const l2_result = self.l2_cache.getOrPut(l2_key);
     const texture = l2_result.value_ptr;
