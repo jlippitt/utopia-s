@@ -6,7 +6,7 @@ pub fn Lru(comptime V: type) type {
     return struct {
         const Entry = struct {
             node: std.DoublyLinkedList.Node,
-            key: u64,
+            key: ?u64,
             value: V,
         };
 
@@ -63,6 +63,7 @@ pub fn Lru(comptime V: type) type {
             var lru: std.DoublyLinkedList = .{};
 
             for (entries) |*entry| {
+                entry.key = null;
                 entry.value = init_value;
                 lru.append(&entry.node);
             }
@@ -80,6 +81,14 @@ pub fn Lru(comptime V: type) type {
         }
 
         pub fn clear(self: *Self) void {
+            var iter = self.map.valueIterator();
+
+            while (iter.next()) |value_ptr| {
+                const node = value_ptr.*;
+                const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
+                entry.key = null;
+            }
+
             self.map.clearRetainingCapacity();
         }
 
@@ -90,7 +99,7 @@ pub fn Lru(comptime V: type) type {
         pub fn peek(self: *Self, key: u64) ?*V {
             if (self.map.get(key)) |node| {
                 const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
-                std.debug.assert(entry.key == key);
+                std.debug.assert(entry.key.? == key);
                 return &entry.value;
             }
 
@@ -100,7 +109,7 @@ pub fn Lru(comptime V: type) type {
         pub fn get(self: *Self, key: u64) ?*V {
             if (self.map.get(key)) |node| {
                 const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
-                std.debug.assert(entry.key == key);
+                std.debug.assert(entry.key.? == key);
                 self.list.remove(node);
                 self.list.append(node);
                 return &entry.value;
@@ -112,7 +121,7 @@ pub fn Lru(comptime V: type) type {
         pub fn getOrPut(self: *Self, key: u64) GetOrPutResult {
             if (self.map.get(key)) |node| {
                 const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
-                std.debug.assert(entry.key == key);
+                std.debug.assert(entry.key.? == key);
                 self.list.remove(node);
                 self.list.append(node);
 
@@ -127,7 +136,10 @@ pub fn Lru(comptime V: type) type {
 
             const entry: *Entry = @alignCast(@fieldParentPtr("node", node));
 
-            _ = self.map.remove(entry.key);
+            if (entry.key) |old_key| {
+                std.debug.assert(self.map.remove(old_key));
+            }
+
             self.map.putAssumeCapacity(key, node);
 
             entry.key = key;
