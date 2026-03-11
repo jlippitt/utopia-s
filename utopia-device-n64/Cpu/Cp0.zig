@@ -85,7 +85,7 @@ pub const Exception = union(ExceptionType) {
     fn unusual(self: @This()) bool {
         return switch (self) {
             .interrupt => false,
-            .tlb_miss_load, .tlb_miss_store => |miss| miss.invalid,
+            .tlb_miss_load, .tlb_miss_store => false,
             .coprocessor_unusable => |index| index != 1,
             else => true,
         };
