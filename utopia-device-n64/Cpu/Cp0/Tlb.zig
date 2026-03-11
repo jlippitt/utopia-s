@@ -84,6 +84,7 @@ pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct {
     const result = &self.cache[@intFromBool(store)][@as(u20, @truncate(vaddr >> 12))];
 
     if (result.valid) {
+        @branchHint(.likely);
         return .{ (@as(u32, result.pfn) << 12) | (vaddr & 0xfff), result.cache };
     }
 
