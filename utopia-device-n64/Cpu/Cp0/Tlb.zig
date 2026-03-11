@@ -41,11 +41,12 @@ pub const Entry = struct {
     entry_lo: [2]EntryLo = @splat(.{}),
 };
 
-pub const CacheEntry = struct {
-    page: u32 = 0,
+pub const CacheEntry = packed struct(u32) {
     valid: bool = false,
     dirty: bool = false,
     cache: bool = false,
+    __: u9 = 0,
+    pfn: u20 = 0,
 };
 
 pub const Error = error{
@@ -79,7 +80,7 @@ pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct {
             return error.TlbModification;
         }
 
-        return .{ result.page | (vaddr & 0xfff), result.cache };
+        return .{ (@as(u32, result.pfn) << 12) | (vaddr & 0xfff), result.cache };
     }
 
     for (self.entries) |entry| {
@@ -108,10 +109,10 @@ pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct {
 
         if (entry_hi.global) {
             result.* = .{
-                .page = address & ~@as(u32, 0xfff),
                 .valid = true,
                 .dirty = dirty,
                 .cache = cache,
+                .pfn = @truncate(address >> 12),
             };
         }
 
@@ -176,8 +177,8 @@ fn invalidateCache(self: *Self, entry: *const Entry) void {
     const end: u20 = start + ((@as(u20, entry.page_mask.mask) + 1) << 1);
 
     if (start < 0x8_0000 or end >= 0xc_0000) {
-        for (start..end) |page| {
-            self.cache[page].valid = false;
+        for (start..end) |vpn| {
+            self.cache[vpn].valid = false;
         }
     }
 }
