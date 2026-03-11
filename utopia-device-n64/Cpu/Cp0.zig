@@ -105,7 +105,8 @@ index: Tlb.Index = .{},
 entry_lo: [2]Tlb.EntryLo = @splat(.{}),
 context: Context = .{},
 page_mask: Tlb.PageMask = .{},
-wired: u6 = 0,
+wired_value: u6 = 0,
+wired_updated: u64 = 0,
 bad_vaddr: u64 = 0,
 count_value: u32 = 0,
 count_updated: u64 = 0,
@@ -220,11 +221,12 @@ pub fn except(self: *Self, exception: Exception, pc: u32, delay: bool) u32 {
 fn get(self: *Self, reg: Register) u64 {
     return switch (reg) {
         .Index => @as(u32, @bitCast(self.index)),
+        .Random => self.getRandom(),
         .EntryLo0 => @bitCast(self.entry_lo[0]),
         .EntryLo1 => @bitCast(self.entry_lo[1]),
         .PageMask => @bitCast(self.page_mask),
         .Context => @bitCast(self.context),
-        .Wired => self.wired,
+        .Wired => self.wired_value,
         .BadVaddr => self.bad_vaddr,
         .Count => self.getCurrentCount(),
         .EntryHi => @bitCast(self.entry_hi),
@@ -250,6 +252,7 @@ fn set(self: *Self, reg: Register, value: u64) void {
             fw.num.writeMasked(u32, @ptrCast(&self.index), @truncate(value), 0x8000_003f);
             fw.log.trace("  Index: {any}", .{self.index});
         },
+        .Random => {}, // Read-only
         .EntryLo0 => {
             fw.num.writeMasked(u64, @ptrCast(&self.entry_lo[0]), value, 0x0000_0000_3fff_ffff);
             fw.log.trace("  EntryLo0: {any}", .{self.entry_lo[0]});
@@ -267,8 +270,9 @@ fn set(self: *Self, reg: Register, value: u64) void {
             fw.log.trace("  Context: {any}", .{self.context});
         },
         .Wired => {
-            self.wired = @truncate(value);
-            fw.log.trace("  Wired: {d}", .{self.wired});
+            self.wired_value = @truncate(value);
+            fw.log.trace("  Wired: {d}", .{self.wired_value});
+            self.wired_updated = self.getDevice().clock.getCycles();
         },
         .BadVaddr => {}, // Read-only
         .Count => {
@@ -399,6 +403,20 @@ fn checkPendingInterrupts(self: *Self) void {
     }
 
     self.getDevice().clock.reschedule(.cpu_interrupt, 0);
+}
+
+fn getRandom(self: *const Self) u32 {
+    const cycles = self.getDeviceConst().clock.getCycles();
+    const delta = (cycles - self.wired_updated) >> 2;
+
+    const random = if (self.wired_value > 31)
+        63 - @as(u6, @truncate(delta & 63))
+    else
+        31 - @as(u5, @truncate(delta % (@as(u64, 32) - self.wired_value)));
+
+    fw.log.info("Random: {d} ({d})", .{ random, self.wired_value });
+
+    return random;
 }
 
 fn getCurrentCount(self: *const Self) u32 {
