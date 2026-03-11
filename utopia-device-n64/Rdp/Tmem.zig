@@ -21,7 +21,7 @@ pub const TextureDescriptor = struct {
 const Self = @This();
 
 data: *[data_len]u64,
-l1_cache: fw.lru.Lru(u64),
+l1_cache: fw.lru.Lru(?*Texture),
 l2_cache: fw.lru.Lru(Texture),
 decoder: Decoder,
 upload_buffer: sdl3.gpu.TransferBuffer,
@@ -48,7 +48,7 @@ pub fn init(
 
     return .{
         .data = data[0..data_len],
-        .l1_cache = try .init(arena.allocator(), l1_cache_size, 0),
+        .l1_cache = try .init(arena.allocator(), l1_cache_size, null),
         .l2_cache = try .init(arena.allocator(), l2_cache_size, .init()),
         .decoder = try .init(arena),
         .upload_buffer = upload_buffer,
@@ -301,12 +301,9 @@ pub fn loadBlock(self: *Self, rdram: []const u8, size: Tile.Size) void {
 fn invalidateL1Cache(self: *Self) void {
     var iter = self.l1_cache.iterator();
 
-    while (iter.next()) |key| {
-        if (self.l2_cache.peek(key.*)) |texture| {
-            texture.unref();
-        }
-
-        key.* = 0;
+    while (iter.next()) |value| {
+        value.*.?.unref();
+        value.* = null;
     }
 
     self.l1_cache.clear();
@@ -323,11 +320,7 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
     const l1_result = self.l1_cache.getOrPut(tile.cacheKey());
 
     if (l1_result.found_existing) {
-        const l2_key = l1_result.value_ptr.*;
-
-        if (self.l2_cache.get(l2_key)) |texture| {
-            return texture;
-        }
+        return l1_result.value_ptr.*.?;
     }
 
     // Width must be padded to the nearest TMEM word
@@ -348,6 +341,9 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
             }),
         }
 
+        l1_result.value_ptr.* = &self.null_texture;
+        self.null_texture.ref();
+
         return &self.null_texture;
     };
 
@@ -355,16 +351,15 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
     std.hash.autoHashStrat(&l2_hasher, .{ width, height, pixels }, .Deep);
     const l2_key = l2_hasher.final();
 
-    if (self.l2_cache.get(l1_result.value_ptr.*)) |texture| {
+    if (l1_result.value_ptr.*) |texture| {
         texture.unref();
     }
-
-    l1_result.value_ptr.* = l2_key;
 
     const l2_result = self.l2_cache.getOrPut(l2_key);
     const texture = l2_result.value_ptr;
 
     if (l2_result.found_existing) {
+        l1_result.value_ptr.* = texture;
         texture.ref();
         return texture;
     }
@@ -379,7 +374,7 @@ fn resolveTexture(self: *Self, gpu: sdl3.gpu.Device, tile: Tile) error{SdlError}
 
     try texture.activate(gpu, self.upload_buffer, width, height, pixels);
 
+    l1_result.value_ptr.* = texture;
     texture.ref();
-
     return texture;
 }
