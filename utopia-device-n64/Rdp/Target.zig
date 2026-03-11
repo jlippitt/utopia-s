@@ -140,8 +140,22 @@ pub fn markDirty(self: *Self, depth: bool) void {
 }
 
 pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!void {
+    // Primary check for the common case, i.e. params were not updated
     if (!self.params_changed) {
         return;
+    }
+
+    // Secondary check to make sure they *really* changed. It's apparently quite
+    // common to adjust them and then set them back to what they were before.
+    if (self.surface) |surface| {
+        if (self.params.color_address == surface.color_address and
+            self.params.color_format == surface.color_format and
+            self.params.depth_address == surface.depth_address and
+            self.params.image_width == surface.image_width and
+            self.params.image_height == surface.image_height)
+        {
+            return;
+        }
     }
 
     if (self.params.image_width == 0 or self.params.image_height == 0) {
@@ -210,7 +224,7 @@ pub fn update(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!vo
 
     self.params_changed = false;
 
-    fw.log.debug("Target updated", .{});
+    fw.log.debug("Target updated: {any}", .{self.params});
 }
 
 pub fn downloadImageData(self: *Self, gpu: sdl3.gpu.Device, rdram: []u8) error{SdlError}!void {
