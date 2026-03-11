@@ -58,28 +58,32 @@ pub const Error = error{
 const Self = @This();
 
 entries: [32]Entry = @splat(.{}),
-cache: *[cache_size]CacheEntry,
+cache: [2]*[cache_size]CacheEntry,
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
-    const cache = try arena.allocator().alloc(CacheEntry, cache_size);
+    const cache: [2][]CacheEntry = .{
+        try arena.allocator().alloc(CacheEntry, cache_size),
+        try arena.allocator().alloc(CacheEntry, cache_size),
+    };
 
-    for (cache) |*result| {
-        result.* = .{};
+    for (cache) |inner| {
+        for (inner) |*result| {
+            result.* = .{};
+        }
     }
 
     return .{
-        .cache = cache[0..cache_size],
+        .cache = .{
+            cache[0][0..cache_size],
+            cache[1][0..cache_size],
+        },
     };
 }
 
 pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct { u32, bool } {
-    const result = &self.cache[@as(u20, @truncate(vaddr >> 12))];
+    const result = &self.cache[@intFromBool(store)][@as(u20, @truncate(vaddr >> 12))];
 
     if (result.valid) {
-        if (store and !result.dirty) {
-            return error.TlbModification;
-        }
-
         return .{ (@as(u32, result.pfn) << 12) | (vaddr & 0xfff), result.cache };
     }
 
@@ -107,6 +111,10 @@ pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct {
         const cache = entry_lo.cache != 0b010;
         const dirty = entry_lo.dirty;
 
+        if (store and !dirty) {
+            return error.TlbModification;
+        }
+
         if (entry_hi.global) {
             result.* = .{
                 .valid = true,
@@ -114,10 +122,6 @@ pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct {
                 .cache = cache,
                 .pfn = @truncate(address >> 12),
             };
-        }
-
-        if (store and !dirty) {
-            return error.TlbModification;
         }
 
         return .{ address, cache };
@@ -178,7 +182,8 @@ fn invalidateCache(self: *Self, entry: *const Entry) void {
 
     if (start < 0x8_0000 or end >= 0xc_0000) {
         for (start..end) |vpn| {
-            self.cache[vpn].valid = false;
+            self.cache[0][vpn].valid = false;
+            self.cache[1][vpn].valid = false;
         }
     }
 }
