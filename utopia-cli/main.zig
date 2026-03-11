@@ -37,8 +37,12 @@ pub fn main() !void {
     var video = try VideoDevice.init(device.getVideoState().resolution);
     defer video.deinit();
 
-    var audio = try AudioDevice.init(device.getAudioState().sample_rate);
-    defer audio.deinit();
+    var maybe_audio: ?AudioDevice = if (!app_args.no_fps_limit)
+        try AudioDevice.init(device.getAudioState().sample_rate)
+    else
+        null;
+
+    defer if (maybe_audio) |*audio| audio.deinit();
 
     const gamepad_ids = try sdl3.gamepad.getGamepads();
 
@@ -51,7 +55,9 @@ pub fn main() !void {
 
     var controller_state: utopia.ControllerState = .{};
 
-    try audio.play();
+    if (maybe_audio) |*audio| {
+        try audio.play();
+    }
 
     var fps_counter = try FpsCounter.init();
     var timer = try std.time.Timer.start();
@@ -93,7 +99,7 @@ pub fn main() !void {
             try video.update(video_state.pixel_data);
         }
 
-        if (!app_args.no_fps_limit) {
+        if (maybe_audio) |*audio| {
             const audio_state = device.getAudioState();
 
             try audio.setSampleRate(audio_state.sample_rate);
