@@ -122,10 +122,12 @@ watch_hi: WatchHi = .{},
 x_context: XContext = .{},
 error_epc: u64 = 0,
 tag_lo: TagLo = .{},
-tlb: Tlb = .init(),
+tlb: Tlb,
 
-pub fn init() Self {
-    return .{};
+pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    return .{
+        .tlb = try .init(arena),
+    };
 }
 
 pub fn cp1Usable(self: *const Self) bool {
@@ -187,7 +189,7 @@ pub fn raiseInterrupt(self: *Self, interrupt: Interrupt) void {
     self.checkPendingInterrupts();
 }
 
-pub fn mapAddress(self: *const Self, vaddr: u32, store: bool) Tlb.Error!struct { u32, bool } {
+pub fn mapAddress(self: *Self, vaddr: u32, store: bool) Tlb.Error!struct { u32, bool } {
     return self.tlb.mapAddress(vaddr, self.entry_hi.asid, store);
 }
 

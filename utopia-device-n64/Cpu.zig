@@ -65,12 +65,13 @@ lo: u64 = 0,
 hi: u64 = 0,
 ll_bit: bool = false,
 busy_wait: bool = false,
-cp0: Cp0 = .init(),
+cp0: Cp0,
 cp1: Cp1 = .init(),
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     return .{
         .icache = try .init(arena),
+        .cp0 = try .init(arena),
     };
 }
 

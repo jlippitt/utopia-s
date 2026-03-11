@@ -1,6 +1,8 @@
+const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../../Cpu.zig");
 
+const cache_size = 0x100000;
 const mask_filter = 0xaaa;
 
 pub const Index = packed struct(u32) {
@@ -39,6 +41,13 @@ pub const Entry = struct {
     entry_lo: [2]EntryLo = @splat(.{}),
 };
 
+pub const CacheEntry = struct {
+    page: u32 = 0,
+    valid: bool = false,
+    dirty: bool = false,
+    cache: bool = false,
+};
+
 pub const Error = error{
     TlbModification,
     TlbMiss,
@@ -48,12 +57,31 @@ pub const Error = error{
 const Self = @This();
 
 entries: [32]Entry = @splat(.{}),
+cache: *[cache_size]CacheEntry,
 
-pub fn init() Self {
-    return .{};
+pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    const cache = try arena.allocator().alloc(CacheEntry, cache_size);
+
+    for (cache) |*result| {
+        result.* = .{};
+    }
+
+    return .{
+        .cache = cache[0..cache_size],
+    };
 }
 
-pub fn mapAddress(self: *const Self, vaddr: u32, asid: u8, store: bool) Error!struct { u32, bool } {
+pub fn mapAddress(self: *Self, vaddr: u32, asid: u8, store: bool) Error!struct { u32, bool } {
+    const result = &self.cache[@as(u20, @truncate(vaddr >> 12))];
+
+    if (result.valid) {
+        if (store and !result.dirty) {
+            return error.TlbModification;
+        }
+
+        return .{ result.page | (vaddr & 0xfff), result.cache };
+    }
+
     for (self.entries) |entry| {
         const entry_hi = entry.entry_hi;
         const page = @as(u32, entry_hi.vpn2) << 13;
@@ -74,14 +102,24 @@ pub fn mapAddress(self: *const Self, vaddr: u32, asid: u8, store: bool) Error!st
             return error.TlbInvalid;
         }
 
-        if (store and !entry_lo.dirty) {
+        const address = (@as(u32, entry_lo.pfn) << 12) | (vaddr & ~mask & ~selector_bit);
+        const cache = entry_lo.cache != 0b010;
+        const dirty = entry_lo.dirty;
+
+        if (entry_hi.global) {
+            result.* = .{
+                .page = address & ~@as(u32, 0xfff),
+                .valid = true,
+                .dirty = dirty,
+                .cache = cache,
+            };
+        }
+
+        if (store and !dirty) {
             return error.TlbModification;
         }
 
-        return .{
-            (@as(u32, entry_lo.pfn) << 12) | (vaddr & ~mask & ~selector_bit),
-            entry_lo.cache != 0b010,
-        };
+        return .{ address, cache };
     }
 
     return error.TlbMiss;
@@ -101,6 +139,8 @@ fn write(self: *Self, index: u5, regs: Entry) void {
     const mask = filtered | (filtered >> 1);
 
     var entry = &self.entries[index];
+
+    self.invalidateCache(entry);
 
     entry.page_mask = .{
         .mask = mask,
@@ -127,6 +167,19 @@ fn write(self: *Self, index: u5, regs: Entry) void {
     }
 
     fw.log.trace("TLB Entry {}: {any}", .{ index, entry.* });
+
+    self.invalidateCache(entry);
+}
+
+fn invalidateCache(self: *Self, entry: *const Entry) void {
+    const start: u20 = @truncate(entry.entry_hi.vpn2 << 1);
+    const end: u20 = start + ((@as(u20, entry.page_mask.mask) + 1) << 1);
+
+    if (start < 0x8_0000 or end >= 0xc_0000) {
+        for (start..end) |page| {
+            self.cache[page].valid = false;
+        }
+    }
 }
 
 fn probe(self: *const Self, entry_hi: EntryHi) Index {
