@@ -140,6 +140,20 @@ pub fn getTagLo(self: *const Self) TagLo {
     return self.tag_lo;
 }
 
+pub fn getRandom(self: *const Self) u6 {
+    const cycles = self.getDeviceConst().clock.getCycles();
+    const delta = (cycles - self.wired_updated) >> 2;
+
+    const random = if (self.wired_value > 31)
+        63 - @as(u6, @truncate(delta & 63))
+    else
+        31 - @as(u6, @truncate(delta % (@as(u64, 32) - self.wired_value)));
+
+    fw.log.trace("Random: {d} ({d})", .{ random, self.wired_value });
+
+    return random;
+}
+
 pub fn setIndex(self: *Self, index: Tlb.Index) void {
     self.index = index;
     fw.log.trace("  Index: {any}", .{self.index});
@@ -405,20 +419,6 @@ fn checkPendingInterrupts(self: *Self) void {
     self.getDevice().clock.reschedule(.cpu_interrupt, 0);
 }
 
-fn getRandom(self: *const Self) u32 {
-    const cycles = self.getDeviceConst().clock.getCycles();
-    const delta = (cycles - self.wired_updated) >> 2;
-
-    const random = if (self.wired_value > 31)
-        63 - @as(u6, @truncate(delta & 63))
-    else
-        31 - @as(u5, @truncate(delta % (@as(u64, 32) - self.wired_value)));
-
-    fw.log.info("Random: {d} ({d})", .{ random, self.wired_value });
-
-    return random;
-}
-
 fn getCurrentCount(self: *const Self) u32 {
     const cycles = self.getDeviceConst().clock.getCycles();
     const delta = (cycles - self.count_updated) >> 2;
@@ -584,6 +584,7 @@ const special_table: [32]*const Core.Instruction = blk: {
     var ops: [32]*const Core.Instruction = @splat(Core.reserved);
     ops[0o01] = Tlb.tlbr;
     ops[0o02] = Tlb.tlbwi;
+    ops[0o06] = Tlb.tlbwr;
     ops[0o10] = Tlb.tlbp;
     ops[0o30] = eret;
     break :blk ops;

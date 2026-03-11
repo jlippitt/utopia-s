@@ -152,6 +152,27 @@ fn probe(self: *const Self, entry_hi: EntryHi) Index {
     };
 }
 
+pub fn tlbr(core: *Core, word: u32) void {
+    _ = word;
+    fw.log.trace("{X:08}: TLBR", .{core.pc});
+    const index: u5 = @truncate(core.cp0.index.index);
+    core.cp0.setEntry(core.cp0.tlb.read(index));
+}
+
+pub fn tlbwr(core: *Core, word: u32) void {
+    _ = word;
+
+    fw.log.trace("{X:08}: TLBWR", .{core.pc});
+
+    const index: u5 = @truncate(core.cp0.getRandom());
+
+    core.cp0.tlb.write(index, .{
+        .page_mask = core.cp0.page_mask,
+        .entry_hi = core.cp0.entry_hi,
+        .entry_lo = core.cp0.entry_lo,
+    });
+}
+
 pub fn tlbwi(core: *Core, word: u32) void {
     _ = word;
 
@@ -170,11 +191,4 @@ pub fn tlbp(core: *Core, word: u32) void {
     _ = word;
     fw.log.trace("{X:08}: TLBP", .{core.pc});
     core.cp0.setIndex(core.cp0.tlb.probe(core.cp0.entry_hi));
-}
-
-pub fn tlbr(core: *Core, word: u32) void {
-    _ = word;
-    fw.log.trace("{X:08}: TLBR", .{core.pc});
-    const index: u5 = @truncate(core.cp0.index.index);
-    core.cp0.setEntry(core.cp0.tlb.read(index));
 }
