@@ -44,8 +44,8 @@ pub fn setScissor(core: *Core, word: u64) void {
     const scissor: sdl3.rect.Rect(i32) = .{
         .x = @as(i32, cmd.xh >> 2) * Target.msaa,
         .y = @as(i32, cmd.yh >> 2) * Target.msaa,
-        .w = @as(i32, (cmd.xl - cmd.xh) >> 2) * Target.msaa,
-        .h = @as(i32, (cmd.yl - cmd.yh) >> 2) * Target.msaa,
+        .w = @as(i32, (cmd.xl -| cmd.xh) >> 2) * Target.msaa,
+        .h = @as(i32, (cmd.yl -| cmd.yh) >> 2) * Target.msaa,
     };
 
     core.display_list.setScissor(scissor);
