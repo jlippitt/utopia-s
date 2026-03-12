@@ -38,20 +38,40 @@ pub fn writeCommand(self: *Self, address: u32, value: u32, mask: u32) void {
 }
 
 pub fn readRegister(self: *Self, index: u3) u32 {
-    return switch (index) {
+    var sync: bool = true;
+
+    const value: u32 = switch (index) {
         0 => self.dma_regs.start,
         1 => self.dma_regs.end,
-        2 => self.dma_active.start,
+        2 => blk: {
+            sync = self.status.freeze;
+            break :blk self.dma_active.start;
+        },
         3 => @bitCast(self.status),
         // TODO: DPC clock (awaiting more accurate timing)
-        4 => 0x00ff_ffff,
+        4 => blk: {
+            sync = false;
+            break :blk 0x00ff_ffff;
+        },
         // 4 => @truncate(
         //     ((self.getDeviceConst().clock.getCycles() - self.clock_reset) / 3) & 0x00ff_ffff,
         // ),
-        5 => @intFromBool(self.status.cmd_busy),
+        5 => blk: {
+            sync = false;
+            break :blk @intFromBool(self.status.cmd_busy);
+        },
         6 => @intFromBool(self.status.pipe_busy),
-        7 => @intFromBool(self.status.tmem_busy),
+        7 => blk: {
+            sync = false;
+            break :blk @intFromBool(self.status.tmem_busy);
+        },
     };
+
+    if (sync) {
+        self.getDevice().rsp.forceSync();
+    }
+
+    return value;
 }
 
 pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
@@ -129,6 +149,8 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
                     fw.log.panic("{t}", .{err});
                 };
             }
+
+            self.getDevice().rsp.forceSync();
         },
         else => fw.log.panic("Unmapped RDP register write: {} <= {X:08}", .{ index, value }),
     }
@@ -194,6 +216,7 @@ pub fn syncFull(self: *Self) void {
     self.status.pipe_busy = false;
     self.status.gclk = false;
     self.getDevice().mi.raiseInterrupt(.dp);
+    self.getDevice().rsp.forceSync();
 }
 
 pub fn getDevice(self: *Self) *Device {

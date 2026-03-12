@@ -61,10 +61,16 @@ pub fn handleRunEvent(self: *Self) void {
     // halted flag becomes set if sstep is set
     self.status.halted = self.status.halted or self.status.sstep;
 
+    fw.log.debug("RSP processed {d} instructions", .{time_elapsed / cycles_per_step});
+
     // If not halted, schedule a new timeslice
     if (!self.status.halted) {
         self.getDevice().clock.schedule(.rsp_run, time_elapsed);
     }
+}
+
+pub fn forceSync(self: *Self) void {
+    self.time_remaining = 0;
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -109,23 +115,40 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
 }
 
 pub fn readRegister(self: *Self, index: u3) u32 {
-    return switch (index) {
+    var sync: bool = true;
+
+    const value: u32 = switch (index) {
         0 => self.sp_addr,
         1 => self.dram_addr,
         2, 3 => @bitCast(self.dma),
         4 => @bitCast(self.status),
-        5 => @intFromBool(self.status.dma_full),
-        6 => @intFromBool(self.status.dma_busy),
+        5 => blk: {
+            sync = false;
+            break :blk @intFromBool(self.status.dma_full);
+        },
+        6 => blk: {
+            sync = false;
+            break :blk @intFromBool(self.status.dma_busy);
+        },
         7 => blk: {
+            sync = self.semaphore;
             const value = @intFromBool(self.semaphore);
             self.semaphore = true;
             fw.log.debug("SP_SEMAPHORE: {}", .{self.semaphore});
             break :blk value;
         },
     };
+
+    if (sync) {
+        self.forceSync();
+    }
+
+    return value;
 }
 
 pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
+    var sync = true;
+
     switch (index) {
         0 => {
             fw.num.writeMasked(
@@ -136,6 +159,7 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
             );
 
             fw.log.debug("SP_DMA_SPADDR: {X:04}", .{self.sp_addr});
+            sync = false;
         },
         1 => {
             fw.num.writeMasked(
@@ -146,6 +170,7 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
             );
 
             fw.log.debug("SP_DMA_RAMADDR: {X:08}", .{self.dram_addr});
+            sync = false;
         },
         2 => {
             fw.num.writeMasked(
@@ -207,7 +232,12 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
         7 => {
             self.semaphore = false;
             fw.log.debug("SP_SEMAPHORE: {}", .{self.semaphore});
+            sync = false;
         },
+    }
+
+    if (sync) {
+        self.forceSync();
     }
 }
 
@@ -262,8 +292,6 @@ pub fn writeDataAlignedMasked(
 }
 
 pub fn readCp0Register(self: *Self, reg: Core.Cp0Register) u32 {
-    self.time_remaining = 0;
-
     if (@intFromEnum(reg) >= @intFromEnum(Core.Cp0Register.DPC_START)) {
         return self.getDevice().rdp.readRegister(@truncate(@intFromEnum(reg)));
     }
@@ -272,8 +300,6 @@ pub fn readCp0Register(self: *Self, reg: Core.Cp0Register) u32 {
 }
 
 pub fn writeCp0Register(self: *Self, reg: Core.Cp0Register, value: u32) void {
-    self.time_remaining = 0;
-
     if (@intFromEnum(reg) >= @intFromEnum(Core.Cp0Register.DPC_START)) {
         self.getDevice().rdp.writeRegister(
             @truncate(@intFromEnum(reg)),
@@ -291,13 +317,14 @@ pub fn writeCp0Register(self: *Self, reg: Core.Cp0Register, value: u32) void {
 }
 
 pub fn break_(self: *Self) void {
-    self.time_remaining = 0;
     self.status.broke = true;
     self.status.halted = true;
 
     if (self.status.intbreak) {
         self.getDevice().mi.raiseInterrupt(.sp);
     }
+
+    self.forceSync();
 }
 
 fn transferDma(self: *Self, comptime direction: DmaDirection) void {
