@@ -7,7 +7,7 @@ const Tmem = @import("./Tmem.zig");
 const fragment = @import("./fragment.zig");
 
 const max_display_groups = 256;
-const max_buffer_len = 1024;
+const max_buffer_len = 4096;
 const index_buffer_size = @sizeOf(Core.Index) * max_buffer_len;
 const vertex_buffer_size = @sizeOf(Core.Vertex) * max_buffer_len;
 
