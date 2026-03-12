@@ -178,8 +178,8 @@ fn write(self: *Self, index: u5, regs: Entry) void {
 }
 
 fn invalidateCache(self: *Self, entry: *const Entry) void {
-    const start: u20 = @truncate(entry.entry_hi.vpn2 << 1);
-    const end: u20 = start + ((@as(u20, entry.page_mask.mask) + 1) << 1);
+    const start: u32 = @as(u20, @truncate(entry.entry_hi.vpn2 << 1));
+    const end = start + ((@as(u20, entry.page_mask.mask) + 1) << 1);
 
     if (start < 0x8_0000 or end >= 0xc_0000) {
         for (start..end) |vpn| {
