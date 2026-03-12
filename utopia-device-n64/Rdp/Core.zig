@@ -180,11 +180,12 @@ pub fn render(self: *Self) RenderError!void {
         return;
     }
 
-    try self.display_list.uploadBuffers(self.gpu);
-
     const surface = self.target.getSurface() orelse {
+        self.display_list.clear();
         return;
     };
+
+    try self.display_list.uploadBuffers(self.gpu);
 
     const color_target: sdl3.gpu.ColorTargetInfo = .{
         .texture = surface.color_texture_msaa,
