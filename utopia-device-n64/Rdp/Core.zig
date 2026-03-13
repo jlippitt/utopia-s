@@ -236,43 +236,55 @@ pub fn render(self: *Self) RenderError!void {
         var index_offset: u32 = 0;
 
         for (display_groups) |display_group| {
-            render_pass.bindGraphicsPipeline(display_group.pipeline.getBinding());
+            const changed = display_group.changed;
 
-            render_pass.setScissor(display_group.scissor);
+            if (changed.pipeline) {
+                render_pass.bindGraphicsPipeline(display_group.pipeline.getBinding());
+            }
 
-            command_buffer.pushFragmentUniformData(
-                0,
-                std.mem.asBytes(&display_group.tex[0].desc.transform()),
-            );
+            if (changed.scissor) {
+                render_pass.setScissor(display_group.scissor);
+            }
 
-            command_buffer.pushFragmentUniformData(
-                1,
-                std.mem.asBytes(&display_group.tex[1].desc.transform()),
-            );
-
-            command_buffer.pushFragmentUniformData(
-                2,
-                std.mem.asBytes(&display_group.frag_state),
-            );
+            if (changed.frag_state) {
+                command_buffer.pushFragmentUniformData(
+                    2,
+                    std.mem.asBytes(&display_group.frag_state),
+                );
+            }
 
             const sampler = switch (display_group.sample_type) {
                 .nearest => self.sampler_nearest,
                 .linear => self.sampler_linear,
             };
 
-            render_pass.bindFragmentSamplers(0, &.{
-                .{
-                    .texture = display_group.tex[0].texture.getBinding(),
-                    .sampler = sampler,
-                },
-            });
+            if (changed.tex0) {
+                command_buffer.pushFragmentUniformData(
+                    0,
+                    std.mem.asBytes(&display_group.tex[0].desc.transform()),
+                );
 
-            render_pass.bindFragmentSamplers(1, &.{
-                .{
-                    .texture = display_group.tex[1].texture.getBinding(),
-                    .sampler = sampler,
-                },
-            });
+                render_pass.bindFragmentSamplers(0, &.{
+                    .{
+                        .texture = display_group.tex[0].texture.getBinding(),
+                        .sampler = sampler,
+                    },
+                });
+            }
+
+            if (changed.tex1) {
+                command_buffer.pushFragmentUniformData(
+                    1,
+                    std.mem.asBytes(&display_group.tex[1].desc.transform()),
+                );
+
+                render_pass.bindFragmentSamplers(1, &.{
+                    .{
+                        .texture = display_group.tex[1].texture.getBinding(),
+                        .sampler = sampler,
+                    },
+                });
+            }
 
             render_pass.drawIndexedPrimitives(display_group.len, 1, index_offset, 0, 0);
 

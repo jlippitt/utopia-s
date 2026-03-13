@@ -37,6 +37,7 @@ const FragmentState = extern struct {
 };
 
 pub const DisplayGroup = struct {
+    changed: Changed,
     pipeline: *Pipeline,
     scissor: sdl3.rect.Rect(i32),
     sample_type: sdl3.gpu.Filter,
@@ -45,10 +46,12 @@ pub const DisplayGroup = struct {
     len: u32,
 };
 
-const Changed = packed struct(u4) {
+const Changed = packed struct(u6) {
     pipeline: bool = false,
     scissor: bool = false,
     sample_type: bool = false,
+    tex0: bool = false,
+    tex1: bool = false,
     frag_state: bool = false,
 };
 
@@ -391,10 +394,15 @@ fn pushPrimitive(
     self.vertices.appendSliceAssumeCapacity(vertices);
 
     if (self.getCurrentDisplayGroup()) |display_group| {
-        if (std.meta.eql(tex, display_group.tex) and @as(u4, @bitCast(self.changed)) == 0) {
+        self.changed.tex0 = !std.meta.eql(tex[0], display_group.tex[0]);
+        self.changed.tex1 = !std.meta.eql(tex[1], display_group.tex[1]);
+
+        if (@as(u6, @bitCast(self.changed)) == 0) {
             display_group.len += @intCast(indices.len);
             return;
         }
+    } else {
+        self.changed = @as(Changed, @bitCast(@as(u6, std.math.maxInt(u6))));
     }
 
     self.pipeline.ref();
@@ -402,6 +410,7 @@ fn pushPrimitive(
     tex[1].texture.ref();
 
     self.display_groups.appendAssumeCapacity(.{
+        .changed = self.changed,
         .pipeline = self.pipeline,
         .scissor = self.scissor,
         .sample_type = self.sample_type,
