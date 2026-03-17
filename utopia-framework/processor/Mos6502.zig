@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const interrupt = @import("./Mos6502/interrupt.zig");
 const implied = @import("./Mos6502/implied.zig").implied;
+const load = @import("./Mos6502/load.zig").load;
 
 pub const stack_page: u16 = 0x0100;
 
@@ -21,11 +22,13 @@ pub const Interrupt = packed struct(u8) {
     irq: u6 = 0,
 };
 
-pub const Instruction = fn (core: *Self) void;
-
 pub const Interface = struct {
     read: fn (self: *Self, address: u16) u8,
 };
+
+pub const Instruction = fn (core: *Self) void;
+
+const BindFn = fn (comptime func: anytype, comptime args: anytype) Instruction;
 
 const Self = @This();
 
@@ -107,33 +110,62 @@ pub fn next(self: *Self, comptime iface: Interface) u8 {
     return value;
 }
 
+pub fn setNz(self: *Self, value: u8) void {
+    self.flags.n = fw.num.bit(value, 7);
+    self.flags.z = value == 0;
+}
+
 fn opTable(comptime iface: Interface) [256]*const Instruction {
+    const bind = bindFn(iface);
+
     var ops: [256]*const Instruction = undefined;
 
     inline for (0..256) |opcode| {
         ops[opcode] = bind(invalid, .{opcode});
     }
 
-    ops[0x18] = bind(implied, .{ iface, .CLC });
-    ops[0x38] = bind(implied, .{ iface, .SEC });
-    ops[0x58] = bind(implied, .{ iface, .CLI });
-    ops[0x78] = bind(implied, .{ iface, .SEI });
-    ops[0xb8] = bind(implied, .{ iface, .CLV });
-    ops[0xd8] = bind(implied, .{ iface, .CLD });
-    ops[0xf8] = bind(implied, .{ iface, .SED });
+    // +0x00
+    ops[0xa0] = bind(load, .{ .LDY, .immediate });
+
+    // +0x18
+    ops[0x18] = bind(implied, .CLC);
+    ops[0x38] = bind(implied, .SEC);
+    ops[0x58] = bind(implied, .CLI);
+    ops[0x78] = bind(implied, .SEI);
+    ops[0xb8] = bind(implied, .CLV);
+    ops[0xd8] = bind(implied, .CLD);
+    ops[0xf8] = bind(implied, .SED);
+
+    // +0x09
+    ops[0xa9] = bind(load, .{ .LDA, .immediate });
+
+    // +0x02
+    ops[0xa2] = bind(load, .{ .LDX, .immediate });
 
     return ops;
 }
 
-fn bind(comptime func: anytype, comptime args: anytype) Instruction {
+fn bindFn(comptime iface: Interface) BindFn {
     return struct {
-        fn instr(core: *Self) void {
-            @call(.always_inline, func, args ++ .{core});
+        fn bind(comptime func: anytype, comptime args: anytype) Instruction {
+            const is_tuple = switch (@typeInfo(@TypeOf(args))) {
+                .@"struct" => |struc| struc.is_tuple,
+                else => false,
+            };
+
+            const tuple_args = if (is_tuple) args else .{args};
+
+            return struct {
+                fn instr(core: *Self) void {
+                    @call(.always_inline, func, tuple_args ++ .{ iface, core });
+                }
+            }.instr;
         }
-    }.instr;
+    }.bind;
 }
 
-fn invalid(comptime opcode: u8, core: *Self) void {
+fn invalid(comptime opcode: u8, comptime iface: Interface, core: *Self) void {
     _ = core;
+    _ = iface;
     fw.log.todo("MOS-6502 opcode: {X:02}", .{opcode});
 }
