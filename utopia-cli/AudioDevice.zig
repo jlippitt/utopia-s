@@ -67,6 +67,10 @@ pub fn setSampleRate(self: *Self, sample_rate: u32) error{SdlError}!void {
 }
 
 pub fn queueAudioData(self: *Self, sample_data: []const [2]i16) error{SdlError}!void {
+    if (sample_data.len == 0) {
+        return;
+    }
+
     try self.stream.putData(std.mem.sliceAsBytes(sample_data));
     self.last_sample = sample_data[sample_data.len - 1];
 }

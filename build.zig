@@ -28,12 +28,21 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const utopia_device_nes = b.addModule("utopia-device-nes", .{
+        .root_source_file = b.path("utopia-device-nes/Device.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "framework", .module = utopia_framework },
+        },
+    });
+
     const utopia = b.addModule("utopia", .{
         .root_source_file = b.path("utopia/lib.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "framework", .module = utopia_framework },
             .{ .name = "device-n64", .module = utopia_device_n64 },
+            .{ .name = "device-nes", .module = utopia_device_nes },
         },
     });
 

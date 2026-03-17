@@ -140,7 +140,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
     }
 }
 
-pub fn handleNewLineEvent(self: *Self) Rdp.RenderError!bool {
+pub fn handleNewLineEvent(self: *Self) bool {
     var frame_complete: bool = false;
 
     self.v_current += 2;
@@ -148,7 +148,7 @@ pub fn handleNewLineEvent(self: *Self) Rdp.RenderError!bool {
     if (self.v_current >= self.v_total) {
         const serrate: u10 = @intFromBool(self.ctrl.serrate);
         self.v_current = self.v_current & serrate ^ serrate;
-        try self.getDevice().rdp.downloadImageData();
+        self.getDevice().rdp.downloadImageData();
         self.render();
         frame_complete = true;
     }

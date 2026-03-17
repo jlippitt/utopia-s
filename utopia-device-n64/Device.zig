@@ -98,16 +98,16 @@ arena: std.heap.ArenaAllocator,
 
 // utopia.Device methods
 
-pub fn init(allocator: std.mem.Allocator, device_args: Args) fw.InitError!fw.Device {
+pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
     var arena = std.heap.ArenaAllocator.init(allocator);
 
     const rom = try fw.fs.readFileAllocAligned(
         arena.allocator(),
-        device_args.rom_path,
+        args.rom_path,
         .@"8",
     );
 
-    const pifdata_path = device_args.pifdata_path orelse {
+    const pifdata_path = args.pifdata_path orelse {
         fw.log.err("Running this device without a 'pifdata' ROM is not yet supported", .{});
         return error.ArgError;
     };
@@ -164,7 +164,7 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
 }
 
-pub fn runFrame(self: *Self) fw.RenderError!void {
+pub fn runFrame(self: *Self) void {
     self.ai.clearSampleBuffer();
 
     while (true) {
@@ -179,7 +179,7 @@ pub fn runFrame(self: *Self) fw.RenderError!void {
                 .cpu_timer => self.cpu.handleTimerEvent(),
                 .rsp_run => self.rsp.handleRunEvent(),
                 .ai_sample => self.ai.handleSampleEvent(),
-                .vi_new_line => if (try self.vi.handleNewLineEvent()) {
+                .vi_new_line => if (self.vi.handleNewLineEvent()) {
                     return;
                 },
             }

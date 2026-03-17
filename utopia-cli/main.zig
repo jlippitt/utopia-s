@@ -90,8 +90,7 @@ pub fn main() !void {
         }
 
         device.updateControllerState(&controller_state);
-
-        try device.runFrame();
+        device.runFrame();
 
         {
             const video_state = device.getVideoState();

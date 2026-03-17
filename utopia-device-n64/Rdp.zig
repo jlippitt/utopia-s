@@ -6,7 +6,6 @@ const Core = @import("./Rdp/Core.zig");
 const register = @import("./register.zig");
 
 pub const InitError = Core.InitError;
-pub const RenderError = Core.RenderError;
 
 const Self = @This();
 
@@ -156,13 +155,16 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
     }
 }
 
-pub fn downloadImageData(self: *Self) RenderError!void {
+pub fn downloadImageData(self: *Self) void {
     fw.log.pushContext("rdp");
     defer fw.log.popContext();
-    try self.core.downloadImageData();
+
+    self.core.downloadImageData() catch |err| {
+        fw.log.panic("{t}", .{err});
+    };
 }
 
-pub fn transferDma(self: *Self) RenderError!void {
+fn transferDma(self: *Self) Core.RenderError!void {
     if (self.status.flush) {
         fw.log.unimplemented("RDP flush flag", .{});
     }

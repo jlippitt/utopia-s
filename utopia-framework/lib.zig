@@ -7,6 +7,8 @@ pub const lru = @import("./lru.zig");
 pub const mem = @import("./mem.zig");
 pub const num = @import("./num.zig");
 
+pub const default_sample_rate = 48000;
+
 pub const CliArgType = union(enum) {
     positional: void,
     flag: ?u8,
@@ -24,10 +26,6 @@ pub const InitError = std.mem.Allocator.Error ||
         ArgError,
         SdlError,
     };
-
-pub const RenderError = error{
-    SdlError,
-};
 
 pub const Resolution = struct {
     x: u32,
@@ -95,7 +93,7 @@ pub const ButtonState = struct {
 pub fn Interface(comptime Self: type) type {
     return struct {
         deinit: *const fn (self: *Self) void,
-        runFrame: *const fn (self: *Self) RenderError!void,
+        runFrame: *const fn (self: *Self) void,
         getVideoState: *const fn (self: *const Self) VideoState,
         getAudioState: *const fn (self: *const Self) AudioState,
         updateControllerState: *const fn (self: *Self, state: *const ControllerState) void,
@@ -120,7 +118,7 @@ pub const Device = struct {
                 return @call(.always_inline, iface.deinit, .{self});
             }
 
-            fn runFrameImpl(ptr: *anyopaque) RenderError!void {
+            fn runFrameImpl(ptr: *anyopaque) void {
                 const self: *Inner = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.runFrame, .{self});
             }
@@ -159,7 +157,7 @@ pub const Device = struct {
         return self.vtable.deinit(self.ptr);
     }
 
-    pub fn runFrame(self: Self) RenderError!void {
+    pub fn runFrame(self: Self) void {
         return self.vtable.runFrame(self.ptr);
     }
 

@@ -3,7 +3,7 @@ const fw = @import("framework");
 const Device = @import("./Device.zig");
 const Clock = @import("./Clock.zig");
 
-const max_sample_rate = 48000;
+const max_sample_rate = fw.default_sample_rate;
 
 // Allow for 2 frames worth of data
 const sample_buffer_size = max_sample_rate * 2;
