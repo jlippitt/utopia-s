@@ -82,7 +82,9 @@ pub fn step(self: *Self, comptime iface: Interface) void {
         return;
     }
 
-    self.dispatch(iface);
+    const op_table = comptime opTable(iface);
+
+    op_table[self.next(iface)](self);
 }
 
 pub fn poll(self: *Self) void {
@@ -105,15 +107,33 @@ pub fn next(self: *Self, comptime iface: Interface) u8 {
     return value;
 }
 
-fn dispatch(self: *Self, comptime iface: Interface) void {
-    switch (self.next(iface)) {
-        0x18 => implied(.CLC, iface, self),
-        0x38 => implied(.SEC, iface, self),
-        0x58 => implied(.CLI, iface, self),
-        0x78 => implied(.SEI, iface, self),
-        0xb8 => implied(.CLV, iface, self),
-        0xd8 => implied(.CLD, iface, self),
-        0xf8 => implied(.SED, iface, self),
-        else => |opcode| fw.log.panic("Invalid opcode: {X:02}", .{opcode}),
+fn opTable(comptime iface: Interface) [256]*const Instruction {
+    var ops: [256]*const Instruction = undefined;
+
+    inline for (0..256) |opcode| {
+        ops[opcode] = bind(invalid, .{opcode});
     }
+
+    ops[0x18] = bind(implied, .{ iface, .CLC });
+    ops[0x38] = bind(implied, .{ iface, .SEC });
+    ops[0x58] = bind(implied, .{ iface, .CLI });
+    ops[0x78] = bind(implied, .{ iface, .SEI });
+    ops[0xb8] = bind(implied, .{ iface, .CLV });
+    ops[0xd8] = bind(implied, .{ iface, .CLD });
+    ops[0xf8] = bind(implied, .{ iface, .SED });
+
+    return ops;
+}
+
+fn bind(comptime func: anytype, comptime args: anytype) Instruction {
+    return struct {
+        fn instr(core: *Self) void {
+            @call(.always_inline, func, args ++ .{core});
+        }
+    }.instr;
+}
+
+fn invalid(comptime opcode: u8, core: *Self) void {
+    _ = core;
+    fw.log.todo("MOS-6502 opcode: {X:02}", .{opcode});
 }

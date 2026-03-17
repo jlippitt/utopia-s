@@ -11,7 +11,7 @@ const ImpliedOp = enum {
     SED,
 };
 
-pub fn implied(comptime op: ImpliedOp, comptime iface: Core.Interface, core: *Core) void {
+pub fn implied(comptime iface: Core.Interface, comptime op: ImpliedOp, core: *Core) void {
     fw.log.trace("{t}", .{op});
     core.poll();
     _ = core.read(iface, core.pc);
