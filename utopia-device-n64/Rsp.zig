@@ -212,7 +212,7 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
             register.setFlag(&self.status, "sig6", masked_value, 21);
             register.setFlag(&self.status, "sig7", masked_value, 23);
 
-            if ((masked_value & 4) != 0) {
+            if (fw.num.bit(masked_value, 2)) {
                 self.status.broke = false;
             }
 

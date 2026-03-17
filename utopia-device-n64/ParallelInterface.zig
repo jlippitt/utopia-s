@@ -55,7 +55,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
         },
         2 => self.transferDma(.read, @truncate(value & mask)),
         3 => self.transferDma(.write, @truncate(value & mask)),
-        4 => if ((value & 0x02) != 0) {
+        4 => if (fw.num.bit(value & mask, 1)) {
             self.getDevice().mi.clearInterrupt(.pi);
         },
         5 => {

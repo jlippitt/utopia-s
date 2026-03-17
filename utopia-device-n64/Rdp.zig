@@ -125,19 +125,19 @@ pub fn writeRegister(self: *Self, index: u3, value: u32, mask: u32) void {
             register.setFlag(&self.status, "freeze", masked_value, 2);
             register.setFlag(&self.status, "flush", masked_value, 4);
 
-            if ((masked_value & 0x0040) != 0) {
+            if (fw.num.bit(masked_value, 6)) {
                 self.status.tmem_busy = false;
             }
 
-            if ((masked_value & 0x0080) != 0) {
+            if (fw.num.bit(masked_value, 7)) {
                 self.status.pipe_busy = false;
             }
 
-            if ((masked_value & 0x0100) != 0) {
+            if (fw.num.bit(masked_value, 8)) {
                 self.status.cmd_busy = false;
             }
 
-            if ((value & 0x0200) != 0) {
+            if (fw.num.bit(masked_value, 9)) {
                 self.clock_reset = self.getDeviceConst().clock.getCycles();
                 fw.log.debug("DPC_CLOCK reset", .{});
             }

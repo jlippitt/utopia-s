@@ -45,7 +45,7 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
                 fw.log.unimplemented("MI Upper Mode", .{});
             }
 
-            if ((masked_value & 0x0800) != 0) {
+            if (fw.num.bit(masked_value, 11)) {
                 self.clearInterrupt(.dp);
             }
 

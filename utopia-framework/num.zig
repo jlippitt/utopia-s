@@ -101,3 +101,7 @@ pub fn zeroExtend(comptime T: type, value: anytype) T {
 pub fn writeMasked(comptime T: type, dst: *T, value: T, mask: T) void {
     dst.* = (dst.* & ~mask) | (value & mask);
 }
+
+pub fn bit(src: anytype, index: std.math.Log2Int(@TypeOf(src))) bool {
+    return (src & (@as(@TypeOf(src), 1) << index)) != 0;
+}
