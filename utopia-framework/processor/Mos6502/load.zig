@@ -15,9 +15,9 @@ pub fn load(
     core: *Core,
 ) void {
     fw.log.trace("{t} {f}", .{ op, mode });
-    const addr = mode.resolve(iface, core, false);
+    const address = mode.resolve(iface, core, false);
     core.poll();
-    const value = core.read(iface, addr);
+    const value = core.read(iface, address);
 
     switch (comptime op) {
         .LDA => {

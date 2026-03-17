@@ -3,6 +3,7 @@ const fw = @import("framework");
 const interrupt = @import("./Mos6502/interrupt.zig");
 const implied = @import("./Mos6502/implied.zig").implied;
 const load = @import("./Mos6502/load.zig").load;
+const store = @import("./Mos6502/store.zig").store;
 
 pub const stack_page: u16 = 0x0100;
 
@@ -24,6 +25,7 @@ pub const Interrupt = packed struct(u8) {
 
 pub const Interface = struct {
     read: fn (self: *Self, address: u16) u8,
+    write: fn (self: *Self, address: u16, value: u8) void,
 };
 
 pub const Instruction = fn (core: *Self) void;
@@ -104,6 +106,11 @@ pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
     return value;
 }
 
+pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
+    fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
+    iface.write(self, address, value);
+}
+
 pub fn next(self: *Self, comptime iface: Interface) u8 {
     const value = self.read(iface, self.pc);
     self.pc +%= 1;
@@ -136,11 +143,23 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xd8] = bind(implied, .CLD);
     ops[0xf8] = bind(implied, .SED);
 
+    // +0x0c
+    ops[0x8c] = bind(store, .{ .STY, .absolute });
+    ops[0xac] = bind(load, .{ .LDY, .absolute });
+
     // +0x09
     ops[0xa9] = bind(load, .{ .LDA, .immediate });
 
+    // +0x0d
+    ops[0x8d] = bind(store, .{ .STA, .absolute });
+    ops[0xad] = bind(load, .{ .LDA, .absolute });
+
     // +0x02
     ops[0xa2] = bind(load, .{ .LDX, .immediate });
+
+    // +0x0e
+    ops[0x8e] = bind(store, .{ .STX, .absolute });
+    ops[0xae] = bind(load, .{ .LDX, .absolute });
 
     return ops;
 }

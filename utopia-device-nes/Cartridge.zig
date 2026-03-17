@@ -35,8 +35,17 @@ pub fn init(rom: []const u8) error{ArgError}!Self {
 
 pub fn readPrg(self: *const Self, address: u16, prev_value: u8) u8 {
     if (address < 0x8000) {
+        // TODO: PRG RAM
         return prev_value;
     }
 
     return self.prg_rom[address & self.prg_rom_mask];
+}
+
+pub fn writePrg(self: *const Self, address: u16, value: u8) void {
+    _ = self;
+    _ = address;
+    _ = value;
+
+    // TODO: PRG RAM + Mappers
 }

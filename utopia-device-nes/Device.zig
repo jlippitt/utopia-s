@@ -64,6 +64,7 @@ fn runFrame(self: *Self) void {
     for (0..(1789773 / 60)) |_| {
         self.cpu.step(.{
             .read = read,
+            .write = write,
         });
 
         fw.log.trace("{f}", .{self.cpu});
@@ -113,4 +114,22 @@ fn read(cpu: *Cpu, address: u16) u8 {
     }
 
     return self.mdr;
+}
+
+fn write(cpu: *Cpu, address: u16, value: u8) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+
+    self.mdr = value;
+    self.cartridge.writePrg(address, value);
+
+    if (address < 0x2000) {
+        @branchHint(.unlikely);
+        self.wram[address & wram_mask] = value;
+    } else if (address < 0x4000) {
+        @branchHint(.unlikely);
+        fw.log.trace("TODO: PPU writes", .{});
+    } else if (address < 0x4020) {
+        @branchHint(.unlikely);
+        fw.log.trace("TODO: APU/Joypad writes", .{});
+    }
 }
