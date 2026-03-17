@@ -15,4 +15,5 @@ pub fn reset(comptime iface: Core.Interface, core: *Core) void {
     const lo = core.read(iface, reset_vector);
     const hi = core.read(iface, reset_vector +% 1);
     core.pc = (@as(u16, hi) << 8) | lo;
+    core.flags.i = true;
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const interrupt = @import("./Mos6502/interrupt.zig");
+const implied = @import("./Mos6502/implied.zig").implied;
 
 pub const stack_page: u16 = 0x0100;
 
@@ -84,6 +85,14 @@ pub fn step(self: *Self, comptime iface: Interface) void {
     self.dispatch(iface);
 }
 
+pub fn poll(self: *Self) void {
+    self.int_polled = self.int_active;
+
+    if (self.flags.i) {
+        self.int_polled.irq = 0;
+    }
+}
+
 pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
     const value = iface.read(self, address);
     fw.log.trace("  {X:04} => {X:02}", .{ address, value });
@@ -98,6 +107,13 @@ pub fn next(self: *Self, comptime iface: Interface) u8 {
 
 fn dispatch(self: *Self, comptime iface: Interface) void {
     switch (self.next(iface)) {
+        0x18 => implied(.CLC, iface, self),
+        0x38 => implied(.SEC, iface, self),
+        0x58 => implied(.CLI, iface, self),
+        0x78 => implied(.SEI, iface, self),
+        0xb8 => implied(.CLV, iface, self),
+        0xd8 => implied(.CLD, iface, self),
+        0xf8 => implied(.SED, iface, self),
         else => |opcode| fw.log.panic("Invalid opcode: {X:02}", .{opcode}),
     }
 }
