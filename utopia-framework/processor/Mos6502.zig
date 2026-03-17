@@ -134,11 +134,15 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     // +0x00
     ops[0xa0] = bind(load, .{ .LDY, .immediate });
 
+    // +0x08
+    ops[0xa8] = bind(implied, .TAY);
+
     // +0x18
     ops[0x18] = bind(implied, .CLC);
     ops[0x38] = bind(implied, .SEC);
     ops[0x58] = bind(implied, .CLI);
     ops[0x78] = bind(implied, .SEI);
+    ops[0x98] = bind(implied, .TYA);
     ops[0xb8] = bind(implied, .CLV);
     ops[0xd8] = bind(implied, .CLD);
     ops[0xf8] = bind(implied, .SED);
@@ -156,6 +160,14 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // +0x02
     ops[0xa2] = bind(load, .{ .LDX, .immediate });
+
+    // +0x0a
+    ops[0x8a] = bind(implied, .TXA);
+    ops[0xaa] = bind(implied, .TAX);
+
+    // +0x1a
+    ops[0x9a] = bind(implied, .TXS);
+    ops[0xba] = bind(implied, .TSX);
 
     // +0x0e
     ops[0x8e] = bind(store, .{ .STX, .absolute });
