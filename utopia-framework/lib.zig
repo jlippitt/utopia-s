@@ -6,6 +6,7 @@ pub const log = @import("./log.zig");
 pub const lru = @import("./lru.zig");
 pub const mem = @import("./mem.zig");
 pub const num = @import("./num.zig");
+pub const processor = @import("./processor.zig");
 
 pub const default_sample_rate = 48000;
 

@@ -17,6 +17,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    utopia_framework.addImport("framework", utopia_framework);
+
     const utopia_device_n64 = b.addModule("utopia-device-n64", .{
         .root_source_file = b.path("utopia-device-n64/Device.zig"),
         .target = target,

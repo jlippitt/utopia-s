@@ -1,5 +1,11 @@
 const std = @import("std");
 const fw = @import("framework");
+const Cartridge = @import("./Cartridge.zig");
+
+const Cpu = fw.processor.Mos6502;
+
+const wram_size = 2048;
+const wram_mask = wram_size - 1;
 
 pub const Args = struct {
     pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
@@ -16,6 +22,10 @@ pub const Args = struct {
 
 const Self = @This();
 
+cpu: Cpu,
+mdr: u8 = 0,
+wram: *[wram_size]u8,
+cartridge: Cartridge,
 arena: std.heap.ArenaAllocator,
 
 pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
@@ -26,11 +36,14 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
         args.rom_path,
     );
 
-    _ = rom;
+    const wram = try arena.allocator().alloc(u8, wram_size);
 
     const self = try arena.allocator().create(Self);
 
     self.* = .{
+        .cpu = .init(true),
+        .wram = wram[0..wram_size],
+        .cartridge = try .init(rom),
         .arena = arena,
     };
 
@@ -48,7 +61,13 @@ fn deinit(self: *Self) void {
 }
 
 fn runFrame(self: *Self) void {
-    _ = self;
+    for (0..(1789773 / 60)) |_| {
+        self.cpu.step(.{
+            .read = read,
+        });
+
+        fw.log.trace("{f}", .{self.cpu});
+    }
 }
 
 fn getVideoState(self: *const Self) fw.VideoState {
@@ -75,4 +94,23 @@ fn getAudioState(self: *const Self) fw.AudioState {
 fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     _ = self;
     _ = state;
+}
+
+fn read(cpu: *Cpu, address: u16) u8 {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+
+    self.mdr = self.cartridge.readPrg(address, self.mdr);
+
+    if (address < 0x2000) {
+        @branchHint(.unlikely);
+        self.mdr = self.wram[address & wram_mask];
+    } else if (address < 0x4000) {
+        @branchHint(.unlikely);
+        fw.log.todo("PPU reads", .{});
+    } else if (address < 0x4020) {
+        @branchHint(.unlikely);
+        fw.log.todo("APU/Joypad reads", .{});
+    }
+
+    return self.mdr;
 }
