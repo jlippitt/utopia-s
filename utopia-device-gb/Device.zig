@@ -82,6 +82,7 @@ fn deinit(self: *Self) void {
 fn runFrame(self: *Self) void {
     for (0..(4_194_304 / 4 / 60)) |_| {
         self.cpu.step(.{
+            .idle = idle,
             .read = read,
             .write = write,
         });
@@ -114,6 +115,11 @@ fn getAudioState(self: *const Self) fw.AudioState {
 fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     _ = self;
     _ = state;
+}
+
+fn idle(cpu: *Cpu) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    _ = self;
 }
 
 fn read(cpu: *Cpu, address: u16) u8 {

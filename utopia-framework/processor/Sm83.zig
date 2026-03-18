@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const alu = @import("./Sm83/alu.zig");
 const bit = @import("./Sm83/bit.zig");
+const control = @import("./Sm83/control.zig");
 const load = @import("./Sm83/load.zig");
 
 pub const Flags = packed struct(u8) {
@@ -13,6 +14,7 @@ pub const Flags = packed struct(u8) {
 };
 
 pub const Interface = struct {
+    idle: fn (self: *Self) void,
     read: fn (self: *Self, address: u16) u8,
     write: fn (self: *Self, address: u16, value: u8) void,
 };
@@ -51,6 +53,11 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
 
 pub fn step(self: *Self, comptime iface: Interface) void {
     self.decode(iface)(self);
+}
+
+pub fn idle(self: *Self, comptime iface: Interface) void {
+    fw.log.trace("  IO", .{});
+    iface.idle(self);
 }
 
 pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
@@ -97,6 +104,13 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     inline for (0..256) |opcode| {
         ops[opcode] = bind(invalid, .{opcode});
     }
+
+    // 0x00+0
+    ops[0x18] = bind(control.jr, .{});
+    ops[0x20] = bind(control.jrConditional, .NZ);
+    ops[0x28] = bind(control.jrConditional, .Z);
+    ops[0x30] = bind(control.jrConditional, .NC);
+    ops[0x38] = bind(control.jrConditional, .C);
 
     // 0x00+1
     ops[0x01] = bind(load.ld16, .BC);
