@@ -13,6 +13,8 @@ pub const LoadOp = enum {
     ORA,
     AND,
     EOR,
+    ADC,
+    SBC,
 };
 
 pub fn load(
@@ -59,6 +61,8 @@ pub fn load(
             core.a ^= value;
             core.setNz(core.a);
         },
+        .ADC => addWithCarry(core, value),
+        .SBC => addWithCarry(core, ~value),
     }
 }
 
@@ -66,4 +70,16 @@ fn compare(core: *Core, lhs: u8, rhs: u8) void {
     const result, const overflow = @subWithOverflow(lhs, rhs);
     core.setNz(result);
     core.flags.c = overflow == 0;
+}
+
+fn addWithCarry(core: *Core, rhs: u8) void {
+    const lhs = core.a;
+    const carry: u8 = @intFromBool(core.flags.c);
+    const result = lhs +% rhs +% carry;
+    const carries = lhs ^ rhs ^ result;
+    const overflow = (lhs ^ result) & (rhs ^ result);
+    core.a = result;
+    core.setNz(result);
+    core.flags.v = fw.num.bit(overflow, 7);
+    core.flags.c = fw.num.bit(carries ^ overflow, 7);
 }
