@@ -276,26 +276,30 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xa2] = bind(load, .{ .LDX, .immediate });
 
     // +0x06
-    // ops[0x06] = bind(modify.memory, .{ .ASL, .zero_page });
-    // ops[0x26] = bind(modify.memory, .{ .ROL, .zero_page });
-    // ops[0x46] = bind(modify.memory, .{ .LSR, .zero_page });
-    // ops[0x66] = bind(modify.memory, .{ .ROR, .zero_page });
+    ops[0x06] = bind(modify.memory, .{ .ASL, .zero_page });
+    ops[0x26] = bind(modify.memory, .{ .ROL, .zero_page });
+    ops[0x46] = bind(modify.memory, .{ .LSR, .zero_page });
+    ops[0x66] = bind(modify.memory, .{ .ROR, .zero_page });
     ops[0x86] = bind(store, .{ .STX, .zero_page });
     ops[0xa6] = bind(load, .{ .LDX, .zero_page });
     ops[0xc6] = bind(modify.memory, .{ .DEC, .zero_page });
     ops[0xe6] = bind(modify.memory, .{ .INC, .zero_page });
 
     // +0x16
-    // ops[0x16] = bind(modify.memory, .{ .ASL, .zero_page_x });
-    // ops[0x36] = bind(modify.memory, .{ .ROL, .zero_page_x });
-    // ops[0x56] = bind(modify.memory, .{ .LSR, .zero_page_x });
-    // ops[0x76] = bind(modify.memory, .{ .ROR, .zero_page_x });
+    ops[0x16] = bind(modify.memory, .{ .ASL, .zero_page_x });
+    ops[0x36] = bind(modify.memory, .{ .ROL, .zero_page_x });
+    ops[0x56] = bind(modify.memory, .{ .LSR, .zero_page_x });
+    ops[0x76] = bind(modify.memory, .{ .ROR, .zero_page_x });
     ops[0x96] = bind(store, .{ .STX, .zero_page_y });
     ops[0xb6] = bind(load, .{ .LDX, .zero_page_y });
     ops[0xd6] = bind(modify.memory, .{ .DEC, .zero_page_x });
     ops[0xf6] = bind(modify.memory, .{ .INC, .zero_page_x });
 
     // +0x0a
+    ops[0x0a] = bind(modify.accumulator, .ASL);
+    ops[0x2a] = bind(modify.accumulator, .ROL);
+    ops[0x4a] = bind(modify.accumulator, .LSR);
+    ops[0x6a] = bind(modify.accumulator, .ROR);
     ops[0x8a] = bind(implied, .TXA);
     ops[0xaa] = bind(implied, .TAX);
     ops[0xca] = bind(implied, .DEX);
@@ -306,20 +310,20 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xba] = bind(implied, .TSX);
 
     // +0x0e
-    // ops[0x0e] = bind(modify.memory, .{ .ASL, .absolute });
-    // ops[0x2e] = bind(modify.memory, .{ .ROL, .absolute });
-    // ops[0x4e] = bind(modify.memory, .{ .LSR, .absolute });
-    // ops[0x6e] = bind(modify.memory, .{ .ROR, .absolute });
+    ops[0x0e] = bind(modify.memory, .{ .ASL, .absolute });
+    ops[0x2e] = bind(modify.memory, .{ .ROL, .absolute });
+    ops[0x4e] = bind(modify.memory, .{ .LSR, .absolute });
+    ops[0x6e] = bind(modify.memory, .{ .ROR, .absolute });
     ops[0x8e] = bind(store, .{ .STX, .absolute });
     ops[0xae] = bind(load, .{ .LDX, .absolute });
     ops[0xce] = bind(modify.memory, .{ .DEC, .absolute });
     ops[0xee] = bind(modify.memory, .{ .INC, .absolute });
 
     // +0x1e
-    // ops[0x1e] = bind(modify.memory, .{ .ASL, .absolute_x });
-    // ops[0x3e] = bind(modify.memory, .{ .ROL, .absolute_x });
-    // ops[0x5e] = bind(modify.memory, .{ .LSR, .absolute_x });
-    // ops[0x7e] = bind(modify.memory, .{ .ROR, .absolute_x });
+    ops[0x1e] = bind(modify.memory, .{ .ASL, .absolute_x });
+    ops[0x3e] = bind(modify.memory, .{ .ROL, .absolute_x });
+    ops[0x5e] = bind(modify.memory, .{ .LSR, .absolute_x });
+    ops[0x7e] = bind(modify.memory, .{ .ROR, .absolute_x });
     ops[0xbe] = bind(load, .{ .LDX, .absolute_y });
     ops[0xde] = bind(modify.memory, .{ .DEC, .absolute_x });
     ops[0xfe] = bind(modify.memory, .{ .INC, .absolute_x });
