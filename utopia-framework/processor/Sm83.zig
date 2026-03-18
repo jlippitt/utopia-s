@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const alu = @import("./Sm83/alu.zig");
+const bit = @import("./Sm83/bit.zig");
 const load = @import("./Sm83/load.zig");
 
 pub const Flags = packed struct(u8) {
@@ -49,8 +50,7 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
 }
 
 pub fn step(self: *Self, comptime iface: Interface) void {
-    const op_table = comptime opTable(iface);
-    op_table[self.nextByte(iface)](self);
+    self.decode(iface)(self);
 }
 
 pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
@@ -74,6 +74,19 @@ pub fn nextWord(self: *Self, comptime iface: Interface) u16 {
     const lo = self.nextByte(iface);
     const hi = self.nextByte(iface);
     return (@as(u16, hi) << 8) | lo;
+}
+
+fn decode(self: *Self, comptime iface: Interface) *const Instruction {
+    const main_table = comptime opTable(iface);
+    const cb_table = comptime opTableCb(iface);
+    const opcode = self.nextByte(iface);
+
+    if (opcode == 0xcb) {
+        @branchHint(.unlikely);
+        return cb_table[self.nextByte(iface)];
+    } else {
+        return main_table[opcode];
+    }
 }
 
 fn opTable(comptime iface: Interface) [256]*const Instruction {
@@ -228,6 +241,49 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     return ops;
 }
 
+fn opTableCb(comptime iface: Interface) [256]*const Instruction {
+    const bind = bindFn(iface);
+
+    var ops: [256]*const Instruction = undefined;
+
+    inline for (0x00..0x40) |opcode| {
+        ops[opcode] = bind(invalidCb, .{opcode});
+    }
+
+    inline for (0..8) |index| {
+        const offset = index << 3;
+
+        ops[0x40 + offset] = bind(bit.bit, .{ index, .B });
+        ops[0x41 + offset] = bind(bit.bit, .{ index, .C });
+        ops[0x42 + offset] = bind(bit.bit, .{ index, .D });
+        ops[0x43 + offset] = bind(bit.bit, .{ index, .E });
+        ops[0x44 + offset] = bind(bit.bit, .{ index, .H });
+        ops[0x45 + offset] = bind(bit.bit, .{ index, .L });
+        ops[0x46 + offset] = bind(bit.bit, .{ index, .HL_increment });
+        ops[0x47 + offset] = bind(bit.bit, .{ index, .A });
+
+        ops[0x80 + offset] = bind(bit.res, .{ index, .B });
+        ops[0x81 + offset] = bind(bit.res, .{ index, .C });
+        ops[0x82 + offset] = bind(bit.res, .{ index, .D });
+        ops[0x83 + offset] = bind(bit.res, .{ index, .E });
+        ops[0x84 + offset] = bind(bit.res, .{ index, .H });
+        ops[0x85 + offset] = bind(bit.res, .{ index, .L });
+        ops[0x86 + offset] = bind(bit.res, .{ index, .HL_increment });
+        ops[0x87 + offset] = bind(bit.res, .{ index, .A });
+
+        ops[0xc0 + offset] = bind(bit.set, .{ index, .B });
+        ops[0xc1 + offset] = bind(bit.set, .{ index, .C });
+        ops[0xc2 + offset] = bind(bit.set, .{ index, .D });
+        ops[0xc3 + offset] = bind(bit.set, .{ index, .E });
+        ops[0xc4 + offset] = bind(bit.set, .{ index, .H });
+        ops[0xc5 + offset] = bind(bit.set, .{ index, .L });
+        ops[0xc6 + offset] = bind(bit.set, .{ index, .HL_increment });
+        ops[0xc7 + offset] = bind(bit.set, .{ index, .A });
+    }
+
+    return ops;
+}
+
 fn bindFn(comptime iface: Interface) BindFn {
     return struct {
         fn bind(comptime func: anytype, comptime args: anytype) Instruction {
@@ -251,4 +307,10 @@ fn invalid(comptime opcode: u8, comptime iface: Interface, core: *Self) void {
     _ = core;
     _ = iface;
     fw.log.todo("SM83 opcode: {X:02}", .{opcode});
+}
+
+fn invalidCb(comptime opcode: u8, comptime iface: Interface, core: *Self) void {
+    _ = core;
+    _ = iface;
+    fw.log.todo("SM83 opcode: CB {X:02}", .{opcode});
 }
