@@ -11,11 +11,23 @@ pub const Mode8 = enum {
     E,
     H,
     L,
+    immediate,
+    absolute,
+    BC_indirect,
+    DE_indirect,
     HL_indirect,
+    HL_increment,
+    HL_decrement,
 
     pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.writeAll(switch (self) {
+            .immediate => "u8",
+            .absolute => "(u16)",
+            .BC_indirect => "(BC)",
+            .DE_indirect => "(DE)",
             .HL_indirect => "(HL)",
+            .HL_increment => "(HL+)",
+            .HL_decrement => "(HL-)",
             else => @tagName(self),
         });
     }
@@ -29,7 +41,46 @@ pub const Mode8 = enum {
             .E => @truncate(core.de),
             .H => @truncate(core.hl >> 8),
             .L => @truncate(core.hl),
+            .immediate => core.nextByte(iface),
+            .absolute => core.read(iface, core.nextWord(iface)),
+            .BC_indirect => core.read(iface, core.bc),
+            .DE_indirect => core.read(iface, core.de),
             .HL_indirect => core.read(iface, core.hl),
+            .HL_increment => blk: {
+                const value = core.read(iface, core.hl);
+                core.hl +%= 1;
+                break :blk value;
+            },
+            .HL_decrement => blk: {
+                const value = core.read(iface, core.hl);
+                core.hl -%= 1;
+                break :blk value;
+            },
+        };
+    }
+
+    pub fn write(comptime self: Self, iface: Core.Interface, core: *Core, value: u8) void {
+        return switch (comptime self) {
+            .A => core.a = value,
+            .B => core.bc = (core.bc & 0xff) | (@as(u16, value) << 8),
+            .C => core.bc = (core.bc & 0xff00) | @as(u16, value),
+            .D => core.de = (core.de & 0xff) | (@as(u16, value) << 8),
+            .E => core.de = (core.de & 0xff00) | @as(u16, value),
+            .H => core.hl = (core.hl & 0xff) | (@as(u16, value) << 8),
+            .L => core.hl = (core.hl & 0xff00) | @as(u16, value),
+            .immediate => @compileError("Cannot write to immediate address"),
+            .absolute => core.write(iface, core.nextWord(iface), value),
+            .BC_indirect => core.write(iface, core.bc, value),
+            .DE_indirect => core.write(iface, core.de, value),
+            .HL_indirect => core.write(iface, core.hl, value),
+            .HL_increment => {
+                core.write(iface, core.hl, value);
+                core.hl +%= 1;
+            },
+            .HL_decrement => {
+                core.write(iface, core.hl, value);
+                core.hl -%= 1;
+            },
         };
     }
 };

@@ -13,6 +13,7 @@ pub const Flags = packed struct(u8) {
 
 pub const Interface = struct {
     read: fn (self: *Self, address: u16) u8,
+    write: fn (self: *Self, address: u16, value: u8) void,
 };
 
 const Instruction = fn (core: *Self) void;
@@ -58,6 +59,11 @@ pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
     return value;
 }
 
+pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
+    fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
+    iface.write(self, address, value);
+}
+
 pub fn nextByte(self: *Self, comptime iface: Interface) u8 {
     const value = self.read(iface, self.pc);
     self.pc +%= 1;
@@ -84,6 +90,106 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x11] = bind(load.ld16, .DE);
     ops[0x21] = bind(load.ld16, .HL);
     ops[0x31] = bind(load.ld16, .SP);
+
+    // 0x00+2
+    ops[0x02] = bind(load.ld, .{ .BC_indirect, .A });
+    ops[0x0a] = bind(load.ld, .{ .A, .BC_indirect });
+    ops[0x12] = bind(load.ld, .{ .DE_indirect, .A });
+    ops[0x1a] = bind(load.ld, .{ .A, .DE_indirect });
+    ops[0x22] = bind(load.ld, .{ .HL_increment, .A });
+    ops[0x2a] = bind(load.ld, .{ .A, .HL_increment });
+    ops[0x32] = bind(load.ld, .{ .HL_decrement, .A });
+    ops[0x3a] = bind(load.ld, .{ .A, .HL_decrement });
+
+    // 0x00+6
+    ops[0x06] = bind(load.ld, .{ .B, .immediate });
+    ops[0x0e] = bind(load.ld, .{ .C, .immediate });
+    ops[0x16] = bind(load.ld, .{ .D, .immediate });
+    ops[0x1e] = bind(load.ld, .{ .E, .immediate });
+    ops[0x26] = bind(load.ld, .{ .H, .immediate });
+    ops[0x2e] = bind(load.ld, .{ .L, .immediate });
+    ops[0x36] = bind(load.ld, .{ .HL_indirect, .immediate });
+    ops[0x3e] = bind(load.ld, .{ .A, .immediate });
+
+    // 0x40
+    ops[0x40] = bind(load.ld, .{ .B, .B });
+    ops[0x41] = bind(load.ld, .{ .B, .C });
+    ops[0x42] = bind(load.ld, .{ .B, .D });
+    ops[0x43] = bind(load.ld, .{ .B, .E });
+    ops[0x44] = bind(load.ld, .{ .B, .H });
+    ops[0x45] = bind(load.ld, .{ .B, .L });
+    ops[0x46] = bind(load.ld, .{ .B, .HL_indirect });
+    ops[0x47] = bind(load.ld, .{ .B, .A });
+
+    // 0x48
+    ops[0x48] = bind(load.ld, .{ .C, .B });
+    ops[0x49] = bind(load.ld, .{ .C, .C });
+    ops[0x4a] = bind(load.ld, .{ .C, .D });
+    ops[0x4b] = bind(load.ld, .{ .C, .E });
+    ops[0x4c] = bind(load.ld, .{ .C, .H });
+    ops[0x4d] = bind(load.ld, .{ .C, .L });
+    ops[0x4e] = bind(load.ld, .{ .C, .HL_indirect });
+    ops[0x4f] = bind(load.ld, .{ .C, .A });
+
+    // 0x50
+    ops[0x50] = bind(load.ld, .{ .D, .B });
+    ops[0x51] = bind(load.ld, .{ .D, .C });
+    ops[0x52] = bind(load.ld, .{ .D, .D });
+    ops[0x53] = bind(load.ld, .{ .D, .E });
+    ops[0x54] = bind(load.ld, .{ .D, .H });
+    ops[0x55] = bind(load.ld, .{ .D, .L });
+    ops[0x56] = bind(load.ld, .{ .D, .HL_indirect });
+    ops[0x57] = bind(load.ld, .{ .D, .A });
+
+    // 0x58
+    ops[0x58] = bind(load.ld, .{ .E, .B });
+    ops[0x59] = bind(load.ld, .{ .E, .C });
+    ops[0x5a] = bind(load.ld, .{ .E, .D });
+    ops[0x5b] = bind(load.ld, .{ .E, .E });
+    ops[0x5c] = bind(load.ld, .{ .E, .H });
+    ops[0x5d] = bind(load.ld, .{ .E, .L });
+    ops[0x5e] = bind(load.ld, .{ .E, .HL_indirect });
+    ops[0x5f] = bind(load.ld, .{ .E, .A });
+
+    // 0x60
+    ops[0x60] = bind(load.ld, .{ .H, .B });
+    ops[0x61] = bind(load.ld, .{ .H, .C });
+    ops[0x62] = bind(load.ld, .{ .H, .D });
+    ops[0x63] = bind(load.ld, .{ .H, .E });
+    ops[0x64] = bind(load.ld, .{ .H, .H });
+    ops[0x65] = bind(load.ld, .{ .H, .L });
+    ops[0x66] = bind(load.ld, .{ .H, .HL_indirect });
+    ops[0x67] = bind(load.ld, .{ .H, .A });
+
+    // 0x68
+    ops[0x68] = bind(load.ld, .{ .L, .B });
+    ops[0x69] = bind(load.ld, .{ .L, .C });
+    ops[0x6a] = bind(load.ld, .{ .L, .D });
+    ops[0x6b] = bind(load.ld, .{ .L, .E });
+    ops[0x6c] = bind(load.ld, .{ .L, .H });
+    ops[0x6d] = bind(load.ld, .{ .L, .L });
+    ops[0x6e] = bind(load.ld, .{ .L, .HL_indirect });
+    ops[0x6f] = bind(load.ld, .{ .L, .A });
+
+    // 0x70
+    ops[0x70] = bind(load.ld, .{ .HL_indirect, .B });
+    ops[0x71] = bind(load.ld, .{ .HL_indirect, .C });
+    ops[0x72] = bind(load.ld, .{ .HL_indirect, .D });
+    ops[0x73] = bind(load.ld, .{ .HL_indirect, .E });
+    ops[0x74] = bind(load.ld, .{ .HL_indirect, .H });
+    ops[0x75] = bind(load.ld, .{ .HL_indirect, .L });
+    // ops[0x76] = bind(control.halt, .{});
+    ops[0x77] = bind(load.ld, .{ .HL_indirect, .A });
+
+    // 0x78
+    ops[0x78] = bind(load.ld, .{ .A, .B });
+    ops[0x79] = bind(load.ld, .{ .A, .C });
+    ops[0x7a] = bind(load.ld, .{ .A, .D });
+    ops[0x7b] = bind(load.ld, .{ .A, .E });
+    ops[0x7c] = bind(load.ld, .{ .A, .H });
+    ops[0x7d] = bind(load.ld, .{ .A, .L });
+    ops[0x7e] = bind(load.ld, .{ .A, .HL_indirect });
+    ops[0x7f] = bind(load.ld, .{ .A, .A });
 
     // 0xa0
     ops[0xa0] = bind(alu.and_, .B);
@@ -114,6 +220,10 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xb5] = bind(alu.or_, .L);
     ops[0xb6] = bind(alu.or_, .HL_indirect);
     ops[0xb7] = bind(alu.or_, .A);
+
+    // 0xc0+2
+    ops[0xea] = bind(load.ld, .{ .absolute, .A });
+    ops[0xfa] = bind(load.ld, .{ .A, .absolute });
 
     return ops;
 }

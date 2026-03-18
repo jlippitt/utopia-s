@@ -83,6 +83,7 @@ fn runFrame(self: *Self) void {
     for (0..(4_194_304 / 4 / 60)) |_| {
         self.cpu.step(.{
             .read = read,
+            .write = write,
         });
 
         fw.log.trace("{f}", .{self.cpu});
@@ -150,4 +151,35 @@ fn read(cpu: *Cpu, address: u16) u8 {
     }
 
     return 0;
+}
+
+fn write(cpu: *Cpu, address: u16, value: u8) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+
+    if (address < 0x8000) {
+        @branchHint(.unlikely);
+        fw.log.todo("Mapper writes", .{});
+    }
+
+    if (address < 0xa000) {
+        fw.log.trace("TODO: VRAM writes", .{});
+        return;
+    }
+
+    if (address < 0xc000) {
+        fw.log.todo("ERAM writes", .{});
+    }
+
+    if (address < 0xfe00) {
+        self.wram[address & wram_mask] = value;
+        return;
+    }
+
+    if (address >= 0xff00) {
+        fw.log.todo("I/O writes", .{});
+    }
+
+    if (address < 0xfea0) {
+        fw.log.todo("OAM writes", .{});
+    }
 }
