@@ -149,7 +149,7 @@ fn read(cpu: *Cpu, address: u16) u8 {
     }
 
     if (address >= 0xff00) {
-        fw.log.todo("I/O reads", .{});
+        return readIo(cpu, @truncate(address));
     }
 
     if (address < 0xfea0) {
@@ -182,10 +182,33 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
     }
 
     if (address >= 0xff00) {
-        fw.log.todo("I/O writes", .{});
+        writeIo(cpu, @truncate(address), value);
+        return;
     }
 
     if (address < 0xfea0) {
         fw.log.todo("OAM writes", .{});
+    }
+}
+
+fn readIo(cpu: *Cpu, address: u8) u8 {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+
+    _ = self;
+
+    return switch (address) {
+        0x10...0x3f => 0, // TODO: APU
+        else => fw.log.todo("I/O read: {X:02}", .{address}),
+    };
+}
+
+fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+
+    _ = self;
+
+    switch (address) {
+        0x10...0x3f => {}, // TODO: APU
+        else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
 }
