@@ -184,6 +184,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // +0x0c
     ops[0x2c] = bind(load, .{ .BIT, .absolute });
+    ops[0x4c] = bind(control.jmp, .{});
     ops[0x8c] = bind(store, .{ .STY, .absolute });
     ops[0xac] = bind(load, .{ .LDY, .absolute });
     ops[0xcc] = bind(load, .{ .CPY, .absolute });

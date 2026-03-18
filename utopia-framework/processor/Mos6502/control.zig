@@ -45,6 +45,14 @@ pub fn branch(comptime op: BranchOp, comptime iface: Core.Interface, core: *Core
     }
 }
 
+pub fn jmp(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("JMP addr", .{});
+    const lo = core.next(iface);
+    core.poll();
+    const hi = core.read(iface, core.pc);
+    core.pc = (@as(u16, hi) << 8) | lo;
+}
+
 pub fn jsr(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("JSR addr", .{});
     const lo = core.next(iface);
