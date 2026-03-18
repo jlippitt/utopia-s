@@ -85,6 +85,8 @@ fn runFrame(self: *Self) void {
             .idle = idle,
             .read = read,
             .write = write,
+            .readIo = readIo,
+            .writeIo = writeIo,
         });
 
         fw.log.trace("{f}", .{self.cpu});

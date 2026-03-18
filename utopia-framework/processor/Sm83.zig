@@ -17,6 +17,8 @@ pub const Interface = struct {
     idle: fn (self: *Self) void,
     read: fn (self: *Self, address: u16) u8,
     write: fn (self: *Self, address: u16, value: u8) void,
+    readIo: fn (self: *Self, address: u8) u8,
+    writeIo: fn (self: *Self, address: u8, value: u8) void,
 };
 
 const Instruction = fn (core: *Self) void;
@@ -69,6 +71,17 @@ pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
 pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
     fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
     iface.write(self, address, value);
+}
+
+pub fn readIo(self: *Self, comptime iface: Interface, address: u8) u8 {
+    const value = iface.readIo(self, address);
+    fw.log.trace("  FF{X:02} => {X:02}", .{ address, value });
+    return value;
+}
+
+pub fn writeIo(self: *Self, comptime iface: Interface, address: u8, value: u8) void {
+    fw.log.trace("  FF{X:02} <= {X:02}", .{ address, value });
+    iface.writeIo(self, address, value);
 }
 
 pub fn nextByte(self: *Self, comptime iface: Interface) u8 {
@@ -248,8 +261,14 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xb6] = bind(alu.or_, .HL_indirect);
     ops[0xb7] = bind(alu.or_, .A);
 
+    // 0xc0+0
+    ops[0xe0] = bind(load.ld, .{ .high, .A });
+    ops[0xf0] = bind(load.ld, .{ .A, .high });
+
     // 0xc0+2
+    ops[0xe2] = bind(load.ld, .{ .C_indirect, .A });
     ops[0xea] = bind(load.ld, .{ .absolute, .A });
+    ops[0xf2] = bind(load.ld, .{ .A, .C_indirect });
     ops[0xfa] = bind(load.ld, .{ .A, .absolute });
 
     return ops;
