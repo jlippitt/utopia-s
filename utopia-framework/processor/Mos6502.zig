@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const control = @import("./Mos6502/control.zig");
 const interrupt = @import("./Mos6502/interrupt.zig");
 const implied = @import("./Mos6502/implied.zig").implied;
 const load = @import("./Mos6502/load.zig").load;
@@ -133,6 +134,16 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // +0x00
     ops[0xa0] = bind(load, .{ .LDY, .immediate });
+
+    // +0x10
+    ops[0x10] = bind(control.branch, .BPL);
+    ops[0x30] = bind(control.branch, .BMI);
+    ops[0x50] = bind(control.branch, .BVC);
+    ops[0x70] = bind(control.branch, .BVS);
+    ops[0x90] = bind(control.branch, .BCC);
+    ops[0xb0] = bind(control.branch, .BCS);
+    ops[0xd0] = bind(control.branch, .BNE);
+    ops[0xf0] = bind(control.branch, .BEQ);
 
     // +0x08
     ops[0xa8] = bind(implied, .TAY);

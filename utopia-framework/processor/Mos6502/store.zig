@@ -2,7 +2,7 @@ const fw = @import("framework");
 const Core = @import("../Mos6502.zig");
 const AddressMode = @import("./address.zig").Mode;
 
-const StoreOp = enum {
+pub const StoreOp = enum {
     STA,
     STX,
     STY,
