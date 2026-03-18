@@ -10,7 +10,7 @@ pub fn bit(
 ) void {
     fw.log.trace("BIT {d}, {f}", .{ index, mode });
     const value = mode.read(iface, core);
-    core.flags.z = fw.num.bit(value, index);
+    core.flags.z = !fw.num.bit(value, index);
     core.flags.n = false;
     core.flags.h = true;
 }
