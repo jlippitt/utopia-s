@@ -200,6 +200,7 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
 
     return switch (address) {
         0x10...0x3f => 0, // TODO: APU
+        0x40...0x4f => 0, // TODO: PPU
         else => fw.log.todo("I/O read: {X:02}", .{address}),
     };
 }
@@ -211,6 +212,7 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
 
     switch (address) {
         0x10...0x3f => {}, // TODO: APU
+        0x40...0x4f => {}, // TODO: PPU
         else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
 }
