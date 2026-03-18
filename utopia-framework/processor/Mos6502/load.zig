@@ -9,6 +9,10 @@ pub const LoadOp = enum {
     CMP,
     CPX,
     CPY,
+    BIT,
+    ORA,
+    AND,
+    EOR,
 };
 
 pub fn load(
@@ -38,6 +42,23 @@ pub fn load(
         .CMP => compare(core, core.a, value),
         .CPX => compare(core, core.x, value),
         .CPY => compare(core, core.y, value),
+        .BIT => {
+            core.flags.n = fw.num.bit(value, 7);
+            core.flags.v = fw.num.bit(value, 6);
+            core.flags.z = (value & core.a) == 0;
+        },
+        .ORA => {
+            core.a |= value;
+            core.setNz(core.a);
+        },
+        .AND => {
+            core.a &= value;
+            core.setNz(core.a);
+        },
+        .EOR => {
+            core.a ^= value;
+            core.setNz(core.a);
+        },
     }
 }
 
