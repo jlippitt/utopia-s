@@ -118,6 +118,11 @@ pub fn next(self: *Self, comptime iface: Interface) u8 {
     return value;
 }
 
+pub fn pull(self: *Self, comptime iface: Interface) u8 {
+    self.s +%= 1;
+    return self.read(iface, stack_page | self.s);
+}
+
 pub fn push(self: *Self, comptime iface: Interface, value: u8) void {
     self.write(iface, stack_page | self.s, value);
     self.s -%= 1;
@@ -139,6 +144,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // +0x00
     ops[0x20] = bind(control.jsr, .{});
+    ops[0x60] = bind(control.rts, .{});
     ops[0xa0] = bind(load, .{ .LDY, .immediate });
     ops[0xc0] = bind(load, .{ .CPY, .immediate });
     ops[0xe0] = bind(load, .{ .CPX, .immediate });

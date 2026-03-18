@@ -55,3 +55,14 @@ pub fn jsr(comptime iface: Core.Interface, core: *Core) void {
     const hi = core.read(iface, core.pc);
     core.pc = (@as(u16, hi) << 8) | lo;
 }
+
+pub fn rts(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("RTS", .{});
+    _ = core.read(iface, core.pc);
+    _ = core.read(iface, Core.stack_page | core.s);
+    const lo = core.pull(iface);
+    const hi = core.pull(iface);
+    core.pc = (@as(u16, hi) << 8) | lo;
+    core.poll();
+    _ = core.next(iface);
+}
