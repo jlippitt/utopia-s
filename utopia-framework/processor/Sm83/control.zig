@@ -58,3 +58,22 @@ pub fn callConditional(comptime cond: Condition, comptime iface: Core.Interface,
         fw.log.trace("  Branch not taken", .{});
     }
 }
+
+pub fn ret(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("RET", .{});
+    core.pc = core.popWord(iface);
+    core.idle(iface);
+}
+
+pub fn retConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("RET {t}", .{cond});
+    core.idle(iface);
+
+    if (cond.apply(&core.flags)) {
+        fw.log.trace("  Branch taken", .{});
+        core.pc = core.popWord(iface);
+        core.idle(iface);
+    } else {
+        fw.log.trace("  Branch not taken", .{});
+    }
+}
