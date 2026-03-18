@@ -299,6 +299,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x8a] = bind(implied, .TXA);
     ops[0xaa] = bind(implied, .TAX);
     ops[0xca] = bind(implied, .DEX);
+    ops[0xea] = bind(implied, .NOP);
 
     // +0x1a
     ops[0x9a] = bind(implied, .TXS);

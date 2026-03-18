@@ -19,6 +19,7 @@ const ImpliedOp = enum {
     INX,
     DEY,
     INY,
+    NOP,
 };
 
 pub fn implied(comptime op: ImpliedOp, comptime iface: Core.Interface, core: *Core) void {
@@ -71,5 +72,6 @@ pub fn implied(comptime op: ImpliedOp, comptime iface: Core.Interface, core: *Co
             core.y +%= 1;
             core.setNz(core.y);
         },
+        .NOP => {},
     }
 }

@@ -113,7 +113,8 @@ fn read(cpu: *Cpu, address: u16) u8 {
         self.mdr = self.ppu.read(address);
     } else if (address < 0x4020) {
         @branchHint(.unlikely);
-        fw.log.todo("APU/Joypad reads", .{});
+        fw.log.trace("TODO: APU/Joypad reads", .{});
+        self.mdr = 0;
     }
 
     return self.mdr;
