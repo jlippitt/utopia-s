@@ -9,6 +9,8 @@ pub const Mode = enum {
     absolute_x,
     absolute_y,
     zero_page,
+    zero_page_x,
+    zero_page_y,
     zero_page_indirect_y,
 
     pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -18,6 +20,8 @@ pub const Mode = enum {
             .absolute_x => "addr,X",
             .absolute_y => "addr,Y",
             .zero_page => "zp",
+            .zero_page_x => "zp,X",
+            .zero_page_y => "zp,Y",
             .zero_page_indirect_y => "(zp),Y",
         });
     }
@@ -35,15 +39,11 @@ pub const Mode = enum {
                 break :blk address;
             },
             .absolute => getAbsolute(iface, core),
-            .absolute_x => blk: {
-                const base = getAbsolute(iface, core);
-                break :blk indexAbsolute(iface, core, base, core.x, write);
-            },
-            .absolute_y => blk: {
-                const base = getAbsolute(iface, core);
-                break :blk indexAbsolute(iface, core, base, core.y, write);
-            },
+            .absolute_x => indexAbsolute(iface, core, getAbsolute(iface, core), core.x, write),
+            .absolute_y => indexAbsolute(iface, core, getAbsolute(iface, core), core.y, write),
             .zero_page => core.next(iface),
+            .zero_page_x => indexZeroPage(iface, core, core.next(iface), core.x),
+            .zero_page_y => indexZeroPage(iface, core, core.next(iface), core.y),
             .zero_page_indirect_y => blk: {
                 const direct = core.next(iface);
                 const lo = core.read(iface, direct);
@@ -69,4 +69,9 @@ fn indexAbsolute(iface: Core.Interface, core: *Core, base: u16, index: u8, write
     }
 
     return result;
+}
+
+fn indexZeroPage(iface: Core.Interface, core: *Core, base: u8, index: u8) u8 {
+    _ = core.read(iface, base);
+    return base +% index;
 }
