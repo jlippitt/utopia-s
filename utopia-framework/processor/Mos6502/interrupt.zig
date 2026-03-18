@@ -17,3 +17,14 @@ pub fn reset(comptime iface: Core.Interface, core: *Core) void {
     core.pc = (@as(u16, hi) << 8) | lo;
     core.flags.i = true;
 }
+
+pub fn rti(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("RTI", .{});
+    _ = core.read(iface, core.pc);
+    _ = core.read(iface, Core.stack_page | core.s);
+    core.flags = @bitCast(core.pull(iface) & 0xcf);
+    const lo = core.pull(iface);
+    core.poll();
+    const hi = core.pull(iface);
+    core.pc = (@as(u16, hi) << 8) | lo;
+}

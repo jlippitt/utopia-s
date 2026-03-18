@@ -146,6 +146,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // +0x00
     ops[0x20] = bind(control.jsr, .{});
+    ops[0x40] = bind(interrupt.rti, .{});
     ops[0x60] = bind(control.rts, .{});
     ops[0xa0] = bind(load, .{ .LDY, .immediate });
     ops[0xc0] = bind(load, .{ .CPY, .immediate });
