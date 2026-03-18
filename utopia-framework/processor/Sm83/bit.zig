@@ -2,6 +2,48 @@ const fw = @import("framework");
 const Core = @import("../Sm83.zig");
 const address = @import("./address.zig");
 
+pub fn rlca(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("RLCA", .{});
+    core.flags.c = fw.num.bit(core.a, 7);
+    core.a = (core.a << 1) | (core.a >> 7);
+    core.flags.z = false;
+    core.flags.n = false;
+    core.flags.h = false;
+}
+
+pub fn rrca(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("RRCA", .{});
+    core.flags.c = fw.num.bit(core.a, 0);
+    core.a = (core.a << 1) | (core.a << 7);
+    core.flags.z = false;
+    core.flags.n = false;
+    core.flags.h = false;
+}
+
+pub fn rla(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("RLA", .{});
+    const carry: u8 = @intFromBool(core.flags.c);
+    core.flags.c = fw.num.bit(core.a, 7);
+    core.a = (core.a << 1) | carry;
+    core.flags.z = false;
+    core.flags.n = false;
+    core.flags.h = false;
+}
+
+pub fn rra(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("RRA", .{});
+    const carry: u8 = @intFromBool(core.flags.c);
+    core.flags.c = fw.num.bit(core.a, 0);
+    core.a = (core.a << 1) | (carry << 7);
+    core.flags.z = false;
+    core.flags.n = false;
+    core.flags.h = false;
+}
+
 pub fn rlc(comptime mode: address.Mode8, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("RLC {f}", .{mode});
     const value = mode.read(iface, core);

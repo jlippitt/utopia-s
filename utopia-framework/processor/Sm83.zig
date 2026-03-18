@@ -196,6 +196,12 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x36] = bind(load.ld, .{ .HL_indirect, .immediate });
     ops[0x3e] = bind(load.ld, .{ .A, .immediate });
 
+    // 0x00+7
+    ops[0x07] = bind(bit.rlca, .{});
+    ops[0x0f] = bind(bit.rrca, .{});
+    ops[0x17] = bind(bit.rla, .{});
+    ops[0x1f] = bind(bit.rra, .{});
+
     // 0x40
     ops[0x40] = bind(load.ld, .{ .B, .B });
     ops[0x41] = bind(load.ld, .{ .B, .C });
@@ -483,10 +489,4 @@ fn invalid(comptime opcode: u8, comptime iface: Interface, core: *Self) void {
     _ = core;
     _ = iface;
     fw.log.todo("SM83 opcode: {X:02}", .{opcode});
-}
-
-fn invalidCb(comptime opcode: u8, comptime iface: Interface, core: *Self) void {
-    _ = core;
-    _ = iface;
-    fw.log.todo("SM83 opcode: CB {X:02}", .{opcode});
 }
