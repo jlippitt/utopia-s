@@ -15,10 +15,10 @@ const ImpliedOp = enum {
     TYA,
     TSX,
     TXS,
-    INX,
     DEX,
-    INY,
+    INX,
     DEY,
+    INY,
 };
 
 pub fn implied(comptime op: ImpliedOp, comptime iface: Core.Interface, core: *Core) void {
@@ -55,20 +55,20 @@ pub fn implied(comptime op: ImpliedOp, comptime iface: Core.Interface, core: *Co
             core.setNz(core.x);
         },
         .TXS => core.s = core.x,
-        .INX => {
-            core.x +%= 1;
-            core.setNz(core.x);
-        },
         .DEX => {
             core.x -%= 1;
             core.setNz(core.x);
         },
-        .INY => {
-            core.y +%= 1;
-            core.setNz(core.y);
+        .INX => {
+            core.x +%= 1;
+            core.setNz(core.x);
         },
         .DEY => {
             core.y -%= 1;
+            core.setNz(core.y);
+        },
+        .INY => {
+            core.y +%= 1;
             core.setNz(core.y);
         },
     }

@@ -4,6 +4,7 @@ const control = @import("./Mos6502/control.zig");
 const interrupt = @import("./Mos6502/interrupt.zig");
 const implied = @import("./Mos6502/implied.zig").implied;
 const load = @import("./Mos6502/load.zig").load;
+const modify = @import("./Mos6502/modify.zig");
 const store = @import("./Mos6502/store.zig").store;
 
 pub const stack_page: u16 = 0x0100;
@@ -253,8 +254,14 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xa2] = bind(load, .{ .LDX, .immediate });
 
     // +0x06
+    // ops[0x06] = bind(modify.memory, .{ .ASL, .zero_page });
+    // ops[0x26] = bind(modify.memory, .{ .ROL, .zero_page });
+    // ops[0x46] = bind(modify.memory, .{ .LSR, .zero_page });
+    // ops[0x66] = bind(modify.memory, .{ .ROR, .zero_page });
     ops[0x86] = bind(store, .{ .STX, .zero_page });
     ops[0xa6] = bind(load, .{ .LDX, .zero_page });
+    ops[0xc6] = bind(modify.memory, .{ .DEC, .zero_page });
+    ops[0xe6] = bind(modify.memory, .{ .INC, .zero_page });
 
     // +0x0a
     ops[0x8a] = bind(implied, .TXA);
@@ -266,8 +273,14 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xba] = bind(implied, .TSX);
 
     // +0x0e
+    // ops[0x0e] = bind(modify.memory, .{ .ASL, .absolute });
+    // ops[0x2e] = bind(modify.memory, .{ .ROL, .absolute });
+    // ops[0x4e] = bind(modify.memory, .{ .LSR, .absolute });
+    // ops[0x6e] = bind(modify.memory, .{ .ROR, .absolute });
     ops[0x8e] = bind(store, .{ .STX, .absolute });
     ops[0xae] = bind(load, .{ .LDX, .absolute });
+    ops[0xce] = bind(modify.memory, .{ .DEC, .absolute });
+    ops[0xee] = bind(modify.memory, .{ .INC, .absolute });
 
     return ops;
 }
