@@ -343,13 +343,90 @@ fn opTableCb(comptime iface: Interface) [256]*const Instruction {
 
     var ops: [256]*const Instruction = undefined;
 
-    inline for (0x00..0x40) |opcode| {
-        ops[opcode] = bind(invalidCb, .{opcode});
-    }
+    // +0x00
+    ops[0x00] = bind(bit.rlc, .B);
+    ops[0x01] = bind(bit.rlc, .C);
+    ops[0x02] = bind(bit.rlc, .D);
+    ops[0x03] = bind(bit.rlc, .E);
+    ops[0x04] = bind(bit.rlc, .H);
+    ops[0x05] = bind(bit.rlc, .L);
+    ops[0x06] = bind(bit.rlc, .HL_indirect);
+    ops[0x07] = bind(bit.rlc, .A);
+
+    // +0x08
+    ops[0x08] = bind(bit.rrc, .B);
+    ops[0x09] = bind(bit.rrc, .C);
+    ops[0x0a] = bind(bit.rrc, .D);
+    ops[0x0b] = bind(bit.rrc, .E);
+    ops[0x0c] = bind(bit.rrc, .H);
+    ops[0x0d] = bind(bit.rrc, .L);
+    ops[0x0e] = bind(bit.rrc, .HL_indirect);
+    ops[0x0f] = bind(bit.rrc, .A);
+
+    // +0x10
+    ops[0x10] = bind(bit.rl, .B);
+    ops[0x11] = bind(bit.rl, .C);
+    ops[0x12] = bind(bit.rl, .D);
+    ops[0x13] = bind(bit.rl, .E);
+    ops[0x14] = bind(bit.rl, .H);
+    ops[0x15] = bind(bit.rl, .L);
+    ops[0x16] = bind(bit.rl, .HL_indirect);
+    ops[0x17] = bind(bit.rl, .A);
+
+    // +0x18
+    ops[0x18] = bind(bit.rr, .B);
+    ops[0x19] = bind(bit.rr, .C);
+    ops[0x1a] = bind(bit.rr, .D);
+    ops[0x1b] = bind(bit.rr, .E);
+    ops[0x1c] = bind(bit.rr, .H);
+    ops[0x1d] = bind(bit.rr, .L);
+    ops[0x1e] = bind(bit.rr, .HL_indirect);
+    ops[0x1f] = bind(bit.rr, .A);
+
+    // +0x20
+    ops[0x20] = bind(bit.sla, .B);
+    ops[0x21] = bind(bit.sla, .C);
+    ops[0x22] = bind(bit.sla, .D);
+    ops[0x23] = bind(bit.sla, .E);
+    ops[0x24] = bind(bit.sla, .H);
+    ops[0x25] = bind(bit.sla, .L);
+    ops[0x26] = bind(bit.sla, .HL_indirect);
+    ops[0x27] = bind(bit.sla, .A);
+
+    // +0x28
+    ops[0x28] = bind(bit.sra, .B);
+    ops[0x29] = bind(bit.sra, .C);
+    ops[0x2a] = bind(bit.sra, .D);
+    ops[0x2b] = bind(bit.sra, .E);
+    ops[0x2c] = bind(bit.sra, .H);
+    ops[0x2d] = bind(bit.sra, .L);
+    ops[0x2e] = bind(bit.sra, .HL_indirect);
+    ops[0x2f] = bind(bit.sra, .A);
+
+    // +0x30
+    ops[0x30] = bind(bit.swap, .B);
+    ops[0x31] = bind(bit.swap, .C);
+    ops[0x32] = bind(bit.swap, .D);
+    ops[0x33] = bind(bit.swap, .E);
+    ops[0x34] = bind(bit.swap, .H);
+    ops[0x35] = bind(bit.swap, .L);
+    ops[0x36] = bind(bit.swap, .HL_indirect);
+    ops[0x37] = bind(bit.swap, .A);
+
+    // +0x38
+    ops[0x38] = bind(bit.srl, .B);
+    ops[0x39] = bind(bit.srl, .C);
+    ops[0x3a] = bind(bit.srl, .D);
+    ops[0x3b] = bind(bit.srl, .E);
+    ops[0x3c] = bind(bit.srl, .H);
+    ops[0x3d] = bind(bit.srl, .L);
+    ops[0x3e] = bind(bit.srl, .HL_indirect);
+    ops[0x3f] = bind(bit.srl, .A);
 
     inline for (0..8) |index| {
         const offset = index << 3;
 
+        // +0x40
         ops[0x40 + offset] = bind(bit.bit, .{ index, .B });
         ops[0x41 + offset] = bind(bit.bit, .{ index, .C });
         ops[0x42 + offset] = bind(bit.bit, .{ index, .D });
@@ -359,6 +436,7 @@ fn opTableCb(comptime iface: Interface) [256]*const Instruction {
         ops[0x46 + offset] = bind(bit.bit, .{ index, .HL_increment });
         ops[0x47 + offset] = bind(bit.bit, .{ index, .A });
 
+        // +0x80
         ops[0x80 + offset] = bind(bit.res, .{ index, .B });
         ops[0x81 + offset] = bind(bit.res, .{ index, .C });
         ops[0x82 + offset] = bind(bit.res, .{ index, .D });
@@ -368,6 +446,7 @@ fn opTableCb(comptime iface: Interface) [256]*const Instruction {
         ops[0x86 + offset] = bind(bit.res, .{ index, .HL_increment });
         ops[0x87 + offset] = bind(bit.res, .{ index, .A });
 
+        // +0xc0
         ops[0xc0 + offset] = bind(bit.set, .{ index, .B });
         ops[0xc1 + offset] = bind(bit.set, .{ index, .C });
         ops[0xc2 + offset] = bind(bit.set, .{ index, .D });
