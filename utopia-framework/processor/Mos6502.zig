@@ -31,8 +31,7 @@ pub const Interface = struct {
     write: fn (self: *Self, address: u16, value: u8) void,
 };
 
-pub const Instruction = fn (core: *Self) void;
-
+const Instruction = fn (core: *Self) void;
 const BindFn = fn (comptime func: anytype, comptime args: anytype) Instruction;
 
 const Self = @This();
