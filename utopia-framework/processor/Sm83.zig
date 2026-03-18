@@ -96,6 +96,14 @@ pub fn nextWord(self: *Self, comptime iface: Interface) u16 {
     return (@as(u16, hi) << 8) | lo;
 }
 
+pub fn popWord(self: *Self, comptime iface: Interface) u16 {
+    const lo = self.read(iface, self.sp);
+    self.sp +%= 1;
+    const hi = self.read(iface, self.sp);
+    self.sp +%= 1;
+    return (@as(u16, hi) << 8) | lo;
+}
+
 pub fn pushWord(self: *Self, comptime iface: Interface, value: u16) void {
     self.sp -%= 1;
     self.write(iface, self.sp, @truncate(value >> 8));
@@ -302,6 +310,12 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xe0] = bind(load.ld, .{ .high, .A });
     ops[0xf0] = bind(load.ld, .{ .A, .high });
 
+    // 0xc0+1
+    ops[0xc1] = bind(load.pop, .BC);
+    ops[0xd1] = bind(load.pop, .DE);
+    ops[0xe1] = bind(load.pop, .HL);
+    ops[0xf1] = bind(load.pop, .AF);
+
     // 0xc0+2
     ops[0xe2] = bind(load.ld, .{ .C_indirect, .A });
     ops[0xea] = bind(load.ld, .{ .absolute, .A });
@@ -315,7 +329,11 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xdc] = bind(control.callConditional, .C);
 
     // 0xc0+5
+    ops[0xc5] = bind(load.push, .BC);
     ops[0xcd] = bind(control.call, .{});
+    ops[0xd5] = bind(load.push, .DE);
+    ops[0xe5] = bind(load.push, .HL);
+    ops[0xf5] = bind(load.push, .AF);
 
     return ops;
 }

@@ -16,3 +16,14 @@ pub fn ld16(comptime dst: address.Mode16, comptime iface: Core.Interface, core: 
     fw.log.trace("LD {f}, u16", .{dst});
     dst.write(core, core.nextWord(iface));
 }
+
+pub fn pop(comptime dst: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("POP {f}", .{dst});
+    dst.write(core, core.popWord(iface));
+}
+
+pub fn push(comptime src: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("PUSH {f}", .{src});
+    core.idle(iface);
+    core.pushWord(iface, src.read(core));
+}

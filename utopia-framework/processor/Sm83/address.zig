@@ -96,6 +96,7 @@ pub const Mode8 = enum {
 pub const Mode16 = enum {
     const Self = @This();
 
+    AF,
     BC,
     DE,
     HL,
@@ -107,6 +108,7 @@ pub const Mode16 = enum {
 
     pub fn read(comptime self: Self, core: *Core) u16 {
         return switch (comptime self) {
+            .AF => (@as(u16, core.a) << 8) | @as(u8, @bitCast(core.flags)),
             .BC => core.bc,
             .DE => core.de,
             .HL => core.hl,
@@ -116,6 +118,10 @@ pub const Mode16 = enum {
 
     pub fn write(comptime self: Self, core: *Core, value: u16) void {
         switch (comptime self) {
+            .AF => {
+                core.a = @truncate(value >> 8);
+                core.flags = @bitCast(@as(u8, @truncate(value)));
+            },
             .BC => core.bc = value,
             .DE => core.de = value,
             .HL => core.hl = value,
