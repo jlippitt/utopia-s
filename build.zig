@@ -19,6 +19,14 @@ pub fn build(b: *std.Build) void {
 
     utopia_framework.addImport("framework", utopia_framework);
 
+    const utopia_device_gb = b.addModule("utopia-device-gb", .{
+        .root_source_file = b.path("utopia-device-gb/Device.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "framework", .module = utopia_framework },
+        },
+    });
+
     const utopia_device_n64 = b.addModule("utopia-device-n64", .{
         .root_source_file = b.path("utopia-device-n64/Device.zig"),
         .target = target,
@@ -43,6 +51,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .imports = &.{
             .{ .name = "framework", .module = utopia_framework },
+            .{ .name = "device-gb", .module = utopia_device_gb },
             .{ .name = "device-n64", .module = utopia_device_n64 },
             .{ .name = "device-nes", .module = utopia_device_nes },
         },
