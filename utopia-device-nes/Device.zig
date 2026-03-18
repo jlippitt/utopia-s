@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Cartridge = @import("./Cartridge.zig");
+const Ppu = @import("./Ppu.zig");
 
 const Cpu = fw.processor.Mos6502;
 
@@ -25,6 +26,7 @@ const Self = @This();
 cpu: Cpu,
 mdr: u8 = 0,
 wram: *[wram_size]u8,
+ppu: Ppu,
 cartridge: Cartridge,
 arena: std.heap.ArenaAllocator,
 
@@ -43,6 +45,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
     self.* = .{
         .cpu = .init(true),
         .wram = wram[0..wram_size],
+        .ppu = .init(),
         .cartridge = try .init(rom),
         .arena = arena,
     };
@@ -107,7 +110,7 @@ fn read(cpu: *Cpu, address: u16) u8 {
         self.mdr = self.wram[address & wram_mask];
     } else if (address < 0x4000) {
         @branchHint(.unlikely);
-        fw.log.todo("PPU reads", .{});
+        self.mdr = self.ppu.read(address);
     } else if (address < 0x4020) {
         @branchHint(.unlikely);
         fw.log.todo("APU/Joypad reads", .{});
@@ -127,7 +130,7 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
         self.wram[address & wram_mask] = value;
     } else if (address < 0x4000) {
         @branchHint(.unlikely);
-        fw.log.trace("TODO: PPU writes", .{});
+        self.ppu.write(address, value);
     } else if (address < 0x4020) {
         @branchHint(.unlikely);
         fw.log.trace("TODO: APU/Joypad writes", .{});
