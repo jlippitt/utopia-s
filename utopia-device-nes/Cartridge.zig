@@ -7,6 +7,9 @@ const header_size = 16;
 const trainer_size = 512;
 const prg_rom_multiplier = 16384;
 
+var test_rom_buf: [256]u8 = undefined;
+var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
+
 const Self = @This();
 
 prg_rom: []const u8,
@@ -44,8 +47,12 @@ pub fn readPrg(self: *const Self, address: u16, prev_value: u8) u8 {
 
 pub fn writePrg(self: *const Self, address: u16, value: u8) void {
     _ = self;
-    _ = address;
-    _ = value;
+
+    if (address >= 0x6004 and address <= 0x8000) {
+        var writer = &test_rom_writer.interface;
+        writer.writeByte(value) catch {};
+        writer.flush() catch {};
+    }
 
     // TODO: PRG RAM + Mappers
 }

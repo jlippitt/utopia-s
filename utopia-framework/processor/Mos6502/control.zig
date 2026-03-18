@@ -53,6 +53,18 @@ pub fn jmp(comptime iface: Core.Interface, core: *Core) void {
     core.pc = (@as(u16, hi) << 8) | lo;
 }
 
+pub fn jmpIndirect(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("JMP (addr)", .{});
+    const direct_lo = core.next(iface);
+    const direct_hi = core.read(iface, core.pc);
+    const direct = (@as(u16, direct_hi) << 8) | direct_lo;
+    const pc_lo = core.read(iface, direct);
+    core.poll();
+    // Hardware bug: Upper byte does not change when page is crossed
+    const pc_hi = core.read(iface, (direct & 0xff00) | ((direct +% 1) & 0xff));
+    core.pc = (@as(u16, pc_hi) << 8) | pc_lo;
+}
+
 pub fn jsr(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("JSR addr", .{});
     const lo = core.next(iface);
