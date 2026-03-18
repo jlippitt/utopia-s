@@ -9,6 +9,7 @@ pub const Mode = enum {
     absolute_x,
     absolute_y,
     zero_page,
+    zero_page_indirect_y,
 
     pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         _ = try writer.write(switch (self) {
@@ -17,6 +18,7 @@ pub const Mode = enum {
             .absolute_x => "addr,X",
             .absolute_y => "addr,Y",
             .zero_page => "zp",
+            .zero_page_indirect_y => "(zp),Y",
         });
     }
 
@@ -42,6 +44,13 @@ pub const Mode = enum {
                 break :blk indexAbsolute(iface, core, base, core.y, write);
             },
             .zero_page => core.next(iface),
+            .zero_page_indirect_y => blk: {
+                const direct = core.next(iface);
+                const lo = core.read(iface, direct);
+                const hi = core.read(iface, direct +% 1);
+                const indirect = (@as(u16, hi) << 8) | lo;
+                break :blk indexAbsolute(iface, core, indirect, core.y, write);
+            },
         };
     }
 };
