@@ -163,11 +163,43 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xac] = bind(load, .{ .LDY, .absolute });
 
     // +0x09
+    // ops[0x09] = bind(load, .{ .ORA, .immediate });
+    // ops[0x29] = bind(load, .{ .AND, .immediate });
+    // ops[0x49] = bind(load, .{ .EOR, .immediate });
+    // ops[0x69] = bind(load, .{ .ADC, .immediate });
     ops[0xa9] = bind(load, .{ .LDA, .immediate });
+    // ops[0xc9] = bind(load, .{ .CMP, .immediate });
+    // ops[0xe9] = bind(load, .{ .SBC, .immediate });
+
+    // +0x19
+    // ops[0x19] = bind(load, .{ .ORA, .absolute_y });
+    // ops[0x39] = bind(load, .{ .AND, .absolute_y });
+    // ops[0x59] = bind(load, .{ .EOR, .absolute_y });
+    // ops[0x79] = bind(load, .{ .ADC, .absolute_y });
+    ops[0x99] = bind(store, .{ .STA, .absolute_y });
+    ops[0xb9] = bind(load, .{ .LDA, .absolute_y });
+    // ops[0xd9] = bind(load, .{ .CMP, .absolute_y });
+    // ops[0xf9] = bind(load, .{ .SBC, .absolute_y });
 
     // +0x0d
+    // ops[0x0d] = bind(load, .{ .ORA, .absolute });
+    // ops[0x2d] = bind(load, .{ .AND, .absolute });
+    // ops[0x4d] = bind(load, .{ .EOR, .absolute });
+    // ops[0x6d] = bind(load, .{ .ADC, .absolute });
     ops[0x8d] = bind(store, .{ .STA, .absolute });
     ops[0xad] = bind(load, .{ .LDA, .absolute });
+    // ops[0xcd] = bind(load, .{ .CMP, .absolute });
+    // ops[0xed] = bind(load, .{ .SBC, .absolute });
+
+    // +0x1d
+    // ops[0x1d] = bind(load, .{ .ORA, .absolute_x });
+    // ops[0x3d] = bind(load, .{ .AND, .absolute_x });
+    // ops[0x5d] = bind(load, .{ .EOR, .absolute_x });
+    // ops[0x7d] = bind(load, .{ .ADC, .absolute_x });
+    ops[0x9d] = bind(store, .{ .STA, .absolute_x });
+    ops[0xbd] = bind(load, .{ .LDA, .absolute_x });
+    // ops[0xdd] = bind(load, .{ .CMP, .absolute_x });
+    // ops[0xfd] = bind(load, .{ .SBC, .absolute_x });
 
     // +0x02
     ops[0xa2] = bind(load, .{ .LDX, .immediate });

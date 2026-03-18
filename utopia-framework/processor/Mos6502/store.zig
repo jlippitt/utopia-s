@@ -15,7 +15,7 @@ pub fn store(
     core: *Core,
 ) void {
     fw.log.trace("{t} {f}", .{ op, mode });
-    const address = mode.resolve(iface, core, false);
+    const address = mode.resolve(iface, core, true);
     core.poll();
 
     const value = switch (comptime op) {
