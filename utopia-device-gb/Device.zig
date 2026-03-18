@@ -6,6 +6,8 @@ const Cpu = fw.processor.Sm83;
 const boot_rom_size = 256;
 const wram_size = 8192;
 const wram_mask = wram_size - 1;
+const hram_size = 127;
+const hram_mask = hram_size;
 
 pub const Args = struct {
     pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
@@ -33,6 +35,7 @@ cpu: Cpu,
 boot_rom_enabled: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
+hram: *[hram_size]u8,
 rom: []const u8,
 arena: std.heap.ArenaAllocator,
 
@@ -55,6 +58,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
     );
 
     const wram = try arena.allocator().alloc(u8, wram_size);
+    const hram = try arena.allocator().alloc(u8, hram_size);
 
     const self = try arena.allocator().create(Self);
 
@@ -62,6 +66,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
         .cpu = .init(),
         .boot_rom = boot_rom[0..boot_rom_size],
         .wram = wram[0..wram_size],
+        .hram = hram[0..hram_size],
         .rom = rom,
         .arena = arena,
     };
@@ -196,11 +201,10 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
 fn readIo(cpu: *Cpu, address: u8) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
-    _ = self;
-
     return switch (address) {
         0x10...0x3f => 0, // TODO: APU
         0x40...0x4f => 0, // TODO: PPU
+        0x80...0xfe => self.hram[address & hram_mask],
         else => fw.log.todo("I/O read: {X:02}", .{address}),
     };
 }
@@ -208,11 +212,10 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
 fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
-    _ = self;
-
     switch (address) {
         0x10...0x3f => {}, // TODO: APU
         0x40...0x4f => {}, // TODO: PPU
+        0x80...0xfe => self.hram[address & hram_mask] = value,
         else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
 }
