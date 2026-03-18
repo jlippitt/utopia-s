@@ -153,6 +153,12 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xd0] = bind(control.branch, .BNE);
     ops[0xf0] = bind(control.branch, .BEQ);
 
+    // +0x04
+    ops[0x84] = bind(store, .{ .STY, .zero_page });
+    ops[0xa4] = bind(load, .{ .LDY, .zero_page });
+    ops[0xc4] = bind(load, .{ .CPY, .zero_page });
+    ops[0xe4] = bind(load, .{ .CPX, .zero_page });
+
     // +0x08
     ops[0xa8] = bind(implied, .TAY);
 
@@ -171,6 +177,16 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xac] = bind(load, .{ .LDY, .absolute });
     ops[0xcc] = bind(load, .{ .CPY, .absolute });
     ops[0xec] = bind(load, .{ .CPX, .absolute });
+
+    // +0x05
+    // ops[0x05] = bind(load, .{ .ORA, .zero_page });
+    // ops[0x25] = bind(load, .{ .AND, .zero_page });
+    // ops[0x45] = bind(load, .{ .EOR, .zero_page });
+    // ops[0x65] = bind(load, .{ .ADC, .zero_page });
+    ops[0x85] = bind(store, .{ .STA, .zero_page });
+    ops[0xa5] = bind(load, .{ .LDA, .zero_page });
+    ops[0xc5] = bind(load, .{ .CMP, .zero_page });
+    // ops[0xe5] = bind(load, .{ .SBC, .zero_page });
 
     // +0x09
     // ops[0x09] = bind(load, .{ .ORA, .immediate });
@@ -213,6 +229,10 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // +0x02
     ops[0xa2] = bind(load, .{ .LDX, .immediate });
+
+    // +0x06
+    ops[0x86] = bind(store, .{ .STX, .zero_page });
+    ops[0xa6] = bind(load, .{ .LDX, .zero_page });
 
     // +0x0a
     ops[0x8a] = bind(implied, .TXA);

@@ -8,6 +8,7 @@ pub const Mode = enum {
     absolute,
     absolute_x,
     absolute_y,
+    zero_page,
 
     pub fn format(self: Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         _ = try writer.write(switch (self) {
@@ -15,6 +16,7 @@ pub const Mode = enum {
             .absolute => "addr",
             .absolute_x => "addr,X",
             .absolute_y => "addr,Y",
+            .zero_page => "zp",
         });
     }
 
@@ -39,6 +41,7 @@ pub const Mode = enum {
                 const base = getAbsolute(iface, core);
                 break :blk indexAbsolute(iface, core, base, core.y, write);
             },
+            .zero_page => core.next(iface),
         };
     }
 };
