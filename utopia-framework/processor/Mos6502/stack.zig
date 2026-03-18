@@ -4,14 +4,14 @@ const Core = @import("../Mos6502.zig");
 pub fn php(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("PHP", .{});
     _ = core.read(iface, core.pc);
-    core.push(iface, @as(u8, @bitCast(core.flags)) | 0x30);
+    core.push(iface, @as(u8, @bitCast(core.flags)));
 }
 
 pub fn plp(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("PLP", .{});
     _ = core.read(iface, core.pc);
     _ = core.read(iface, Core.stack_page | core.s);
-    core.flags = @bitCast(core.pull(iface) & 0xcf);
+    core.flags = @bitCast(core.pull(iface) | 0x30);
 }
 
 pub fn pha(comptime iface: Core.Interface, core: *Core) void {

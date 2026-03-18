@@ -15,7 +15,7 @@ pub const Flags = packed struct(u8) {
     z: bool = false,
     i: bool = false,
     d: bool = false,
-    __: u2 = 0,
+    __: u2 = 0b11,
     v: bool = false,
     n: bool = false,
 };
@@ -145,6 +145,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     }
 
     // +0x00
+    ops[0x00] = bind(interrupt.brk, .{});
     ops[0x20] = bind(control.jsr, .{});
     ops[0x40] = bind(interrupt.rti, .{});
     ops[0x60] = bind(control.rts, .{});
