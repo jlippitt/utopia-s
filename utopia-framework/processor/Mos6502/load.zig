@@ -74,8 +74,7 @@ fn compare(core: *Core, lhs: u8, rhs: u8) void {
 
 fn addWithCarry(core: *Core, rhs: u8) void {
     const lhs = core.a;
-    const carry: u8 = @intFromBool(core.flags.c);
-    const result = lhs +% rhs +% carry;
+    const result = lhs +% rhs +% @intFromBool(core.flags.c);
     const carries = lhs ^ rhs ^ result;
     const overflow = (lhs ^ result) & (rhs ^ result);
     core.a = result;
