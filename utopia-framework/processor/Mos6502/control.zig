@@ -44,3 +44,14 @@ pub fn branch(comptime op: BranchOp, comptime iface: Core.Interface, core: *Core
         fw.log.trace("  Branch not taken", .{});
     }
 }
+
+pub fn jsr(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("JSR addr", .{});
+    const lo = core.next(iface);
+    _ = core.read(iface, Core.stack_page | core.s);
+    core.push(iface, @truncate(core.pc >> 8));
+    core.push(iface, @truncate(core.pc));
+    core.poll();
+    const hi = core.read(iface, core.pc);
+    core.pc = (@as(u16, hi) << 8) | lo;
+}
