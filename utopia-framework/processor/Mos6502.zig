@@ -204,6 +204,16 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     // +0x1c
     ops[0xbc] = bind(load, .{ .LDY, .absolute_x });
 
+    // +0x01
+    ops[0x01] = bind(load, .{ .ORA, .zero_page_x_indirect });
+    ops[0x21] = bind(load, .{ .AND, .zero_page_x_indirect });
+    ops[0x41] = bind(load, .{ .EOR, .zero_page_x_indirect });
+    ops[0x61] = bind(load, .{ .ADC, .zero_page_x_indirect });
+    ops[0x81] = bind(store, .{ .STA, .zero_page_x_indirect });
+    ops[0xa1] = bind(load, .{ .LDA, .zero_page_x_indirect });
+    ops[0xc1] = bind(load, .{ .CMP, .zero_page_x_indirect });
+    ops[0xe1] = bind(load, .{ .SBC, .zero_page_x_indirect });
+
     // +0x11
     ops[0x11] = bind(load, .{ .ORA, .zero_page_indirect_y });
     ops[0x31] = bind(load, .{ .AND, .zero_page_indirect_y });
