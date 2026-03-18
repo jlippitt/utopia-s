@@ -105,6 +105,15 @@ pub const Mode16 = enum {
         try writer.writeAll(@tagName(self));
     }
 
+    pub fn read(comptime self: Self, core: *Core) u16 {
+        return switch (comptime self) {
+            .BC => core.bc,
+            .DE => core.de,
+            .HL => core.hl,
+            .SP => core.sp,
+        };
+    }
+
     pub fn write(comptime self: Self, core: *Core, value: u16) void {
         switch (comptime self) {
             .BC => core.bc = value,

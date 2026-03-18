@@ -141,6 +141,36 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x32] = bind(load.ld, .{ .HL_decrement, .A });
     ops[0x3a] = bind(load.ld, .{ .A, .HL_decrement });
 
+    // 0x00+3
+    ops[0x03] = bind(alu.inc16, .BC);
+    ops[0x0b] = bind(alu.dec16, .BC);
+    ops[0x13] = bind(alu.inc16, .DE);
+    ops[0x1b] = bind(alu.dec16, .DE);
+    ops[0x23] = bind(alu.inc16, .HL);
+    ops[0x2b] = bind(alu.dec16, .HL);
+    ops[0x33] = bind(alu.inc16, .SP);
+    ops[0x3b] = bind(alu.dec16, .SP);
+
+    // 0x00+4
+    ops[0x04] = bind(alu.inc, .B);
+    ops[0x0c] = bind(alu.inc, .C);
+    ops[0x14] = bind(alu.inc, .D);
+    ops[0x1c] = bind(alu.inc, .E);
+    ops[0x24] = bind(alu.inc, .H);
+    ops[0x2c] = bind(alu.inc, .L);
+    ops[0x34] = bind(alu.inc, .HL_indirect);
+    ops[0x3c] = bind(alu.inc, .A);
+
+    // 0x00+5
+    ops[0x05] = bind(alu.inc, .B);
+    ops[0x0d] = bind(alu.inc, .C);
+    ops[0x15] = bind(alu.inc, .D);
+    ops[0x1d] = bind(alu.inc, .E);
+    ops[0x25] = bind(alu.inc, .H);
+    ops[0x2d] = bind(alu.inc, .L);
+    ops[0x35] = bind(alu.inc, .HL_indirect);
+    ops[0x3d] = bind(alu.inc, .A);
+
     // 0x00+6
     ops[0x06] = bind(load.ld, .{ .B, .immediate });
     ops[0x0e] = bind(load.ld, .{ .C, .immediate });
