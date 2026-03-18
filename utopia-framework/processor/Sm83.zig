@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const load = @import("./Sm83/load.zig");
 
 pub const Flags = packed struct(u8) {
     __: u4 = 0,
@@ -47,7 +48,7 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
 
 pub fn step(self: *Self, comptime iface: Interface) void {
     const op_table = comptime opTable(iface);
-    op_table[self.next(iface)](self);
+    op_table[self.nextByte(iface)](self);
 }
 
 pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
@@ -56,10 +57,16 @@ pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
     return value;
 }
 
-pub fn next(self: *Self, comptime iface: Interface) u8 {
+pub fn nextByte(self: *Self, comptime iface: Interface) u8 {
     const value = self.read(iface, self.pc);
     self.pc +%= 1;
     return value;
+}
+
+pub fn nextWord(self: *Self, comptime iface: Interface) u16 {
+    const lo = self.nextByte(iface);
+    const hi = self.nextByte(iface);
+    return (@as(u16, hi) << 8) | lo;
 }
 
 fn opTable(comptime iface: Interface) [256]*const Instruction {
@@ -70,6 +77,12 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     inline for (0..256) |opcode| {
         ops[opcode] = bind(invalid, .{opcode});
     }
+
+    // 0x00+1
+    ops[0x01] = bind(load.ld16, .BC);
+    ops[0x11] = bind(load.ld16, .DE);
+    ops[0x21] = bind(load.ld16, .HL);
+    ops[0x31] = bind(load.ld16, .SP);
 
     return ops;
 }
