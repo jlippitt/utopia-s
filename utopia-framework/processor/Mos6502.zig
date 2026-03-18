@@ -5,6 +5,7 @@ const interrupt = @import("./Mos6502/interrupt.zig");
 const implied = @import("./Mos6502/implied.zig").implied;
 const load = @import("./Mos6502/load.zig").load;
 const modify = @import("./Mos6502/modify.zig");
+const stack = @import("./Mos6502/stack.zig");
 const store = @import("./Mos6502/store.zig").store;
 
 pub const stack_page: u16 = 0x0100;
@@ -172,6 +173,10 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xb4] = bind(load, .{ .LDY, .zero_page_x });
 
     // +0x08
+    ops[0x08] = bind(stack.php, .{});
+    ops[0x28] = bind(stack.plp, .{});
+    ops[0x48] = bind(stack.pha, .{});
+    ops[0x68] = bind(stack.pla, .{});
     ops[0x88] = bind(implied, .DEY);
     ops[0xa8] = bind(implied, .TAY);
     ops[0xc8] = bind(implied, .INY);
