@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const alu = @import("./Sm83/alu.zig");
 const load = @import("./Sm83/load.zig");
 
 pub const Flags = packed struct(u8) {
@@ -83,6 +84,36 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x11] = bind(load.ld16, .DE);
     ops[0x21] = bind(load.ld16, .HL);
     ops[0x31] = bind(load.ld16, .SP);
+
+    // 0xa0
+    ops[0xa0] = bind(alu.and_, .B);
+    ops[0xa1] = bind(alu.and_, .C);
+    ops[0xa2] = bind(alu.and_, .D);
+    ops[0xa3] = bind(alu.and_, .E);
+    ops[0xa4] = bind(alu.and_, .H);
+    ops[0xa5] = bind(alu.and_, .L);
+    ops[0xa6] = bind(alu.and_, .HL_indirect);
+    ops[0xa7] = bind(alu.and_, .A);
+
+    // 0xa8
+    ops[0xa8] = bind(alu.xor, .B);
+    ops[0xa9] = bind(alu.xor, .C);
+    ops[0xaa] = bind(alu.xor, .D);
+    ops[0xab] = bind(alu.xor, .E);
+    ops[0xac] = bind(alu.xor, .H);
+    ops[0xad] = bind(alu.xor, .L);
+    ops[0xae] = bind(alu.xor, .HL_indirect);
+    ops[0xaf] = bind(alu.xor, .A);
+
+    // 0xb0
+    ops[0xb0] = bind(alu.or_, .B);
+    ops[0xb1] = bind(alu.or_, .C);
+    ops[0xb2] = bind(alu.or_, .D);
+    ops[0xb3] = bind(alu.or_, .E);
+    ops[0xb4] = bind(alu.or_, .H);
+    ops[0xb5] = bind(alu.or_, .L);
+    ops[0xb6] = bind(alu.or_, .HL_indirect);
+    ops[0xb7] = bind(alu.or_, .A);
 
     return ops;
 }
