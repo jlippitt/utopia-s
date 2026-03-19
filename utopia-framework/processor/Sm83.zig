@@ -177,14 +177,14 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x3c] = bind(alu.inc, .A);
 
     // 0x00+5
-    ops[0x05] = bind(alu.inc, .B);
-    ops[0x0d] = bind(alu.inc, .C);
-    ops[0x15] = bind(alu.inc, .D);
-    ops[0x1d] = bind(alu.inc, .E);
-    ops[0x25] = bind(alu.inc, .H);
-    ops[0x2d] = bind(alu.inc, .L);
-    ops[0x35] = bind(alu.inc, .HL_indirect);
-    ops[0x3d] = bind(alu.inc, .A);
+    ops[0x05] = bind(alu.dec, .B);
+    ops[0x0d] = bind(alu.dec, .C);
+    ops[0x15] = bind(alu.dec, .D);
+    ops[0x1d] = bind(alu.dec, .E);
+    ops[0x25] = bind(alu.dec, .H);
+    ops[0x2d] = bind(alu.dec, .L);
+    ops[0x35] = bind(alu.dec, .HL_indirect);
+    ops[0x3d] = bind(alu.dec, .A);
 
     // 0x00+6
     ops[0x06] = bind(load.ld, .{ .B, .immediate });
