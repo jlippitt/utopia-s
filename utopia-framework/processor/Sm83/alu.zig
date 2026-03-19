@@ -74,6 +74,14 @@ pub fn dec(comptime mode: address.Mode8, comptime iface: Core.Interface, core: *
     core.flags.h = (result & 0x0f) == 0x0f;
 }
 
+pub fn cpl(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("CPL A", .{});
+    core.a ^= 0xff;
+    core.flags.n = true;
+    core.flags.h = true;
+}
+
 pub fn add16(comptime src: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("ADD HL, {f}", .{src});
     core.idle(iface);
