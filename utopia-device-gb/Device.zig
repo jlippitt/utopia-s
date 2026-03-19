@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const Gpu = @import("./Gpu.zig");
 
 const Cpu = fw.processor.Sm83;
 
@@ -36,6 +37,7 @@ boot_rom_enabled: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
 hram: *[hram_size]u8,
+gpu: Gpu,
 rom: []const u8,
 arena: std.heap.ArenaAllocator,
 
@@ -67,6 +69,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
         .boot_rom = boot_rom[0..boot_rom_size],
         .wram = wram[0..wram_size],
         .hram = hram[0..hram_size],
+        .gpu = .init(),
         .rom = rom,
         .arena = arena,
     };
@@ -203,7 +206,7 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
 
     return switch (address) {
         0x10...0x3f => 0, // TODO: APU
-        0x40...0x4f => 0, // TODO: PPU
+        0x40...0x4f => self.gpu.read(address),
         0x80...0xfe => self.hram[address & hram_mask],
         else => fw.log.todo("I/O read: {X:02}", .{address}),
     };
@@ -214,7 +217,7 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
 
     switch (address) {
         0x10...0x3f => {}, // TODO: APU
-        0x40...0x4f => {}, // TODO: PPU
+        0x40...0x4f => self.gpu.write(address, value),
         0x80...0xfe => self.hram[address & hram_mask] = value,
         else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
