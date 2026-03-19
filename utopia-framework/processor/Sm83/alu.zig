@@ -74,6 +74,34 @@ pub fn dec(comptime mode: address.Mode8, comptime iface: Core.Interface, core: *
     core.flags.h = (result & 0x0f) == 0x0f;
 }
 
+pub fn daa(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("DAA", .{});
+
+    if (core.flags.n) {
+        if (core.flags.h) {
+            core.a -%= 0x06;
+        }
+
+        if (core.flags.c) {
+            core.a -%= 0x60;
+        }
+    } else {
+        if (core.flags.h or (core.a & 0x0f) > 0x09) {
+            core.a, const overflow = @addWithOverflow(core.a, 0x06);
+            core.flags.c = core.flags.c or overflow != 0;
+        }
+
+        if (core.flags.c or (core.a & 0xf0) > 0x90) {
+            core.a, const overflow = @addWithOverflow(core.a, 0x60);
+            core.flags.c = core.flags.c or overflow != 0;
+        }
+    }
+
+    core.flags.z = core.a == 0;
+    core.flags.h = false;
+}
+
 pub fn cpl(comptime iface: Core.Interface, core: *Core) void {
     _ = iface;
     fw.log.trace("CPL A", .{});
