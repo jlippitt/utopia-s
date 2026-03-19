@@ -118,12 +118,13 @@ pub fn pushWord(self: *Self, comptime iface: Interface, value: u16) void {
 }
 
 fn decode(self: *Self, comptime iface: Interface) *const Instruction {
+    @setEvalBranchQuota(2000);
     const main_table = comptime opTable(iface);
-    const cb_table = comptime opTableCb(iface);
     const opcode = self.nextByte(iface);
 
     if (opcode == 0xcb) {
         @branchHint(.unlikely);
+        const cb_table = comptime opTableCb(iface);
         return cb_table[self.nextByte(iface)];
     } else {
         return main_table[opcode];
@@ -149,9 +150,13 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // 0x00+1
     ops[0x01] = bind(load.ld16, .BC);
+    ops[0x09] = bind(alu.add16, .BC);
     ops[0x11] = bind(load.ld16, .DE);
+    ops[0x19] = bind(alu.add16, .DE);
     ops[0x21] = bind(load.ld16, .HL);
+    ops[0x29] = bind(alu.add16, .HL);
     ops[0x31] = bind(load.ld16, .SP);
+    ops[0x39] = bind(alu.add16, .SP);
 
     // 0x00+2
     ops[0x02] = bind(load.ld, .{ .BC_indirect, .A });

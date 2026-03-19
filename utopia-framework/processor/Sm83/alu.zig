@@ -74,6 +74,20 @@ pub fn dec(comptime mode: address.Mode8, comptime iface: Core.Interface, core: *
     core.flags.h = (result & 0x0f) == 0x0f;
 }
 
+pub fn add16(comptime src: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("ADD HL, {f}", .{src});
+    core.idle(iface);
+    const lhs = core.hl;
+    const rhs = src.read(core);
+    const result = lhs +% rhs;
+    const carries = lhs ^ rhs ^ result;
+    const overflow = (lhs ^ result) & (rhs ^ result);
+    core.hl = result;
+    core.flags.n = false;
+    core.flags.h = fw.num.bit(carries, 12);
+    core.flags.c = fw.num.bit((carries ^ overflow), 15);
+}
+
 pub fn inc16(comptime mode: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("INC {f}", .{mode});
     core.idle(iface);
