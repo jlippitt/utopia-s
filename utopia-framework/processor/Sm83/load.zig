@@ -17,6 +17,12 @@ pub fn ld16(comptime dst: address.Mode16, comptime iface: Core.Interface, core: 
     dst.write(core, core.nextWord(iface));
 }
 
+pub fn ldSpHl(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("LD SP, HL", .{});
+    core.idle(iface);
+    core.sp = core.hl;
+}
+
 pub fn ldAbsoluteSp(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("LD (u16), SP", .{});
     const base = core.nextWord(iface);

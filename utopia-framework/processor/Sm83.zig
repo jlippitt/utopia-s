@@ -391,6 +391,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xe1] = bind(load.pop, .HL);
     ops[0xe9] = bind(control.jpHl, .{});
     ops[0xf1] = bind(load.pop, .AF);
+    ops[0xf9] = bind(load.ldSpHl, .{});
 
     // 0xc0+2
     ops[0xc2] = bind(control.jpConditional, .NZ);
