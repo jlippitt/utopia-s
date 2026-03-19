@@ -16,7 +16,7 @@ pub fn rrca(comptime iface: Core.Interface, core: *Core) void {
     _ = iface;
     fw.log.trace("RRCA", .{});
     core.flags.c = fw.num.bit(core.a, 0);
-    core.a = (core.a << 1) | (core.a << 7);
+    core.a = (core.a >> 1) | (core.a << 7);
     core.flags.z = false;
     core.flags.n = false;
     core.flags.h = false;
@@ -38,7 +38,7 @@ pub fn rra(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("RRA", .{});
     const carry: u8 = @intFromBool(core.flags.c);
     core.flags.c = fw.num.bit(core.a, 0);
-    core.a = (core.a << 1) | (carry << 7);
+    core.a = (core.a >> 1) | (carry << 7);
     core.flags.z = false;
     core.flags.n = false;
     core.flags.h = false;
