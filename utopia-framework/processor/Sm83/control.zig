@@ -91,6 +91,14 @@ pub fn ret(comptime iface: Core.Interface, core: *Core) void {
     core.idle(iface);
 }
 
+pub fn reti(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("RETI", .{});
+    core.pc = core.popWord(iface);
+    core.idle(iface);
+    core.ime = true;
+    core.ime_next = true;
+}
+
 pub fn retConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("RET {t}", .{cond});
     core.idle(iface);
