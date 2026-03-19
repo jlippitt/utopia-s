@@ -34,13 +34,15 @@ bc: u16 = 0,
 de: u16 = 0,
 hl: u16 = 0,
 sp: u16 = 0,
+ime: bool = false,
+ime_next: bool = false,
 
 pub fn init() Self {
     return .{};
 }
 
 pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try writer.print("A={X:02} BC={X:04} DE={X:04} HL={X:04} SP={X:04} PC={X:04} F={c}{c}{c}{c}", .{
+    try writer.print("A={X:02} BC={X:04} DE={X:04} HL={X:04} SP={X:04} PC={X:04} F={c}{c}{c}{c} IME={d}", .{
         self.a,
         self.bc,
         self.de,
@@ -51,10 +53,13 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
         @as(u8, if (self.flags.n) 'N' else '-'),
         @as(u8, if (self.flags.h) 'H' else '-'),
         @as(u8, if (self.flags.c) 'C' else '-'),
+        @intFromBool(self.ime),
     });
 }
 
 pub fn step(self: *Self, comptime iface: Interface) void {
+    // TODO: Detect interrupts before setting IME
+    self.ime = self.ime_next;
     self.decode(iface)(self);
 }
 
@@ -391,6 +396,8 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // 0xc0+3
     ops[0xc3] = bind(control.jp, .{});
+    ops[0xf3] = bind(implied.di, .{});
+    ops[0xfb] = bind(implied.ei, .{});
 
     // 0xc0+4
     ops[0xc4] = bind(control.callConditional, .NZ);
