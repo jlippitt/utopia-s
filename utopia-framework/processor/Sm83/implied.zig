@@ -19,3 +19,19 @@ pub fn ei(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("EI", .{});
     core.ime_next = true;
 }
+
+pub fn scf(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("SCF", .{});
+    core.flags.n = false;
+    core.flags.h = false;
+    core.flags.c = true;
+}
+
+pub fn ccf(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("CCF", .{});
+    core.flags.n = false;
+    core.flags.h = false;
+    core.flags.c = !core.flags.c;
+}

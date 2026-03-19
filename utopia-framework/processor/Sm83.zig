@@ -216,6 +216,8 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x17] = bind(bit.rla, .{});
     ops[0x1f] = bind(bit.rra, .{});
     ops[0x2f] = bind(alu.cpl, .{});
+    ops[0x37] = bind(implied.scf, .{});
+    ops[0x3f] = bind(implied.ccf, .{});
 
     // 0x40
     ops[0x40] = bind(load.ld, .{ .B, .B });
