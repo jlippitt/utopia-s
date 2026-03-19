@@ -124,6 +124,21 @@ pub fn add16(comptime src: address.Mode16, comptime iface: Core.Interface, core:
     core.flags.c = fw.num.bit((carries ^ overflow), 15);
 }
 
+pub fn addSpOffset(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("ADD SP, i8", .{});
+    const offset = core.nextByte(iface);
+    core.idle(iface);
+    core.idle(iface);
+    core.sp = addOffsetToSp(core, offset);
+}
+
+pub fn ldHlSpOffset(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("LD HL, SP+i8", .{});
+    const offset = core.nextByte(iface);
+    core.idle(iface);
+    core.hl = addOffsetToSp(core, offset);
+}
+
 pub fn inc16(comptime mode: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("INC {f}", .{mode});
     core.idle(iface);
@@ -159,6 +174,19 @@ fn subWithBorrow(core: *Core, rhs: u8, carry: bool) u8 {
     const overflow = (lhs ^ result) & (lhs ^ rhs);
     core.flags.z = result == 0;
     core.flags.n = true;
+    core.flags.h = fw.num.bit(carries, 4);
+    core.flags.c = fw.num.bit((carries ^ overflow), 7);
+    return result;
+}
+
+fn addOffsetToSp(core: *Core, offset: u8) u16 {
+    const lhs = core.sp;
+    const rhs = fw.num.signExtend(u16, offset);
+    const result = lhs +% rhs;
+    const carries = lhs ^ rhs ^ result;
+    const overflow = (lhs ^ result) & (rhs ^ result);
+    core.flags.z = false;
+    core.flags.n = false;
     core.flags.h = fw.num.bit(carries, 4);
     core.flags.c = fw.num.bit((carries ^ overflow), 7);
     return result;
