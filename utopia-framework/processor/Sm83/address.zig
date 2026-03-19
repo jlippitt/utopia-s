@@ -120,7 +120,7 @@ pub const Mode16 = enum {
         switch (comptime self) {
             .AF => {
                 core.a = @truncate(value >> 8);
-                core.flags = @bitCast(@as(u8, @truncate(value)));
+                core.flags = @bitCast(@as(u8, @truncate(value)) & 0xf0);
             },
             .BC => core.bc = value,
             .DE => core.de = value,
