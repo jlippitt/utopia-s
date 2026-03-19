@@ -543,7 +543,7 @@ fn opTableCb(comptime iface: Interface) [256]*const Instruction {
         ops[0x43 + offset] = bind(bit.bit, .{ index, .E });
         ops[0x44 + offset] = bind(bit.bit, .{ index, .H });
         ops[0x45 + offset] = bind(bit.bit, .{ index, .L });
-        ops[0x46 + offset] = bind(bit.bit, .{ index, .HL_increment });
+        ops[0x46 + offset] = bind(bit.bit, .{ index, .HL_indirect });
         ops[0x47 + offset] = bind(bit.bit, .{ index, .A });
 
         // +0x80
@@ -553,7 +553,7 @@ fn opTableCb(comptime iface: Interface) [256]*const Instruction {
         ops[0x83 + offset] = bind(bit.res, .{ index, .E });
         ops[0x84 + offset] = bind(bit.res, .{ index, .H });
         ops[0x85 + offset] = bind(bit.res, .{ index, .L });
-        ops[0x86 + offset] = bind(bit.res, .{ index, .HL_increment });
+        ops[0x86 + offset] = bind(bit.res, .{ index, .HL_indirect });
         ops[0x87 + offset] = bind(bit.res, .{ index, .A });
 
         // +0xc0
@@ -563,7 +563,7 @@ fn opTableCb(comptime iface: Interface) [256]*const Instruction {
         ops[0xc3 + offset] = bind(bit.set, .{ index, .E });
         ops[0xc4 + offset] = bind(bit.set, .{ index, .H });
         ops[0xc5 + offset] = bind(bit.set, .{ index, .L });
-        ops[0xc6 + offset] = bind(bit.set, .{ index, .HL_increment });
+        ops[0xc6 + offset] = bind(bit.set, .{ index, .HL_indirect });
         ops[0xc7 + offset] = bind(bit.set, .{ index, .A });
     }
 
