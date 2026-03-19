@@ -119,6 +119,7 @@ pub fn pushWord(self: *Self, comptime iface: Interface, value: u16) void {
 
 fn decode(self: *Self, comptime iface: Interface) *const Instruction {
     @setEvalBranchQuota(2000);
+
     const main_table = comptime opTable(iface);
     const opcode = self.nextByte(iface);
 
@@ -387,6 +388,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xc9] = bind(control.ret, .{});
     ops[0xd1] = bind(load.pop, .DE);
     ops[0xe1] = bind(load.pop, .HL);
+    ops[0xe9] = bind(control.jpHl, .{});
     ops[0xf1] = bind(load.pop, .AF);
 
     // 0xc0+2

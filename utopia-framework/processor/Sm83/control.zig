@@ -44,6 +44,12 @@ pub fn jp(comptime iface: Core.Interface, core: *Core) void {
     core.pc = target;
 }
 
+pub fn jpHl(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("JP HL", .{});
+    core.pc = core.hl;
+}
+
 pub fn jpConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("JP {t}, u16", .{cond});
     const target = core.nextWord(iface);
