@@ -3,6 +3,7 @@ const fw = @import("framework");
 const alu = @import("./Sm83/alu.zig");
 const bit = @import("./Sm83/bit.zig");
 const control = @import("./Sm83/control.zig");
+const implied = @import("./Sm83/implied.zig");
 const load = @import("./Sm83/load.zig");
 
 pub const Flags = packed struct(u8) {
@@ -134,6 +135,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     }
 
     // 0x00+0
+    ops[0x00] = bind(implied.nop, .{});
     ops[0x18] = bind(control.jr, .{});
     ops[0x20] = bind(control.jrConditional, .NZ);
     ops[0x28] = bind(control.jrConditional, .Z);
@@ -378,10 +380,17 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0xf1] = bind(load.pop, .AF);
 
     // 0xc0+2
+    ops[0xc2] = bind(control.jpConditional, .NZ);
+    ops[0xca] = bind(control.jpConditional, .Z);
+    ops[0xd2] = bind(control.jpConditional, .NC);
+    ops[0xda] = bind(control.jpConditional, .C);
     ops[0xe2] = bind(load.ld, .{ .C_indirect, .A });
     ops[0xea] = bind(load.ld, .{ .absolute, .A });
     ops[0xf2] = bind(load.ld, .{ .A, .C_indirect });
     ops[0xfa] = bind(load.ld, .{ .A, .absolute });
+
+    // 0xc0+3
+    ops[0xc3] = bind(control.jp, .{});
 
     // 0xc0+4
     ops[0xc4] = bind(control.callConditional, .NZ);

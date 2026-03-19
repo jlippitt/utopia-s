@@ -37,6 +37,26 @@ pub fn jrConditional(comptime cond: Condition, comptime iface: Core.Interface, c
     }
 }
 
+pub fn jp(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("JP u16", .{});
+    const target = core.nextWord(iface);
+    core.idle(iface);
+    core.pc = target;
+}
+
+pub fn jpConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("JP {t}, u16", .{cond});
+    const target = core.nextWord(iface);
+
+    if (cond.apply(&core.flags)) {
+        fw.log.trace("  Branch taken", .{});
+        core.idle(iface);
+        core.pc = target;
+    } else {
+        fw.log.trace("  Branch not taken", .{});
+    }
+}
+
 pub fn call(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("CALL u16", .{});
     const target = core.nextWord(iface);
