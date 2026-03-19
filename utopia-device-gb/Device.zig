@@ -10,6 +10,9 @@ const wram_mask = wram_size - 1;
 const hram_size = 127;
 const hram_mask = hram_size;
 
+var test_rom_buf: [256]u8 = undefined;
+var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
+
 pub const Args = struct {
     pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
         .{
@@ -222,7 +225,14 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
     switch (address) {
-        0x01, 0x02 => {}, // TODO: Serial port
+        0x01 => {
+            // TODO: Serial port
+            test_rom_writer.interface.writeByte(value) catch {};
+        },
+        0x02 => if (value == 0x81) {
+            // TODO: Serial port
+            test_rom_writer.interface.flush() catch {};
+        },
         0x04...0x07 => {}, // TODO: Timer
         0x0f => {
             self.int_flags = @truncate(value);
