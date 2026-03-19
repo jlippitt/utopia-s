@@ -111,3 +111,10 @@ pub fn retConditional(comptime cond: Condition, comptime iface: Core.Interface, 
         fw.log.trace("  Branch not taken", .{});
     }
 }
+
+pub fn rst(comptime address: u8, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("RST ${X:02}", .{address});
+    core.idle(iface);
+    core.pushWord(iface, core.pc);
+    core.pc = address;
+}
