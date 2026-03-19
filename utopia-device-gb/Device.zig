@@ -207,6 +207,7 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
     return switch (address) {
+        0x01, 0x02 => 0, // TODO: Serial port
         0x0f => @as(u8, 0xe0) | self.int_flags,
         0x10...0x3f => 0, // TODO: APU
         0x40...0x4f => self.gpu.read(address),
@@ -220,6 +221,7 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
     switch (address) {
+        0x01, 0x02 => {}, // TODO: Serial port
         0x0f => {
             self.int_flags = @truncate(value);
             fw.log.debug("Interrupt Flags: {b:05}", .{self.int_flags});
