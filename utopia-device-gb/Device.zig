@@ -33,7 +33,7 @@ pub const Args = struct {
 const Self = @This();
 
 cpu: Cpu,
-boot_rom_enabled: bool = true,
+boot_rom_enable: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
 hram: *[hram_size]u8,
@@ -138,7 +138,7 @@ fn read(cpu: *Cpu, address: u16) u8 {
     if (address < 0x8000) {
         @branchHint(.likely);
 
-        if (address < 0x0100 and self.boot_rom_enabled) {
+        if (address < 0x0100 and self.boot_rom_enable) {
             @branchHint(.unlikely);
             return self.boot_rom[address];
         } else {
@@ -218,6 +218,10 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     switch (address) {
         0x10...0x3f => {}, // TODO: APU
         0x40...0x4f => self.gpu.write(address, value),
+        0x50 => {
+            self.boot_rom_enable = false;
+            fw.log.debug("Boot ROM Enable: {}", .{self.boot_rom_enable});
+        },
         0x80...0xfe => self.hram[address & hram_mask] = value,
         else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
