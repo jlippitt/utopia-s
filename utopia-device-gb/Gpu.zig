@@ -3,6 +3,7 @@ const fw = @import("framework");
 const Self = @This();
 
 ctrl: Control = .{},
+status: Status = .{},
 scroll_y: u8 = 0,
 scroll_x: u8 = 0,
 bg_palette: u8 = 0,
@@ -15,6 +16,7 @@ pub fn init() Self {
 pub fn read(self: *Self, address: u8) u8 {
     return switch (address) {
         0x40 => @bitCast(self.ctrl),
+        0x41 => @bitCast(self.status),
         0x42 => self.scroll_y,
         0x43 => self.scroll_x,
         0x44 => 0x90,
@@ -30,6 +32,10 @@ pub fn write(self: *Self, address: u8, value: u8) void {
         0x40 => {
             self.ctrl = @bitCast(value);
             fw.log.debug("LCD Control: {any}", .{self.ctrl});
+        },
+        0x41 => {
+            fw.num.writeMasked(u8, @ptrCast(&self.status), value, 0x78);
+            fw.log.debug("LCD Status: {any}", .{self.status});
         },
         0x42 => {
             self.scroll_y = value;
@@ -64,4 +70,21 @@ const Control = packed struct(u8) {
     window_enable: bool = false,
     window_tile_map: bool = false,
     lcd_enable: bool = false,
+};
+
+const Mode = enum(u2) {
+    hblank,
+    vblank,
+    oam,
+    vram,
+};
+
+const Status = packed struct(u8) {
+    mode: Mode = .hblank,
+    lyc: bool = false,
+    int_hblank: bool = false,
+    int_vblank: bool = false,
+    int_oam: bool = false,
+    int_lyc: bool = false,
+    __: bool = false,
 };
