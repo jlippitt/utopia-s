@@ -33,6 +33,8 @@ pub const Args = struct {
 const Self = @This();
 
 cpu: Cpu,
+int_flags: u5 = 0,
+int_enable: u5 = 0,
 boot_rom_enable: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
@@ -205,9 +207,11 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
     return switch (address) {
+        0x0f => @as(u8, 0xe0) | self.int_flags,
         0x10...0x3f => 0, // TODO: APU
         0x40...0x4f => self.gpu.read(address),
         0x80...0xfe => self.hram[address & hram_mask],
+        0xff => @as(u8, 0xe0) | self.int_enable,
         else => fw.log.todo("I/O read: {X:02}", .{address}),
     };
 }
@@ -216,6 +220,10 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
     switch (address) {
+        0x0f => {
+            self.int_flags = @truncate(value);
+            fw.log.debug("Interrupt Flags: {b:05}", .{self.int_flags});
+        },
         0x10...0x3f => {}, // TODO: APU
         0x40...0x4f => self.gpu.write(address, value),
         0x50 => {
@@ -223,6 +231,10 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
             fw.log.debug("Boot ROM Enable: {}", .{self.boot_rom_enable});
         },
         0x80...0xfe => self.hram[address & hram_mask] = value,
+        0xff => {
+            self.int_enable = @truncate(value);
+            fw.log.debug("Interrupt Enable: {b:05}", .{self.int_enable});
+        },
         else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
 }
