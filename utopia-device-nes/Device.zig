@@ -24,6 +24,7 @@ pub const Args = struct {
 const Self = @This();
 
 cpu: Cpu,
+dma: Dma = .{},
 cycles: u64 = 0,
 mdr: u8 = 0,
 wram: *[wram_size]u8,
@@ -98,7 +99,14 @@ fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
 fn read(cpu: *Cpu, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
-    self.cycles += 1;
+    if (@as(u2, @bitCast(self.dma.request)) != 0) {
+        self.transferDma();
+    }
+
+    return self.readInner(address);
+}
+
+fn readInner(self: *Self, address: u16) u8 {
     self.ppu.step();
     self.ppu.step();
     self.mdr = self.cartridge.readPrg(address, self.mdr);
@@ -123,7 +131,6 @@ fn read(cpu: *Cpu, address: u16) u8 {
 fn write(cpu: *Cpu, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
-    self.cycles += 1;
     self.step(3);
     self.mdr = value;
     self.cartridge.writePrg(address, value);
@@ -136,14 +143,60 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
         self.ppu.write(address, value);
     } else if (address < 0x4020) {
         @branchHint(.unlikely);
+
+        if (address == 0x4014) {
+            self.dma.request.oam = true;
+            self.dma.oam_page = value;
+        }
+
         fw.log.trace("TODO: APU/Joypad writes", .{});
     }
 }
 
+fn transferDma(self: *Self) void {
+    fw.log.trace("DMA Transfer Begin", .{});
+    defer fw.log.trace("DMA Transfer End", .{});
+
+    self.step(3);
+
+    if ((self.cycles & 1) != 0) {
+        self.step(3);
+    }
+
+    if (!self.dma.request.oam) {
+        fw.log.todo("DMC", .{});
+    }
+
+    self.dma.request.oam = false;
+
+    const oam_base = @as(u16, self.dma.oam_page) << 8;
+
+    for (0..256) |index| {
+        // TODO: DMC
+        const address = oam_base | @as(u8, @intCast(index));
+        const value = self.readInner(address);
+        fw.log.trace("DMA Write: OAM <= {X:02} <= {X:04}", .{ value, address });
+        self.step(3);
+        self.ppu.writeOam(value);
+    }
+}
+
 fn step(self: *Self, comptime ppu_cycles: comptime_int) void {
+    self.cycles += 1;
+
     inline for (0..ppu_cycles) |_| {
         self.ppu.step();
     }
 
     // TODO: Step other components
 }
+
+const DmaRequest = packed struct(u2) {
+    oam: bool = false,
+    dmc: bool = false,
+};
+
+const Dma = struct {
+    request: DmaRequest = .{},
+    oam_page: u8 = 0,
+};

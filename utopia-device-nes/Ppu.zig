@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
+const Oam = @import("./Ppu/Oam.zig");
 const Palette = @import("./Ppu/Palette.zig");
 const background = @import("./Ppu/background.zig");
 
@@ -31,14 +32,16 @@ fine_x: u3 = 0,
 write_toggle: bool = false,
 pixels: *[pixel_array_size]u8,
 pixel_index: u32 = 0,
-bg: background.State = .{},
 palette: Palette,
+oam: Oam,
+bg: background.State = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     const pixels = try arena.allocator().alloc(u8, pixel_array_size);
 
     return .{
         .pixels = pixels[0..pixel_array_size],
+        .oam = try .init(arena),
         .palette = .init(),
     };
 }
@@ -102,6 +105,8 @@ pub fn write(self: *Self, address: u16, value: u8) void {
             self.mask = @bitCast(value);
             fw.log.debug("PPUMASK: {any}", .{self.mask});
         },
+        3 => self.oam.setAddress(value),
+        4 => self.oam.write(value),
         5 => {
             if (self.write_toggle) {
                 self.tmp_address.coarse_y = @truncate(value >> 3);
@@ -144,6 +149,10 @@ pub fn write(self: *Self, address: u16, value: u8) void {
         },
         else => fw.log.trace("TODO: PPU register write: {X:04} <= {X:02}", .{ address, value }),
     }
+}
+
+pub fn writeOam(self: *Self, value: u8) void {
+    self.oam.write(value);
 }
 
 pub fn step(self: *Self) void {
