@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Gpu = @import("./Gpu.zig");
+const Interrupt = @import("./Interrupt.zig");
 
 const Cpu = fw.processor.Sm83;
 
@@ -39,8 +40,7 @@ const Self = @This();
 
 cpu: Cpu,
 cycles: u64 = 0,
-int_flags: u5 = 0,
-int_enable: u5 = 0,
+interrupt: Interrupt,
 boot_rom_enable: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
@@ -74,6 +74,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
 
     self.* = .{
         .cpu = .init(),
+        .interrupt = .init(),
         .boot_rom = boot_rom[0..boot_rom_size],
         .wram = wram[0..wram_size],
         .hram = hram[0..hram_size],
@@ -222,11 +223,11 @@ fn readIoInner(self: *Self, address: u8) u8 {
         0x00 => 0xff, // TODO: Joypad,
         0x01, 0x02 => 0, // TODO: Serial port
         0x04...0x07 => 0, // TODO: Timer
-        0x0f => @as(u8, 0xe0) | self.int_flags,
+        0x0f => self.interrupt.getFlags(),
         0x10...0x3f => 0, // TODO: APU
         0x40...0x4f => self.gpu.read(address),
         0x80...0xfe => self.hram[address & hram_mask],
-        0xff => @as(u8, 0xe0) | self.int_enable,
+        0xff => self.interrupt.getEnable(),
         else => fw.log.todo("I/O read: {X:02}", .{address}),
     };
 }
@@ -249,10 +250,7 @@ fn writeIoInner(self: *Self, address: u8, value: u8) void {
             test_rom_writer.interface.flush() catch {};
         },
         0x04...0x07 => {}, // TODO: Timer
-        0x0f => {
-            self.int_flags = @truncate(value);
-            fw.log.debug("Interrupt Flags: {b:05}", .{self.int_flags});
-        },
+        0x0f => self.interrupt.setFlags(value),
         0x10...0x3f => {}, // TODO: APU
         0x40...0x4f => self.gpu.write(address, value),
         0x50 => {
@@ -260,10 +258,7 @@ fn writeIoInner(self: *Self, address: u8, value: u8) void {
             fw.log.debug("Boot ROM Enable: {}", .{self.boot_rom_enable});
         },
         0x80...0xfe => self.hram[address & hram_mask] = value,
-        0xff => {
-            self.int_enable = @truncate(value);
-            fw.log.debug("Interrupt Enable: {b:05}", .{self.int_enable});
-        },
+        0xff => self.interrupt.setEnable(value),
         else => fw.log.warn("TODO: I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
 }

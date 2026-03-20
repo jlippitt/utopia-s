@@ -36,6 +36,7 @@ hl: u16 = 0,
 sp: u16 = 0,
 ime: bool = false,
 ime_next: bool = false,
+interrupt: u5 = 0,
 
 pub fn init() Self {
     return .{};
@@ -57,8 +58,18 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
     });
 }
 
+pub fn setInterrupt(self: *Self, interrupt: u5) void {
+    self.interrupt = interrupt;
+}
+
 pub fn step(self: *Self, comptime iface: Interface) void {
-    // TODO: Detect interrupts before setting IME
+    if (self.interrupt != 0 and self.ime) {
+        self.ime = false;
+        self.ime_next = false;
+        control.rst(0x40 + (@as(u8, @ctz(self.interrupt)) << 3), iface, self);
+        return;
+    }
+
     self.ime = self.ime_next;
     self.decode(iface)(self);
 }

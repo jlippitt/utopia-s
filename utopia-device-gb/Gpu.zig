@@ -1,5 +1,6 @@
 const std = @import("std");
 const fw = @import("framework");
+const Device = @import("./Device.zig");
 
 const vram_begin = 80;
 const hblank_begin = 240; // TODO: This will vary
@@ -107,8 +108,8 @@ pub fn step(self: *Self, cycles: u64) void {
                     self.line += 1;
 
                     if (self.line == vblank_line) {
-                        // TODO: Raise VBlank interrupt
                         self.status.mode = .vblank;
+                        self.getDevice().interrupt.raise(.vblank);
                     } else {
                         self.status.mode = .oam;
                     }
@@ -147,6 +148,10 @@ pub fn step(self: *Self, cycles: u64) void {
             },
         }
     }
+}
+
+fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("gpu", self));
 }
 
 const Control = packed struct(u8) {
