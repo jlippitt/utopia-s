@@ -10,6 +10,8 @@ const wram_mask = wram_size - 1;
 const hram_size = 127;
 const hram_mask = hram_size;
 
+const m_cycle = 4;
+
 var test_rom_buf: [256]u8 = undefined;
 var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
 
@@ -36,6 +38,7 @@ pub const Args = struct {
 const Self = @This();
 
 cpu: Cpu,
+cycles: u64 = 0,
 int_flags: u5 = 0,
 int_enable: u5 = 0,
 boot_rom_enable: bool = true,
@@ -102,7 +105,7 @@ fn runFrame(self: *Self) void {
             .writeIo = writeIo,
         });
 
-        fw.log.trace("{f}", .{self.cpu});
+        fw.log.trace("{f} {f} T={d}", .{ self.cpu, self.gpu, self.cycles });
     }
 }
 
@@ -134,11 +137,12 @@ fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
 
 fn idle(cpu: *Cpu) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
-    _ = self;
+    self.step();
 }
 
 fn read(cpu: *Cpu, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.step();
 
     if (address < 0x8000) {
         @branchHint(.likely);
@@ -164,7 +168,7 @@ fn read(cpu: *Cpu, address: u16) u8 {
     }
 
     if (address >= 0xff00) {
-        return readIo(cpu, @truncate(address));
+        return self.readIoInner(@truncate(address));
     }
 
     if (address < 0xfea0) {
@@ -176,6 +180,7 @@ fn read(cpu: *Cpu, address: u16) u8 {
 
 fn write(cpu: *Cpu, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.step();
 
     if (address < 0x8000) {
         @branchHint(.unlikely);
@@ -197,7 +202,7 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
     }
 
     if (address >= 0xff00) {
-        writeIo(cpu, @truncate(address), value);
+        self.writeIoInner(@truncate(address), value);
         return;
     }
 
@@ -208,7 +213,11 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
 
 fn readIo(cpu: *Cpu, address: u8) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.step();
+    return self.readIoInner(address);
+}
 
+fn readIoInner(self: *Self, address: u8) u8 {
     return switch (address) {
         0x01, 0x02 => 0, // TODO: Serial port
         0x04...0x07 => 0, // TODO: Timer
@@ -223,7 +232,11 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
 
 fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.step();
+    self.writeIoInner(address, value);
+}
 
+fn writeIoInner(self: *Self, address: u8, value: u8) void {
     switch (address) {
         0x01 => {
             // TODO: Serial port
@@ -251,4 +264,9 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
         },
         else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
+}
+
+fn step(self: *Self) void {
+    self.cycles += m_cycle;
+    self.gpu.step(m_cycle);
 }
