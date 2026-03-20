@@ -1,6 +1,17 @@
 const fw = @import("framework");
 const Ppu = @import("../Ppu.zig");
 
+const attr_table: [4]u16 = .{ 0x0000, 0x5555, 0xaaaa, 0xffff };
+
+pub const State = struct {
+    name_latch: u8 = 0,
+    attr_latch: u2 = 0,
+    chr_latch: u8 = 0,
+    attr: u32 = 0,
+    chr_low: u16 = 0,
+    chr_high: u16 = 0,
+};
+
 pub fn copyScrollX(ppu: *Ppu) void {
     ppu.address.coarse_x = ppu.tmp_address.coarse_x;
     ppu.address.name_table_x = ppu.tmp_address.name_table_x;
@@ -38,4 +49,55 @@ pub fn incrementScrollY(ppu: *Ppu) void {
     }
 
     fw.log.debug("VRAM Address (Increment Scroll Y): {X:04}", .{ppu.address.get()});
+}
+
+pub fn loadTiles(ppu: *Ppu) void {
+    const cartridge = &ppu.getDevice().cartridge;
+
+    switch (@as(u3, @truncate(ppu.dot))) {
+        0 => cartridge.setVramAddress(nameAddress(ppu)),
+        1 => ppu.bg.name_latch = cartridge.readVram(),
+        2 => cartridge.setVramAddress(attrAddress(ppu)),
+        3 => {
+            const value = cartridge.readVram();
+            const shift = ((ppu.address.coarse_y & 2) << 1) | (ppu.address.coarse_x & 2);
+            ppu.bg.attr_latch = @truncate(value >> @intCast(shift));
+        },
+        4 => cartridge.setVramAddress(chrAddress(ppu)),
+        5 => ppu.bg.chr_latch = cartridge.readVram(),
+        6 => cartridge.setVramAddress(chrAddress(ppu) | 8),
+        7 => {
+            ppu.bg.attr = (ppu.bg.attr & 0xffff_0000) | attr_table[ppu.bg.attr_latch];
+            ppu.bg.chr_low = (ppu.bg.chr_low & 0xff00) | ppu.bg.chr_latch;
+            ppu.bg.chr_high = (ppu.bg.chr_high & 0xff00) | cartridge.readVram();
+            incrementScrollX(ppu);
+        },
+    }
+}
+
+pub fn loadExtra(ppu: *Ppu) void {
+    const cartridge = &ppu.getDevice().cartridge;
+
+    switch (@as(u1, @truncate(ppu.dot))) {
+        0 => cartridge.setVramAddress(nameAddress(ppu)),
+        1 => ppu.bg.name_latch = cartridge.readVram(),
+    }
+}
+
+pub fn nameAddress(ppu: *Ppu) u15 {
+    return 0x2000 | (ppu.address.get() & 0x0fff);
+}
+
+pub fn attrAddress(ppu: *Ppu) u15 {
+    return 0x23c0 |
+        (@as(u15, ppu.address.name_table_y) << 11) |
+        (@as(u15, ppu.address.name_table_x) << 10) |
+        (@as(u15, ppu.address.coarse_y >> 2) << 3) |
+        (ppu.address.coarse_x >> 2);
+}
+
+fn chrAddress(ppu: *Ppu) u15 {
+    return (@as(u15, ppu.ctrl.bg_chr_table) << 12) |
+        (@as(u15, ppu.bg.name_latch) << 4) |
+        ppu.address.coarse_y;
 }

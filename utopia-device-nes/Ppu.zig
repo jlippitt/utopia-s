@@ -23,6 +23,7 @@ address: Address = .{},
 tmp_address: Address = .{},
 fine_x: u3 = 0,
 write_toggle: bool = false,
+bg: background.State = .{},
 palette: Palette,
 
 pub fn init() Self {
@@ -33,6 +34,10 @@ pub fn init() Self {
 
 pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try writer.print("V={d} H={d}", .{ self.line, self.dot });
+}
+
+pub fn getDevice(self: *Self) *Device {
+    return @alignCast(@fieldParentPtr("ppu", self));
 }
 
 pub fn read(self: *Self, address: u16) u8 {
@@ -156,12 +161,7 @@ fn render(self: *Self) void {
     if (self.dot < 256) {
         @branchHint(.likely);
 
-        // TODO: Load background tiles
-
-        if ((self.dot & 7) == 7) {
-            @branchHint(.unlikely);
-            background.incrementScrollX(self);
-        }
+        background.loadTiles(self);
 
         if (self.dot == 255) {
             @branchHint(.unlikely);
@@ -191,13 +191,13 @@ fn render(self: *Self) void {
 
     if (self.dot < 336) {
         @branchHint(.likely);
-        // TODO: Load background tiles
+        background.loadTiles(self);
         return;
     }
 
     if (self.dot < 340) {
         @branchHint(.likely);
-        // TODO: Load background tiles (extra)
+        background.loadExtra(self);
         return;
     }
 }
@@ -209,15 +209,11 @@ fn incrementVramAddress(self: *Self) void {
     self.getDevice().cartridge.setVramAddress(result);
 }
 
-fn getDevice(self: *Self) *Device {
-    return @alignCast(@fieldParentPtr("ppu", self));
-}
-
 const Control = packed struct(u8) {
     __0: u2 = 0,
     vram_increment: bool = false,
-    obj_chr_table: bool = false,
-    bg_chr_table: bool = false,
+    obj_chr_table: u1 = 0,
+    bg_chr_table: u1 = 0,
     obj_size: bool = false,
     __1: bool = false,
     nmi_output: bool = false,
