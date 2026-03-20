@@ -223,7 +223,7 @@ fn render(self: *Self) void {
     if (self.dot < 320) {
         @branchHint(.likely);
 
-        // TODO: Load object tiles
+        object.loadTiles(self);
 
         if (self.dot == 256) {
             @branchHint(.unlikely);
