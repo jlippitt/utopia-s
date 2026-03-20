@@ -2,16 +2,19 @@ const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 const Palette = @import("./Ppu/Palette.zig");
+const background = @import("./Ppu/background.zig");
 
 const dots_per_line = 341;
 
 const pre_render_line = -1;
+const visible_lines = 240;
 const vblank_line = 241;
 const last_line = 260;
 
 const Self = @This();
 
 ctrl: Control = .{},
+mask: Mask = .{},
 status: Status = .{},
 dot: u32 = 0,
 line: i32 = 0,
@@ -54,8 +57,8 @@ pub fn write(self: *Self, address: u16, value: u8) void {
             self.ctrl = @bitCast(value);
             fw.log.debug("PPUCTRL: {any}", .{self.ctrl});
 
-            self.tmp_address.name_table_x = fw.num.bit(value, 0);
-            self.tmp_address.name_table_y = fw.num.bit(value, 1);
+            self.tmp_address.name_table_x = @intFromBool(fw.num.bit(value, 0));
+            self.tmp_address.name_table_y = @intFromBool(fw.num.bit(value, 1));
             fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
 
             if (self.ctrl.nmi_output and !prev_nmi_output and self.status.vblank) {
@@ -63,6 +66,10 @@ pub fn write(self: *Self, address: u16, value: u8) void {
             } else {
                 self.getDevice().cpu.clearNmi();
             }
+        },
+        1 => {
+            self.mask = @bitCast(value);
+            fw.log.debug("PPUMASK: {any}", .{self.mask});
         },
         5 => {
             if (self.write_toggle) {
@@ -109,17 +116,30 @@ pub fn write(self: *Self, address: u16, value: u8) void {
 }
 
 pub fn step(self: *Self) void {
+    if (self.line < visible_lines) {
+        @branchHint(.likely);
+
+        if (self.mask.renderEnabled()) {
+            @branchHint(.likely);
+            self.render();
+        } else {
+            // TODO: Render backdrop
+        }
+    }
+
     if (self.dot == dots_per_line) {
         @branchHint(.unlikely);
         self.dot = 0;
         self.line += 1;
 
         if (self.line > last_line) {
+            @branchHint(.unlikely);
             self.line = pre_render_line;
             self.status.vblank = false;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
             self.getDevice().cpu.clearNmi();
         } else if (self.line == vblank_line) {
+            @branchHint(.unlikely);
             self.status.vblank = true;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
 
@@ -130,6 +150,56 @@ pub fn step(self: *Self) void {
     }
 
     self.dot += 1;
+}
+
+fn render(self: *Self) void {
+    if (self.dot < 256) {
+        @branchHint(.likely);
+
+        // TODO: Load background tiles
+
+        if ((self.dot & 7) == 7) {
+            @branchHint(.unlikely);
+            background.incrementScrollX(self);
+        }
+
+        if (self.dot == 255) {
+            @branchHint(.unlikely);
+            background.incrementScrollY(self);
+        }
+
+        return;
+    }
+
+    if (self.dot < 320) {
+        @branchHint(.likely);
+
+        // TODO: Load object tiles
+
+        if (self.dot == 256) {
+            @branchHint(.unlikely);
+            background.copyScrollX(self);
+        }
+
+        if (self.line == pre_render_line and self.dot >= 279 and self.dot <= 303) {
+            @branchHint(.unlikely);
+            background.copyScrollY(self);
+        }
+
+        return;
+    }
+
+    if (self.dot < 336) {
+        @branchHint(.likely);
+        // TODO: Load background tiles
+        return;
+    }
+
+    if (self.dot < 340) {
+        @branchHint(.likely);
+        // TODO: Load background tiles (extra)
+        return;
+    }
 }
 
 fn incrementVramAddress(self: *Self) void {
@@ -153,6 +223,21 @@ const Control = packed struct(u8) {
     nmi_output: bool = false,
 };
 
+const Mask = packed struct(u8) {
+    greyscale: bool = false,
+    bg_show_left: bool = false,
+    obj_show_left: bool = false,
+    bg_enable: bool = false,
+    obj_enable: bool = false,
+    emphasis_red: bool = false,
+    emphasis_green: bool = false,
+    emphasis_blue: bool = false,
+
+    fn renderEnabled(self: @This()) bool {
+        return self.bg_enable or self.obj_enable;
+    }
+};
+
 const Status = packed struct(u8) {
     __: u5 = 0,
     sprite_overflow: bool = false,
@@ -163,8 +248,8 @@ const Status = packed struct(u8) {
 const Address = packed struct(u15) {
     coarse_x: u5 = 0,
     coarse_y: u5 = 0,
-    name_table_x: bool = false,
-    name_table_y: bool = false,
+    name_table_x: u1 = 0,
+    name_table_y: u1 = 0,
     fine_y: u3 = 0,
 
     pub fn get(self: @This()) u15 {
