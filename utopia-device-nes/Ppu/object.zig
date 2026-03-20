@@ -1,3 +1,4 @@
+const std = @import("std");
 const fw = @import("framework");
 const Ppu = @import("../Ppu.zig");
 const background = @import("./background.zig");
@@ -115,6 +116,51 @@ pub fn loadTiles(ppu: *Ppu) void {
             sprite.x = @as(i32, ppu.obj.secondary_oam[oam_index + 3]) + 8;
         },
     }
+}
+
+pub fn render(ppu: *Ppu, bg_color: u5) u5 {
+    const start_x: i32 = if (!ppu.mask.bg_enable)
+        std.math.maxInt(i32)
+    else if (!ppu.mask.bg_show_left)
+        8
+    else
+        0;
+
+    var color_index = bg_color;
+    var sprite_blocked = false;
+
+    for (ppu.obj.sprites[0..ppu.obj.selected_count]) |*sprite| {
+        sprite.x -= 1;
+
+        if (sprite.x < 0 or sprite.x >= 8 or ppu.dot < start_x) {
+            continue;
+        }
+
+        const flip_mask: u3 = if (sprite.attr.flip_x) 7 else 0;
+        const shift = fw.num.truncate(u3, sprite.x) ^ flip_mask;
+        const low: u1 = @truncate(sprite.chr_low >> shift);
+        const high: u1 = @truncate(sprite.chr_high >> shift);
+        const pixel_value = (@as(u2, high) << 1) | low;
+
+        if (pixel_value == 0) {
+            continue;
+        }
+
+        if (sprite_blocked) {
+            continue;
+        }
+
+        if (sprite.attr.below_bg and bg_color != 0) {
+            continue;
+        }
+
+        color_index = 0x10 | (@as(u5, sprite.attr.palette) << 2) | pixel_value;
+
+        // Prevent any more sprites from being drawn on top of this one
+        sprite_blocked = true;
+    }
+
+    return color_index;
 }
 
 fn chrAddress(ppu: *Ppu, flip_y: bool) u15 {

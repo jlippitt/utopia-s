@@ -206,7 +206,9 @@ fn render(self: *Self) void {
 
         if (self.line >= 0) {
             @branchHint(.likely);
-            self.drawPixel(background.render(self));
+            const bg_color = background.render(self);
+            const combined_color = object.render(self, bg_color);
+            self.drawPixel(combined_color);
         }
 
         background.loadTiles(self);
