@@ -83,6 +83,7 @@ pub fn read(self: *Self, address: u16) u8 {
             self.write_toggle = false;
             break :blk value;
         },
+        4 => self.oam.read(),
         7 => blk: {
             const vram_address = self.address.get();
 
@@ -103,7 +104,7 @@ pub fn read(self: *Self, address: u16) u8 {
 
             break :blk value;
         },
-        else => fw.log.todo("PPU register read: {X:04}", .{address}),
+        else => 0, // TODO: PPU open bus
     };
 }
 
