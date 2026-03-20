@@ -47,7 +47,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
         .cpu = .init(true),
         .wram = wram[0..wram_size],
         .ppu = .init(),
-        .cartridge = try .init(rom),
+        .cartridge = try .init(&arena, rom),
         .arena = arena,
     };
 

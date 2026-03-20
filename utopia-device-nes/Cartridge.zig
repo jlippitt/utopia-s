@@ -7,6 +7,8 @@ const header_size = 16;
 const trainer_size = 512;
 const prg_rom_multiplier = 16384;
 
+const ci_ram_size = 2048;
+
 var test_rom_buf: [256]u8 = undefined;
 var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
 
@@ -14,8 +16,11 @@ const Self = @This();
 
 prg_rom: []const u8,
 prg_rom_mask: usize,
+vram_address: u15 = 0,
+name_mapping: [4]NameMapping,
+ci_ram: *[ci_ram_size]u8,
 
-pub fn init(rom: []const u8) error{ArgError}!Self {
+pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, OutOfMemory }!Self {
     if (!std.mem.eql(u8, ines_string, rom[0..4])) {
         fw.log.panic("Not a valid INES ROM", .{});
     }
@@ -30,9 +35,23 @@ pub fn init(rom: []const u8) error{ArgError}!Self {
     const prg_rom = rom[prg_rom_begin..][0..prg_rom_size];
     const prg_rom_mask = prg_rom_size - 1;
 
+    const name_mapping = if (fw.num.bit(rom[6], 0)) blk: {
+        fw.log.debug("Default Mirror Mode: Vertical", .{});
+        break :blk NameMapping.mirror_vertical;
+    } else blk: {
+        fw.log.debug("Default Mirror Mode: Horizontal", .{});
+        break :blk NameMapping.mirror_horizontal;
+    };
+
+    fw.log.debug("Default Name Mapping: {any}", .{name_mapping});
+
+    const ci_ram = try arena.allocator().alloc(u8, ci_ram_size);
+
     return .{
         .prg_rom = prg_rom,
         .prg_rom_mask = prg_rom_mask,
+        .name_mapping = name_mapping,
+        .ci_ram = ci_ram[0..ci_ram_size],
     };
 }
 
@@ -56,3 +75,40 @@ pub fn writePrg(self: *const Self, address: u16, value: u8) void {
 
     // TODO: PRG RAM + Mappers
 }
+
+pub fn setVramAddress(self: *Self, address: u15) void {
+    self.vram_address = address;
+}
+
+pub fn writeVram(self: *Self, value: u8) void {
+    if ((self.vram_address & 0x2000) == 0) {
+        fw.log.todo("CHR RAM writes", .{});
+    }
+
+    switch (self.name_mapping[@as(u2, @truncate(self.vram_address >> 10))]) {
+        .ci_ram => |offset| self.ci_ram[offset | @as(u10, @truncate(self.vram_address))] = value,
+        .custom => fw.log.todo("Custom nametable mappings", .{}),
+    }
+}
+
+pub const NameMapping = union(enum) {
+    ci_ram: u11,
+    custom: void,
+
+    pub const ci_ram_low: NameMapping = .{ .ci_ram = 0 };
+    pub const ci_ram_high: NameMapping = .{ .ci_ram = 1024 };
+
+    pub const mirror_horizontal: [4]NameMapping = .{
+        ci_ram_low,
+        ci_ram_low,
+        ci_ram_high,
+        ci_ram_high,
+    };
+
+    pub const mirror_vertical: [4]NameMapping = .{
+        ci_ram_low,
+        ci_ram_high,
+        ci_ram_low,
+        ci_ram_high,
+    };
+};

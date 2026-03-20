@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
+const Palette = @import("./Ppu/Palette.zig");
 
 const dots_per_line = 341;
 
@@ -19,9 +20,12 @@ address: Address = .{},
 tmp_address: Address = .{},
 fine_x: u3 = 0,
 write_toggle: bool = false,
+palette: Palette,
 
 pub fn init() Self {
-    return .{};
+    return .{
+        .palette = .init(),
+    };
 }
 
 pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -50,9 +54,9 @@ pub fn write(self: *Self, address: u16, value: u8) void {
             self.ctrl = @bitCast(value);
             fw.log.debug("PPUCTRL: {any}", .{self.ctrl});
 
-            self.address.name_table_x = fw.num.bit(value, 0);
-            self.address.name_table_y = fw.num.bit(value, 1);
-            fw.log.debug("VRAM Address: {X:04}", .{self.address.get()});
+            self.tmp_address.name_table_x = fw.num.bit(value, 0);
+            self.tmp_address.name_table_y = fw.num.bit(value, 1);
+            fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
 
             if (self.ctrl.nmi_output and !prev_nmi_output and self.status.vblank) {
                 self.getDevice().cpu.raiseNmi();
@@ -79,12 +83,26 @@ pub fn write(self: *Self, address: u16, value: u8) void {
                 self.address = self.tmp_address;
                 fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
                 fw.log.debug("VRAM Address: {X:04}", .{self.address.get()});
+                self.getDevice().cartridge.setVramAddress(self.address.get());
             } else {
                 self.tmp_address.set((self.tmp_address.get() & 0xff) | (@as(u15, value & 0x3f) << 8));
                 fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
             }
 
             self.write_toggle = !self.write_toggle;
+        },
+        7 => {
+            const vram_address = self.address.get();
+
+            fw.log.trace("VRAM Write: {X:04} <= {X:02}", .{ vram_address, value });
+
+            if ((vram_address & 0x3f00) == 0x3f00) {
+                self.palette.write(vram_address, value);
+            } else {
+                self.getDevice().cartridge.writeVram(value);
+            }
+
+            self.incrementVramAddress();
         },
         else => fw.log.trace("TODO: PPU register write: {X:04} <= {X:02}", .{ address, value }),
     }
@@ -112,6 +130,13 @@ pub fn step(self: *Self) void {
     }
 
     self.dot += 1;
+}
+
+fn incrementVramAddress(self: *Self) void {
+    const increment: u15 = if (self.ctrl.vram_increment) 32 else 1;
+    const result = self.address.get() +% increment;
+    self.address.set(result);
+    self.getDevice().cartridge.setVramAddress(result);
 }
 
 fn getDevice(self: *Self) *Device {
