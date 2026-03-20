@@ -158,6 +158,8 @@ pub fn step(self: *Self) void {
         }
     }
 
+    self.dot += 1;
+
     if (self.dot == dots_per_line) {
         @branchHint(.unlikely);
         self.dot = 0;
@@ -178,8 +180,6 @@ pub fn step(self: *Self) void {
                 self.getDevice().cpu.raiseNmi();
             }
         }
-    } else {
-        self.dot += 1;
     }
 }
 

@@ -107,7 +107,7 @@ pub fn render(ppu: *Ppu) u5 {
         return 0;
     }
 
-    const palette_index: u2 = @truncate(ppu.bg.attr >> @as(u5, shift << 1));
+    const palette_index: u2 = @truncate(ppu.bg.attr >> (@as(u5, shift) << 1));
 
     return (@as(u5, palette_index) << 2) | pixel_value;
 }
