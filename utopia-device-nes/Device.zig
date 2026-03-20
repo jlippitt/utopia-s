@@ -24,6 +24,7 @@ pub const Args = struct {
 const Self = @This();
 
 cpu: Cpu,
+cycles: u64 = 0,
 mdr: u8 = 0,
 wram: *[wram_size]u8,
 ppu: Ppu,
@@ -70,7 +71,7 @@ fn runFrame(self: *Self) void {
             .write = write,
         });
 
-        fw.log.trace("{f}", .{self.cpu});
+        fw.log.trace("{f} {f} T={d}", .{ self.cpu, self.ppu, self.cycles });
     }
 }
 
@@ -103,6 +104,9 @@ fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
 fn read(cpu: *Cpu, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
+    self.cycles += 1;
+    self.ppu.step();
+    self.ppu.step();
     self.mdr = self.cartridge.readPrg(address, self.mdr);
 
     if (address < 0x2000) {
@@ -117,12 +121,16 @@ fn read(cpu: *Cpu, address: u16) u8 {
         self.mdr = 0;
     }
 
+    self.step(1);
+
     return self.mdr;
 }
 
 fn write(cpu: *Cpu, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
 
+    self.cycles += 1;
+    self.step(3);
     self.mdr = value;
     self.cartridge.writePrg(address, value);
 
@@ -136,4 +144,12 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
         @branchHint(.unlikely);
         fw.log.trace("TODO: APU/Joypad writes", .{});
     }
+}
+
+fn step(self: *Self, comptime ppu_cycles: comptime_int) void {
+    inline for (0..ppu_cycles) |_| {
+        self.ppu.step();
+    }
+
+    // TODO: Step other components
 }
