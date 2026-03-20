@@ -154,7 +154,7 @@ pub fn step(self: *Self) void {
             @branchHint(.likely);
             self.render();
         } else if (self.dot < 256 and self.line >= 0) {
-            self.drawPixel(.{ .r = 255, .g = 255, .b = 255, .a = 255 });
+            self.drawPixel(self.palette.color(0));
         }
     }
 
@@ -189,7 +189,7 @@ fn render(self: *Self) void {
 
         if (self.line >= 0) {
             @branchHint(.likely);
-            self.drawPixel(.{ .r = 255, .g = 255, .b = 255, .a = 255 });
+            self.drawPixel(self.palette.color(0));
         }
 
         background.loadTiles(self);
