@@ -69,6 +69,14 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
     });
 }
 
+pub fn clearNmi(self: *Self) void {
+    self.int_active.nmi = false;
+}
+
+pub fn raiseNmi(self: *Self) void {
+    self.int_active.nmi = true;
+}
+
 pub fn step(self: *Self, comptime iface: Interface) void {
     if (@as(u8, @bitCast(self.int_polled)) != 0) {
         @branchHint(.unlikely);
@@ -80,7 +88,7 @@ pub fn step(self: *Self, comptime iface: Interface) void {
             interrupt.reset(iface, self);
         } else if (self.int_polled.nmi) {
             self.int_active.nmi = false;
-            fw.log.todo("NMI", .{});
+            interrupt.nmi(iface, self);
         } else {
             fw.log.todo("IRQ", .{});
         }

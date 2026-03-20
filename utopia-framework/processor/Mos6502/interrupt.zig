@@ -24,6 +24,13 @@ pub fn brk(comptime iface: Core.Interface, core: *Core) void {
     jumpToVector(iface, core, irq_vector);
 }
 
+pub fn nmi(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("NMI", .{});
+    _ = core.read(iface, core.pc);
+    pushState(iface, core, 0xef);
+    jumpToVector(iface, core, nmi_vector);
+}
+
 pub fn rti(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("RTI", .{});
     _ = core.read(iface, core.pc);
