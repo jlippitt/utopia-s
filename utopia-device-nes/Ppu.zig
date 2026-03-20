@@ -4,10 +4,16 @@ const Device = @import("./Device.zig");
 const Palette = @import("./Ppu/Palette.zig");
 const background = @import("./Ppu/background.zig");
 
+const width = 256;
+const height = 240;
+const overscan = 8;
+const clipped_height = height - 2 * overscan;
+
+const pixel_array_size = width * height * 4;
+
 const dots_per_line = 341;
 
 const pre_render_line = -1;
-const visible_lines = 240;
 const vblank_line = 241;
 const last_line = 260;
 
@@ -23,21 +29,41 @@ address: Address = .{},
 tmp_address: Address = .{},
 fine_x: u3 = 0,
 write_toggle: bool = false,
+pixels: *[pixel_array_size]u8,
+pixel_index: u32 = 0,
 bg: background.State = .{},
 palette: Palette,
 
-pub fn init() Self {
+pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    const pixels = try arena.allocator().alloc(u8, pixel_array_size);
+
     return .{
+        .pixels = pixels[0..pixel_array_size],
         .palette = .init(),
     };
 }
 
-pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
+pub fn format(self: *const @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
     try writer.print("V={d} H={d}", .{ self.line, self.dot });
+}
+
+pub fn getVideoState(self: *const Self) fw.VideoState {
+    return .{
+        .resolution = .{ .x = width, .y = clipped_height },
+        .pixel_data = self.pixels[(width * overscan * 4)..][0..(width * clipped_height * 4)],
+    };
 }
 
 pub fn getDevice(self: *Self) *Device {
     return @alignCast(@fieldParentPtr("ppu", self));
+}
+
+pub fn frameDone(self: *const Self) bool {
+    return self.pixel_index >= pixel_array_size;
+}
+
+pub fn beginFrame(self: *Self) void {
+    self.pixel_index = 0;
 }
 
 pub fn read(self: *Self, address: u16) u8 {
@@ -121,14 +147,14 @@ pub fn write(self: *Self, address: u16, value: u8) void {
 }
 
 pub fn step(self: *Self) void {
-    if (self.line < visible_lines) {
+    if (self.line < height) {
         @branchHint(.likely);
 
         if (self.mask.renderEnabled()) {
             @branchHint(.likely);
             self.render();
-        } else {
-            // TODO: Render backdrop
+        } else if (self.dot < 256 and self.line >= 0) {
+            self.drawPixel(.{ .r = 255, .g = 255, .b = 255, .a = 255 });
         }
     }
 
@@ -152,14 +178,19 @@ pub fn step(self: *Self) void {
                 self.getDevice().cpu.raiseNmi();
             }
         }
+    } else {
+        self.dot += 1;
     }
-
-    self.dot += 1;
 }
 
 fn render(self: *Self) void {
     if (self.dot < 256) {
         @branchHint(.likely);
+
+        if (self.line >= 0) {
+            @branchHint(.likely);
+            self.drawPixel(.{ .r = 255, .g = 255, .b = 255, .a = 255 });
+        }
 
         background.loadTiles(self);
 
@@ -207,6 +238,12 @@ fn incrementVramAddress(self: *Self) void {
     const result = self.address.get() +% increment;
     self.address.set(result);
     self.getDevice().cartridge.setVramAddress(result);
+}
+
+fn drawPixel(self: *Self, color: fw.color.Abgr32) void {
+    const pixel: *[4]u8 = self.pixels[self.pixel_index..][0..4];
+    pixel.* = @bitCast(color);
+    self.pixel_index += 4;
 }
 
 const Control = packed struct(u8) {

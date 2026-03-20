@@ -46,7 +46,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
     self.* = .{
         .cpu = .init(true),
         .wram = wram[0..wram_size],
-        .ppu = .init(),
+        .ppu = try .init(&arena),
         .cartridge = try .init(&arena, rom),
         .arena = arena,
     };
@@ -65,7 +65,9 @@ fn deinit(self: *Self) void {
 }
 
 fn runFrame(self: *Self) void {
-    for (0..(1789773 / 60)) |_| {
+    self.ppu.beginFrame();
+
+    while (!self.ppu.frameDone()) {
         self.cpu.step(.{
             .read = read,
             .write = write,
@@ -76,15 +78,7 @@ fn runFrame(self: *Self) void {
 }
 
 fn getVideoState(self: *const Self) fw.VideoState {
-    _ = self;
-
-    const width = 256;
-    const height = 240;
-
-    return .{
-        .resolution = .{ .x = width, .y = height },
-        .pixel_data = &[1]u8{0} ** (width * height * 4),
-    };
+    return self.ppu.getVideoState();
 }
 
 fn getAudioState(self: *const Self) fw.AudioState {
