@@ -17,6 +17,8 @@ scroll_x: u8 = 0,
 line: u8 = 0,
 bg_palette: u8 = 0,
 obj_palette: [2]u8 = @splat(0),
+window_y: u8 = 0,
+window_x: u8 = 0,
 dot: u32 = 0,
 
 pub fn init() Self {
@@ -37,6 +39,8 @@ pub fn read(self: *Self, address: u8) u8 {
         0x47 => self.bg_palette,
         0x48 => self.obj_palette[0],
         0x49 => self.obj_palette[1],
+        0x4a => self.window_y,
+        0x4b => self.window_x,
         else => fw.log.todo("GPU register read: {X:02}", .{address}),
     };
 }
@@ -77,6 +81,14 @@ pub fn write(self: *Self, address: u8, value: u8) void {
         0x49 => {
             self.obj_palette[1] = value;
             fw.log.debug("OBJ Palette 1: {X:02}", .{self.obj_palette[1]});
+        },
+        0x4a => {
+            self.window_y = value;
+            fw.log.debug("Window Y: {d}", .{self.window_y});
+        },
+        0x4b => {
+            self.window_x = value;
+            fw.log.debug("Window X: {d}", .{self.window_x});
         },
         else => fw.log.todo("GPU register write: {X:02}", .{address}),
     }

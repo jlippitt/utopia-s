@@ -184,7 +184,7 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
 
     if (address < 0x8000) {
         @branchHint(.unlikely);
-        fw.log.todo("Mapper writes", .{});
+        fw.log.warn("TODO: Mapper writes", .{});
     }
 
     if (address < 0xa000) {
@@ -207,7 +207,7 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
     }
 
     if (address < 0xfea0) {
-        fw.log.todo("OAM writes", .{});
+        fw.log.trace("TODO: OAM writes", .{});
     }
 }
 
@@ -219,6 +219,7 @@ fn readIo(cpu: *Cpu, address: u8) u8 {
 
 fn readIoInner(self: *Self, address: u8) u8 {
     return switch (address) {
+        0x00 => 0xff, // TODO: Joypad,
         0x01, 0x02 => 0, // TODO: Serial port
         0x04...0x07 => 0, // TODO: Timer
         0x0f => @as(u8, 0xe0) | self.int_flags,
@@ -238,6 +239,7 @@ fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
 
 fn writeIoInner(self: *Self, address: u8, value: u8) void {
     switch (address) {
+        0x00 => {}, // TODO: Joypad
         0x01 => {
             // TODO: Serial port
             test_rom_writer.interface.writeByte(value) catch {};
@@ -262,7 +264,7 @@ fn writeIoInner(self: *Self, address: u8, value: u8) void {
             self.int_enable = @truncate(value);
             fw.log.debug("Interrupt Enable: {b:05}", .{self.int_enable});
         },
-        else => fw.log.todo("I/O write: {X:02} <= {X:02}", .{ address, value }),
+        else => fw.log.warn("TODO: I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
 }
 
