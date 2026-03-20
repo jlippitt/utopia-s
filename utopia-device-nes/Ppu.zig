@@ -15,6 +15,10 @@ status: Status = .{},
 dot: u32 = 0,
 line: i32 = 0,
 nmi_active: bool = false,
+address: Address = .{},
+tmp_address: Address = .{},
+fine_x: u3 = 0,
+write_toggle: bool = false,
 
 pub fn init() Self {
     return .{};
@@ -32,6 +36,7 @@ pub fn read(self: *Self, address: u16) u8 {
             self.status.vblank = false;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
             self.getDevice().cpu.clearNmi();
+            self.write_toggle = false;
             break :blk value;
         },
         else => fw.log.todo("PPU register read: {X:04}", .{address}),
@@ -45,11 +50,41 @@ pub fn write(self: *Self, address: u16, value: u8) void {
             self.ctrl = @bitCast(value);
             fw.log.debug("PPUCTRL: {any}", .{self.ctrl});
 
+            self.address.name_table_x = fw.num.bit(value, 0);
+            self.address.name_table_y = fw.num.bit(value, 1);
+            fw.log.debug("VRAM Address: {X:04}", .{self.address.get()});
+
             if (self.ctrl.nmi_output and !prev_nmi_output and self.status.vblank) {
                 self.getDevice().cpu.raiseNmi();
             } else {
                 self.getDevice().cpu.clearNmi();
             }
+        },
+        5 => {
+            if (self.write_toggle) {
+                self.tmp_address.coarse_y = @truncate(value >> 3);
+                self.tmp_address.fine_y = @truncate(value);
+                fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
+            } else {
+                self.tmp_address.coarse_x = @truncate(value >> 3);
+                self.fine_x = @truncate(value);
+                fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
+            }
+
+            self.write_toggle = !self.write_toggle;
+        },
+        6 => {
+            if (self.write_toggle) {
+                self.tmp_address.set((self.tmp_address.get() & 0x7f00) | value);
+                self.address = self.tmp_address;
+                fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
+                fw.log.debug("VRAM Address: {X:04}", .{self.address.get()});
+            } else {
+                self.tmp_address.set((self.tmp_address.get() & 0xff) | (@as(u15, value & 0x3f) << 8));
+                fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
+            }
+
+            self.write_toggle = !self.write_toggle;
         },
         else => fw.log.trace("TODO: PPU register write: {X:04} <= {X:02}", .{ address, value }),
     }
@@ -98,4 +133,20 @@ const Status = packed struct(u8) {
     sprite_overflow: bool = false,
     sprite_zero_hit: bool = false,
     vblank: bool = false,
+};
+
+const Address = packed struct(u15) {
+    coarse_x: u5 = 0,
+    coarse_y: u5 = 0,
+    name_table_x: bool = false,
+    name_table_y: bool = false,
+    fine_y: u3 = 0,
+
+    pub fn get(self: @This()) u15 {
+        return @bitCast(self);
+    }
+
+    pub fn set(self: *@This(), value: u15) void {
+        self.* = @bitCast(value);
+    }
 };
