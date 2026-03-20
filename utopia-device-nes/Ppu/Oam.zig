@@ -16,6 +16,10 @@ pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     };
 }
 
+pub fn get(self: *Self, index: u8) u8 {
+    return self.data[index];
+}
+
 pub fn setAddress(self: *Self, value: u8) void {
     self.address = value;
     fw.log.debug("OAM Address: {X:02}", .{self.address});

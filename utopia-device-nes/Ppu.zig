@@ -4,6 +4,7 @@ const Device = @import("./Device.zig");
 const Oam = @import("./Ppu/Oam.zig");
 const Palette = @import("./Ppu/Palette.zig");
 const background = @import("./Ppu/background.zig");
+const object = @import("./Ppu/object.zig");
 
 const width = 256;
 const height = 240;
@@ -35,6 +36,7 @@ pixel_index: u32 = 0,
 palette: Palette,
 oam: Oam,
 bg: background.State = .{},
+obj: object.State = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     const pixels = try arena.allocator().alloc(u8, pixel_array_size);
@@ -177,11 +179,17 @@ pub fn step(self: *Self) void {
         if (self.line > last_line) {
             @branchHint(.unlikely);
             self.line = pre_render_line;
+
             self.status.vblank = false;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
+
+            self.status.sprite_overflow = false;
+            fw.log.trace("Sprite Overflow: {}", .{self.status.sprite_overflow});
+
             self.getDevice().cpu.clearNmi();
         } else if (self.line == vblank_line) {
             @branchHint(.unlikely);
+
             self.status.vblank = true;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
 
@@ -205,6 +213,7 @@ fn render(self: *Self) void {
 
         if (self.dot == 255) {
             @branchHint(.unlikely);
+            object.selectSprites(self);
             background.incrementScrollY(self);
         }
 
