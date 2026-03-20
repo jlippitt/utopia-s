@@ -204,6 +204,9 @@ pub fn step(self: *Self) void {
             self.status.vblank = false;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
 
+            self.status.sprite_zero_hit = false;
+            fw.log.trace("Sprite Zero Hit: {}", .{self.status.sprite_zero_hit});
+
             self.status.sprite_overflow = false;
             fw.log.trace("Sprite Overflow: {}", .{self.status.sprite_overflow});
 

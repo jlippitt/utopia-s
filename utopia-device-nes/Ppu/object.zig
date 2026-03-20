@@ -22,6 +22,7 @@ pub const Sprite = struct {
 
 pub const State = struct {
     selected_count: u8 = 0,
+    sprite_zero_selected: bool = false,
     sprite_y: u8 = 0,
     sprite_name: u8 = 0,
     secondary_oam: [32]u8 = @splat(0xff),
@@ -34,6 +35,7 @@ pub fn selectSprites(ppu: *Ppu) void {
     const height: i32 = if (ppu.ctrl.obj_size) 16 else 8;
 
     ppu.obj.selected_count = 0;
+    ppu.obj.sprite_zero_selected = false;
 
     // For specifics on M and N indexes (and details on sprite overflow bug), see NESDev Wiki
     var n: u8 = 0;
@@ -55,6 +57,10 @@ pub fn selectSprites(ppu: *Ppu) void {
                 ppu.obj.secondary_oam[write_index +% 2] = ppu.oam.get(read_index +% 2);
                 ppu.obj.secondary_oam[write_index +% 3] = ppu.oam.get(read_index +% 3);
                 ppu.obj.selected_count += 1;
+
+                if (n == 0) {
+                    ppu.obj.sprite_zero_selected = true;
+                }
             }
         } else if (is_on_line) {
             ppu.status.sprite_overflow = true;
@@ -73,6 +79,7 @@ pub fn selectSprites(ppu: *Ppu) void {
 
     if (ppu.obj.selected_count > 0) {
         fw.log.trace("Sprites Selected: {d}", .{ppu.obj.selected_count});
+        fw.log.trace("Sprite Zero Selected: {}", .{ppu.obj.sprite_zero_selected});
     }
 }
 
@@ -129,7 +136,7 @@ pub fn render(ppu: *Ppu, bg_color: u5) u5 {
     var color_index = bg_color;
     var sprite_blocked = false;
 
-    for (ppu.obj.sprites[0..ppu.obj.selected_count]) |*sprite| {
+    for (ppu.obj.sprites[0..ppu.obj.selected_count], 0..) |*sprite, index| {
         sprite.x -= 1;
 
         if (sprite.x < 0 or sprite.x >= 8 or ppu.dot < start_x) {
@@ -146,11 +153,12 @@ pub fn render(ppu: *Ppu, bg_color: u5) u5 {
             continue;
         }
 
-        if (sprite_blocked) {
-            continue;
+        if (index == 0 and ppu.obj.sprite_zero_selected and bg_color != 0 and ppu.dot != 255) {
+            ppu.status.sprite_zero_hit = true;
+            fw.log.debug("Sprite Zero Hit: {}", .{ppu.status.sprite_zero_hit});
         }
 
-        if (sprite.attr.below_bg and bg_color != 0) {
+        if (sprite_blocked or (sprite.attr.below_bg and bg_color != 0)) {
             continue;
         }
 
