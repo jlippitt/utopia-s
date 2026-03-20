@@ -15,6 +15,13 @@ pub fn color(self: *const Self, index: u5) fw.color.Abgr32 {
     return colors[self.data[index]];
 }
 
+pub fn read(self: *Self, address: u15) u8 {
+    // TODO: Greyscale
+    const mask: u5 = if ((address & 0x03) != 0) 0x1f else 0x0f;
+    const index = @as(u5, @truncate(address)) & mask;
+    return self.data[index];
+}
+
 pub fn write(self: *Self, address: u15, value: u8) void {
     const mask: u5 = if ((address & 0x03) != 0) 0x1f else 0x0f;
     const index = @as(u5, @truncate(address)) & mask;

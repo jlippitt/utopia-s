@@ -31,6 +31,7 @@ address: Address = .{},
 tmp_address: Address = .{},
 fine_x: u3 = 0,
 write_toggle: bool = false,
+read_buffer: u8 = 0,
 pixels: *[pixel_array_size]u8,
 pixel_index: u32 = 0,
 palette: Palette,
@@ -80,6 +81,26 @@ pub fn read(self: *Self, address: u16) u8 {
             fw.log.trace("VBlank: {}", .{self.status.vblank});
             self.getDevice().cpu.clearNmi();
             self.write_toggle = false;
+            break :blk value;
+        },
+        7 => blk: {
+            const vram_address = self.address.get();
+
+            const value = if ((vram_address & 0x3f00) == 0x3f00)
+                self.palette.read(vram_address)
+            else
+                self.read_buffer;
+
+            self.read_buffer = self.getDevice().cartridge.readVram();
+
+            fw.log.trace("VRAM Read: {X:04} => {X:02} ({X:02})", .{
+                vram_address,
+                value,
+                self.read_buffer,
+            });
+
+            self.incrementVramAddress();
+
             break :blk value;
         },
         else => fw.log.todo("PPU register read: {X:04}", .{address}),
