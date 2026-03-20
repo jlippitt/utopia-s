@@ -39,7 +39,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, O
     const prg_rom_mask = prg_rom_size - 1;
 
     const chr_rom_size = @as(u32, rom[5]) * chr_rom_multiplier;
-    fw.log.debug("CHR ROM Size: {d}", .{prg_rom_size});
+    fw.log.debug("CHR ROM Size: {d}", .{chr_rom_size});
 
     const chr_data, const chr_writable = if (chr_rom_size == 0)
         .{

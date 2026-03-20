@@ -1,3 +1,4 @@
+const std = @import("std");
 const fw = @import("framework");
 const Ppu = @import("../Ppu.zig");
 
@@ -52,6 +53,10 @@ pub fn incrementScrollY(ppu: *Ppu) void {
 }
 
 pub fn loadTiles(ppu: *Ppu) void {
+    ppu.bg.attr <<= 2;
+    ppu.bg.chr_low <<= 1;
+    ppu.bg.chr_high <<= 1;
+
     const cartridge = &ppu.getDevice().cartridge;
 
     switch (@as(u3, @truncate(ppu.dot))) {
@@ -84,6 +89,29 @@ pub fn loadExtra(ppu: *Ppu) void {
     }
 }
 
+pub fn render(ppu: *Ppu) u5 {
+    if (!ppu.mask.bg_enable) {
+        return 0;
+    }
+
+    if (!ppu.mask.bg_show_left and ppu.dot < 8) {
+        return 0;
+    }
+
+    const shift = @as(u4, 15) - ppu.fine_x;
+    const low: u1 = @truncate(ppu.bg.chr_low >> shift);
+    const high: u1 = @truncate(ppu.bg.chr_high >> shift);
+    const pixel_value = (@as(u2, high) << 1) | low;
+
+    if (pixel_value == 0) {
+        return 0;
+    }
+
+    const palette_index: u2 = @truncate(ppu.bg.attr >> @as(u5, shift << 1));
+
+    return (@as(u5, palette_index) << 2) | pixel_value;
+}
+
 pub fn nameAddress(ppu: *Ppu) u15 {
     return 0x2000 | (ppu.address.get() & 0x0fff);
 }
@@ -99,5 +127,5 @@ pub fn attrAddress(ppu: *Ppu) u15 {
 fn chrAddress(ppu: *Ppu) u15 {
     return (@as(u15, ppu.ctrl.bg_chr_table) << 12) |
         (@as(u15, ppu.bg.name_latch) << 4) |
-        ppu.address.coarse_y;
+        ppu.address.fine_y;
 }

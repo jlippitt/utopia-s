@@ -154,7 +154,7 @@ pub fn step(self: *Self) void {
             @branchHint(.likely);
             self.render();
         } else if (self.dot < 256 and self.line >= 0) {
-            self.drawPixel(self.palette.color(0));
+            self.drawPixel(0);
         }
     }
 
@@ -189,7 +189,7 @@ fn render(self: *Self) void {
 
         if (self.line >= 0) {
             @branchHint(.likely);
-            self.drawPixel(self.palette.color(0));
+            self.drawPixel(background.render(self));
         }
 
         background.loadTiles(self);
@@ -240,7 +240,8 @@ fn incrementVramAddress(self: *Self) void {
     self.getDevice().cartridge.setVramAddress(result);
 }
 
-fn drawPixel(self: *Self, color: fw.color.Abgr32) void {
+fn drawPixel(self: *Self, color_index: u5) void {
+    const color = self.palette.color(color_index);
     const pixel: *[4]u8 = self.pixels[self.pixel_index..][0..4];
     pixel.* = @bitCast(color);
     self.pixel_index += 4;
