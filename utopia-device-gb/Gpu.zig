@@ -71,6 +71,7 @@ pub fn write(self: *Self, address: u8, value: u8) void {
             self.scroll_x = value;
             fw.log.debug("Scroll X: {d}", .{self.scroll_x});
         },
+        0x46 => {}, // TODO: OAM DMA
         0x47 => {
             self.bg_palette = value;
             fw.log.debug("BG Palette: {X:02}", .{self.bg_palette});

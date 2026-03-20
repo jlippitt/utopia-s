@@ -44,6 +44,12 @@ pub fn raise(self: *Self, int_type: Type) void {
     self.update();
 }
 
+pub fn clear(self: *Self, int_type: Type) void {
+    self.flags &= ~@intFromEnum(int_type);
+    fw.log.debug("Interrupt Cleared: {t}", .{int_type});
+    self.update();
+}
+
 fn update(self: *Self) void {
     self.getDevice().cpu.setInterrupt(self.flags & self.enable);
 }

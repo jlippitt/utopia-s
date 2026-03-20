@@ -20,6 +20,7 @@ pub const Interface = struct {
     write: fn (self: *Self, address: u16, value: u8) void,
     readIo: fn (self: *Self, address: u8) u8,
     writeIo: fn (self: *Self, address: u8, value: u8) void,
+    clearInterrupt: fn (self: *Self, interrupt: u5) void,
 };
 
 const Instruction = fn (core: *Self) void;
@@ -64,9 +65,12 @@ pub fn setInterrupt(self: *Self, interrupt: u5) void {
 
 pub fn step(self: *Self, comptime iface: Interface) void {
     if (self.interrupt != 0 and self.ime) {
+        const index: u3 = @ctz(self.interrupt);
+        iface.clearInterrupt(self, @as(u5, 1) << index);
         self.ime = false;
         self.ime_next = false;
-        control.rst(0x40 + (@as(u8, @ctz(self.interrupt)) << 3), iface, self);
+        self.idle(iface);
+        control.rst(0x40 + (@as(u8, index) * 8), iface, self);
         return;
     }
 

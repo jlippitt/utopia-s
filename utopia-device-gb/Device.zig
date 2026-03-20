@@ -104,6 +104,7 @@ fn runFrame(self: *Self) void {
             .write = write,
             .readIo = readIo,
             .writeIo = writeIo,
+            .clearInterrupt = clearInterrupt,
         });
 
         fw.log.trace("{f} {f} T={d}", .{ self.cpu, self.gpu, self.cycles });
@@ -261,6 +262,11 @@ fn writeIoInner(self: *Self, address: u8, value: u8) void {
         0xff => self.interrupt.setEnable(value),
         else => fw.log.warn("TODO: I/O write: {X:02} <= {X:02}", .{ address, value }),
     }
+}
+
+fn clearInterrupt(cpu: *Cpu, interrupt: u5) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.interrupt.clear(@enumFromInt(interrupt));
 }
 
 fn step(self: *Self) void {
