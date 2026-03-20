@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Cartridge = @import("./Cartridge.zig");
+const Apu = @import("./Apu.zig");
 const Ppu = @import("./Ppu.zig");
 
 const Cpu = fw.processor.Mos6502;
@@ -29,6 +30,7 @@ cycles: u64 = 0,
 mdr: u8 = 0,
 wram: *[wram_size]u8,
 ppu: Ppu,
+apu: Apu,
 cartridge: Cartridge,
 arena: std.heap.ArenaAllocator,
 
@@ -48,6 +50,7 @@ pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
         .cpu = .init(true),
         .wram = wram[0..wram_size],
         .ppu = try .init(&arena),
+        .apu = try .init(&arena),
         .cartridge = try .init(&arena, rom),
         .arena = arena,
     };
@@ -66,6 +69,7 @@ fn deinit(self: *Self) void {
 }
 
 fn runFrame(self: *Self) void {
+    self.apu.clearSampleBuffer();
     self.ppu.beginFrame();
 
     while (!self.ppu.frameDone()) {
@@ -83,12 +87,7 @@ fn getVideoState(self: *const Self) fw.VideoState {
 }
 
 fn getAudioState(self: *const Self) fw.AudioState {
-    _ = self;
-
-    return .{
-        .sample_rate = fw.default_sample_rate,
-        .sample_data = &.{},
-    };
+    return self.apu.getAudioState();
 }
 
 fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
@@ -188,7 +187,7 @@ fn step(self: *Self, comptime ppu_cycles: comptime_int) void {
         self.ppu.step();
     }
 
-    // TODO: Step other components
+    self.apu.step();
 }
 
 const DmaRequest = packed struct(u2) {
