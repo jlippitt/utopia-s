@@ -29,11 +29,11 @@ pub const DeviceArgs = union(DeviceType) {
     n64: N64.Args,
     nes: Nes.Args,
 
-    pub fn initDevice(self: Self, allocator: std.mem.Allocator, vfs: anytype) InitError!Device {
+    pub fn initDevice(self: Self, arena: *std.heap.ArenaAllocator, vfs: anytype) InitError!Device {
         return switch (self) {
-            .gb => |device_args| try Gb.init(allocator, vfs, device_args),
-            .n64 => |device_args| try N64.init(allocator, vfs, device_args),
-            .nes => |device_args| try Nes.init(allocator, vfs, device_args),
+            .gb => |device_args| try Gb.init(arena, vfs, device_args),
+            .n64 => |device_args| try N64.init(arena, vfs, device_args),
+            .nes => |device_args| try Nes.init(arena, vfs, device_args),
         };
     }
 };

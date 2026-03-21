@@ -76,17 +76,14 @@ pi: ParallelInterface,
 ri: RdramInterface,
 si: SerialInterface,
 systest_output: *[systest_output_size]u8,
-arena: std.heap.ArenaAllocator,
 
 // utopia.Device methods
 
-pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-
-    const rom = try vfs.readRomAligned(&arena, .@"8");
-    const pifdata = try vfs.readBiosAligned(&arena, "pifdata.bin", .@"4");
+    const rom = try vfs.readRomAligned(arena, .@"8");
+    const pifdata = try vfs.readBiosAligned(arena, "pifdata.bin", .@"4");
 
     const rdram = try arena.allocator().alignedAlloc(u8, .@"4", rdram_size);
 
@@ -99,17 +96,17 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
     const systest_output = try arena.allocator().alloc(u8, systest_output_size);
 
     var clock = Clock.init();
-    const vi = try VideoInterface.init(&arena, &clock);
-    const ai = try AudioInterface.init(&arena, &clock);
+    const vi = try VideoInterface.init(arena, &clock);
+    const ai = try AudioInterface.init(arena, &clock);
 
     const self = try arena.allocator().create(Self);
 
     self.* = .{
-        .cpu = try .init(&arena),
+        .cpu = try .init(arena),
         .clock = clock,
         .rdram = rdram[0..rdram_size],
-        .rsp = try .init(&arena),
-        .rdp = try .init(&arena),
+        .rsp = try .init(arena),
+        .rdp = try .init(arena),
         .mi = .init(),
         .vi = vi,
         .ai = ai,
@@ -117,7 +114,6 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
         .ri = .init(),
         .si = .init(pifdata, cic.getSeed()),
         .systest_output = systest_output[0..systest_output_size],
-        .arena = arena,
     };
 
     return fw.Device.init(self, .{
@@ -131,7 +127,6 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
 
 pub fn deinit(self: *Self) void {
     self.rdp.deinit();
-    self.arena.deinit();
 }
 
 pub fn runFrame(self: *Self) void {

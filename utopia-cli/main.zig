@@ -34,7 +34,10 @@ pub fn main() !void {
 
     const vfs = Vfs.init(app_args.rom_path, app_args.bios_path);
 
-    var device = try device_args.initDevice(allocator, &vfs);
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+
+    var device = try device_args.initDevice(&arena, &vfs);
     defer device.deinit();
 
     var video = try VideoDevice.init(device.getVideoState().resolution);

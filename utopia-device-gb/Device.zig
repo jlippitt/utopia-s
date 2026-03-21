@@ -29,15 +29,12 @@ wram: *[wram_size]u8,
 hram: *[hram_size]u8,
 gpu: Gpu,
 rom: []const u8,
-arena: std.heap.ArenaAllocator,
 
-pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-
-    const rom = try vfs.readRom(&arena);
-    const boot_rom = try vfs.readBios(&arena, "dmg_boot.bin");
+    const rom = try vfs.readRom(arena);
+    const boot_rom = try vfs.readBios(arena, "dmg_boot.bin");
 
     const wram = try arena.allocator().alloc(u8, wram_size);
     const hram = try arena.allocator().alloc(u8, hram_size);
@@ -52,7 +49,6 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
         .hram = hram[0..hram_size],
         .gpu = .init(),
         .rom = rom,
-        .arena = arena,
     };
 
     return fw.Device.init(self, .{
@@ -65,7 +61,7 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
 }
 
 fn deinit(self: *Self) void {
-    self.arena.deinit();
+    _ = self;
 }
 
 fn runFrame(self: *Self) void {

@@ -21,15 +21,11 @@ wram: *[wram_size]u8,
 ppu: Ppu,
 apu: Apu,
 cartridge: Cartridge,
-arena: std.heap.ArenaAllocator,
 
-pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-
-    const rom = try vfs.readRom(&arena);
-
+    const rom = try vfs.readRom(arena);
     const wram = try arena.allocator().alloc(u8, wram_size);
 
     const self = try arena.allocator().create(Self);
@@ -37,10 +33,9 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
     self.* = .{
         .cpu = .init(true),
         .wram = wram[0..wram_size],
-        .ppu = try .init(&arena),
-        .apu = try .init(&arena),
-        .cartridge = try .init(&arena, rom),
-        .arena = arena,
+        .ppu = try .init(arena),
+        .apu = try .init(arena),
+        .cartridge = try .init(arena, rom),
     };
 
     return fw.Device.init(self, .{
@@ -53,7 +48,7 @@ pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError
 }
 
 fn deinit(self: *Self) void {
-    self.arena.deinit();
+    _ = self;
 }
 
 fn runFrame(self: *Self) void {
