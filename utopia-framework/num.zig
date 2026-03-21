@@ -105,3 +105,7 @@ pub fn writeMasked(comptime T: type, dst: *T, value: T, mask: T) void {
 pub fn bit(src: anytype, index: std.math.Log2Int(@TypeOf(src))) bool {
     return (src & (@as(@TypeOf(src), 1) << index)) != 0;
 }
+
+pub fn setBit(comptime T: type, dst: *T, index: std.math.Log2Int(T), value: bool) void {
+    writeMasked(T, dst, @as(T, @intFromBool(value)) << index, @as(T, 1) << index);
+}

@@ -33,7 +33,7 @@ pub fn init(complement_mode: ComplementMode) Self {
     };
 }
 
-pub fn isEnabled(self: *const Self) bool {
+pub fn enabled(self: *const Self) bool {
     return !self.length_counter.muted();
 }
 
@@ -68,8 +68,8 @@ pub fn setTimerHigh(self: *Self, value: u8) void {
     self.envelope.reset();
 }
 
-pub fn setEnabled(self: *Self, enabled: bool) void {
-    self.length_counter.setEnabled(enabled);
+pub fn setEnabled(self: *Self, value: bool) void {
+    self.length_counter.setEnabled(value);
 }
 
 pub fn stepFrame(self: *Self, frame: Frame) void {
