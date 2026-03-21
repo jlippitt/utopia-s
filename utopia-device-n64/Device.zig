@@ -116,7 +116,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .systest_output = systest_output[0..systest_output_size],
     };
 
-    return fw.Device.init(self, .{
+    return .init(self, .{
         .deinit = deinit,
         .runFrame = runFrame,
         .getVideoState = getVideoState,

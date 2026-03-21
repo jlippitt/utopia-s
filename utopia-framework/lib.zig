@@ -84,17 +84,17 @@ pub const ButtonState = struct {
     misc6: bool = false,
 };
 
-pub fn Interface(comptime Self: type) type {
-    return struct {
-        deinit: *const fn (self: *Self) void,
-        runFrame: *const fn (self: *Self) void,
-        getVideoState: *const fn (self: *const Self) VideoState,
-        getAudioState: *const fn (self: *const Self) AudioState,
-        updateControllerState: *const fn (self: *Self, state: *const ControllerState) void,
-    };
-}
-
 pub const Device = struct {
+    pub fn Interface(comptime T: type) type {
+        return struct {
+            deinit: *const fn (self: *T) void,
+            runFrame: *const fn (self: *T) void,
+            getVideoState: *const fn (self: *const T) VideoState,
+            getAudioState: *const fn (self: *const T) AudioState,
+            updateControllerState: *const fn (self: *T, state: *const ControllerState) void,
+        };
+    }
+
     const Self = @This();
 
     ptr: *anyopaque,
@@ -103,32 +103,32 @@ pub const Device = struct {
     pub fn init(
         inner: anytype,
         comptime iface: Interface(@typeInfo(@TypeOf(inner)).pointer.child),
-    ) InitError!Self {
-        const Inner = @typeInfo(@TypeOf(inner)).pointer.child;
+    ) Self {
+        const T = @typeInfo(@TypeOf(inner)).pointer.child;
 
         const gen = struct {
             fn deinitImpl(ptr: *anyopaque) void {
-                const self: *Inner = @ptrCast(@alignCast(ptr));
+                const self: *T = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.deinit, .{self});
             }
 
             fn runFrameImpl(ptr: *anyopaque) void {
-                const self: *Inner = @ptrCast(@alignCast(ptr));
+                const self: *T = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.runFrame, .{self});
             }
 
             fn getVideoStateImpl(ptr: *const anyopaque) VideoState {
-                const self: *const Inner = @ptrCast(@alignCast(ptr));
+                const self: *const T = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.getVideoState, .{self});
             }
 
             fn getAudioStateImpl(ptr: *const anyopaque) AudioState {
-                const self: *const Inner = @ptrCast(@alignCast(ptr));
+                const self: *const T = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.getAudioState, .{self});
             }
 
             fn updateControllerStateImpl(ptr: *anyopaque, state: *const ControllerState) void {
-                const self: *Inner = @ptrCast(@alignCast(ptr));
+                const self: *T = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.updateControllerState, .{ self, state });
             }
 

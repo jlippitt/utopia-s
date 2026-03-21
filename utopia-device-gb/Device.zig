@@ -52,7 +52,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .rom = rom,
     };
 
-    return fw.Device.init(self, .{
+    return .init(self, .{
         .deinit = deinit,
         .runFrame = runFrame,
         .getVideoState = getVideoState,

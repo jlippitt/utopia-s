@@ -45,7 +45,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .cartridge = try .init(arena, rom),
     };
 
-    return fw.Device.init(self, .{
+    return .init(self, .{
         .deinit = deinit,
         .runFrame = runFrame,
         .getVideoState = getVideoState,
@@ -55,7 +55,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
 }
 
 fn deinit(self: *Self) void {
-    _ = self;
+    self.cartridge.deinit();
 }
 
 fn runFrame(self: *Self) void {
