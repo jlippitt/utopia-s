@@ -16,14 +16,14 @@ pub const State = struct {
 pub fn copyScrollX(ppu: *Ppu) void {
     ppu.address.coarse_x = ppu.tmp_address.coarse_x;
     ppu.address.name_table_x = ppu.tmp_address.name_table_x;
-    fw.log.debug("VRAM Address (Copy Scroll X): {X:04}", .{ppu.address.get()});
+    fw.log.trace("VRAM Address (Copy Scroll X): {X:04}", .{ppu.address.get()});
 }
 
 pub fn copyScrollY(ppu: *Ppu) void {
     ppu.address.coarse_y = ppu.tmp_address.coarse_y;
     ppu.address.name_table_y = ppu.tmp_address.name_table_y;
     ppu.address.fine_y = ppu.tmp_address.fine_y;
-    fw.log.debug("VRAM Address (Copy Scroll Y): {X:04}", .{ppu.address.get()});
+    fw.log.trace("VRAM Address (Copy Scroll Y): {X:04}", .{ppu.address.get()});
 }
 
 pub fn incrementScrollX(ppu: *Ppu) void {
@@ -49,7 +49,7 @@ pub fn incrementScrollY(ppu: *Ppu) void {
         }
     }
 
-    fw.log.debug("VRAM Address (Increment Scroll Y): {X:04}", .{ppu.address.get()});
+    fw.log.trace("VRAM Address (Increment Scroll Y): {X:04}", .{ppu.address.get()});
 }
 
 pub fn loadTiles(ppu: *Ppu) void {

@@ -44,7 +44,7 @@ pub fn step(self: *Self) ?Frame {
             self.frame_number = 0;
             self.cycles_remaining = frame_timings.get(self.ctrl.mode)[0] + 2;
 
-            fw.log.debug("Frame Counter Step: {} (Cycles Remaining: {})", .{
+            fw.log.trace("Frame Counter Step: {} (Cycles Remaining: {})", .{
                 self.frame_number,
                 self.cycles_remaining,
             });
@@ -102,7 +102,7 @@ pub fn step(self: *Self) ?Frame {
 
     self.cycles_remaining = frame_timings.get(self.ctrl.mode)[self.frame_number];
 
-    fw.log.debug("Frame Counter Step: {} (Cycles Remaining: {})", .{
+    fw.log.trace("Frame Counter Step: {} (Cycles Remaining: {})", .{
         self.frame_number,
         self.cycles_remaining,
     });

@@ -26,12 +26,12 @@ pub fn setAddress(self: *Self, value: u8) void {
 }
 
 pub fn read(self: *Self) u8 {
-    fw.log.debug("OAM Read: {X:02} <= {X:02}", .{ self.address, self.data[self.address] });
+    fw.log.trace("OAM Read: {X:02} <= {X:02}", .{ self.address, self.data[self.address] });
     return self.data[self.address];
 }
 
 pub fn write(self: *Self, value: u8) void {
     self.data[self.address] = value;
-    fw.log.debug("OAM Write: {X:02} <= {X:02}", .{ self.address, self.data[self.address] });
+    fw.log.trace("OAM Write: {X:02} <= {X:02}", .{ self.address, self.data[self.address] });
     self.address +%= 1;
 }

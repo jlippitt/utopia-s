@@ -19,6 +19,7 @@ pub fn read(self: *Self, address: u15) u8 {
     // TODO: Greyscale
     const mask: u5 = if ((address & 0x03) != 0) 0x1f else 0x0f;
     const index = @as(u5, @truncate(address)) & mask;
+    fw.log.trace("Palette Read: {X:02} => {X:02}", .{ index, self.data[index] });
     return self.data[index];
 }
 
