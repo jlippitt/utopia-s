@@ -3,6 +3,7 @@ const fw = @import("framework");
 const NROM = @import("./Cartridge/NROM.zig");
 const UxROM = @import("./Cartridge/UxROM.zig");
 const CNROM = @import("./Cartridge/CNROM.zig");
+const AxROM = @import("./Cartridge/AxROM.zig");
 
 const ines_string: []const u8 = &.{ 0x4e, 0x45, 0x53, 0x1a };
 
@@ -98,6 +99,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, O
         0 => try NROM.init(arena, &self),
         2 => try UxROM.init(arena, &self),
         3 => try CNROM.init(arena, &self),
+        7 => try AxROM.init(arena, &self),
         else => fw.log.unimplemented("INES mapper: {d}", .{mapper_number}),
     };
 
@@ -205,6 +207,10 @@ pub fn mapChr(self: *Self, start: u32, len: u32, page_offset: i32) void {
         self.chr_mapping[index] = offset & self.chr_mask;
         offset += chr_page_size;
     }
+}
+
+pub fn mapName(self: *Self, mapping: [4]NameMapping) void {
+    self.name_mapping = mapping;
 }
 
 pub fn printMappings(self: *Self) void {
