@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const NROM = @import("./Cartridge/NROM.zig");
 const UxROM = @import("./Cartridge/UxROM.zig");
+const CNROM = @import("./Cartridge/CNROM.zig");
 
 const ines_string: []const u8 = &.{ 0x4e, 0x45, 0x53, 0x1a };
 
@@ -96,6 +97,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, O
     self.mapper = switch (mapper_number) {
         0 => try NROM.init(arena, &self),
         2 => try UxROM.init(arena, &self),
+        3 => try CNROM.init(arena, &self),
         else => fw.log.unimplemented("INES mapper: {d}", .{mapper_number}),
     };
 
