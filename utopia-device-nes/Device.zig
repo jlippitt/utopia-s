@@ -3,6 +3,7 @@ const fw = @import("framework");
 const processor = @import("processor");
 const Cartridge = @import("./Cartridge.zig");
 const Apu = @import("./Apu.zig");
+const Joypad = @import("./Joypad.zig");
 const Ppu = @import("./Ppu.zig");
 
 const Cpu = processor.Mos6502;
@@ -21,6 +22,7 @@ mdr: u8 = 0,
 wram: *[wram_size]u8,
 ppu: Ppu,
 apu: Apu,
+joypad: Joypad,
 cartridge: Cartridge,
 
 pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
@@ -36,6 +38,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .wram = wram[0..wram_size],
         .ppu = try .init(arena),
         .apu = try .init(arena),
+        .joypad = .init(),
         .cartridge = try .init(arena, rom),
     };
 
@@ -75,8 +78,7 @@ fn getAudioState(self: *const Self) fw.AudioState {
 }
 
 fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
-    _ = self;
-    _ = state;
+    self.joypad.update(state);
 }
 
 fn read(cpu: *Cpu, address: u16) u8 {
@@ -102,8 +104,13 @@ fn readInner(self: *Self, address: u16) u8 {
         self.mdr = self.ppu.read(address);
     } else if (address < 0x4020) {
         @branchHint(.unlikely);
-        fw.log.trace("TODO: APU/Joypad reads", .{});
-        self.mdr = 0;
+
+        if ((address & 0xfffe) == 0x4016) {
+            self.mdr = self.joypad.read(address, self.mdr);
+        } else {
+            fw.log.trace("TODO: APU reads", .{});
+            self.mdr = 0;
+        }
     }
 
     self.step(1);
@@ -130,9 +137,11 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
         if (address == 0x4014) {
             self.dma.request.oam = true;
             self.dma.oam_page = value;
+        } else if (address == 0x4016) {
+            self.joypad.write(value);
+        } else {
+            fw.log.trace("TODO: APU writes", .{});
         }
-
-        fw.log.trace("TODO: APU/Joypad writes", .{});
     }
 }
 
