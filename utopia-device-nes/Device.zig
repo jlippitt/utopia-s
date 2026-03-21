@@ -1,10 +1,11 @@
 const std = @import("std");
 const fw = @import("framework");
+const processor = @import("processor");
 const Cartridge = @import("./Cartridge.zig");
 const Apu = @import("./Apu.zig");
 const Ppu = @import("./Ppu.zig");
 
-const Cpu = fw.processor.Mos6502;
+const Cpu = processor.Mos6502;
 
 const wram_size = 2048;
 const wram_mask = wram_size - 1;

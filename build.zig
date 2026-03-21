@@ -17,13 +17,20 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    utopia_framework.addImport("framework", utopia_framework);
+    const utopia_processor = b.addModule("utopia-processor", .{
+        .root_source_file = b.path("utopia-processor/lib.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "framework", .module = utopia_framework },
+        },
+    });
 
     const utopia_device_gb = b.addModule("utopia-device-gb", .{
         .root_source_file = b.path("utopia-device-gb/Device.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "framework", .module = utopia_framework },
+            .{ .name = "processor", .module = utopia_processor },
         },
     });
 
@@ -43,6 +50,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .imports = &.{
             .{ .name = "framework", .module = utopia_framework },
+            .{ .name = "processor", .module = utopia_processor },
         },
     });
 

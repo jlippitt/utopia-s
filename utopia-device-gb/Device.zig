@@ -1,9 +1,10 @@
 const std = @import("std");
 const fw = @import("framework");
+const processor = @import("processor");
 const Gpu = @import("./Gpu.zig");
 const Interrupt = @import("./Interrupt.zig");
 
-const Cpu = fw.processor.Sm83;
+const Cpu = processor.Sm83;
 
 const boot_rom_size = 256;
 const wram_size = 8192;
