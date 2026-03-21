@@ -30,8 +30,8 @@ pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     return .{
         .samples = samples,
         .frame_counter = .init(),
-        .pulse1 = .init(),
-        .pulse2 = .init(),
+        .pulse1 = .init(.ones),
+        .pulse2 = .init(.twos),
     };
 }
 
