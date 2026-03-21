@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 const FrameCounter = @import("./Apu/FrameCounter.zig");
+const Noise = @import("./Apu/Noise.zig");
 const Pulse = @import("./Apu/Pulse.zig");
 const Triangle = @import("./Apu/Triangle.zig");
 
@@ -22,6 +23,7 @@ frame_counter: FrameCounter,
 pulse1: Pulse,
 pulse2: Pulse,
 triangle: Triangle,
+noise: Noise,
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     const samples = try std.ArrayList(fw.Sample).initCapacity(
@@ -35,6 +37,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
         .pulse1 = .init(.ones),
         .pulse2 = .init(.twos),
         .triangle = .init(),
+        .noise = .init(),
     };
 }
 
@@ -55,6 +58,7 @@ pub fn read(self: *Self, prev_value: u8) u8 {
     fw.num.setBit(u8, &value, 0, self.pulse1.enabled());
     fw.num.setBit(u8, &value, 1, self.pulse2.enabled());
     fw.num.setBit(u8, &value, 2, self.triangle.enabled());
+    fw.num.setBit(u8, &value, 3, self.noise.enabled());
     fw.num.setBit(u8, &value, 6, self.getDevice().irq.has(.frame_counter));
 
     self.getDevice().irq.clear(.frame_counter);
@@ -75,10 +79,14 @@ pub fn write(self: *Self, address: u16, value: u8) void {
         0x08 => self.triangle.setControl(value),
         0x0a => self.triangle.setTimerLow(value),
         0x0b => self.triangle.setTimerHigh(value),
+        0x0c => self.noise.setControl(value),
+        0x0e => self.noise.setTimerLow(value),
+        0x0f => self.noise.setTimerHigh(value),
         0x15 => {
             self.pulse1.setEnabled(fw.num.bit(value, 0));
             self.pulse2.setEnabled(fw.num.bit(value, 1));
             self.triangle.setEnabled(fw.num.bit(value, 2));
+            self.noise.setEnabled(fw.num.bit(value, 3));
         },
         0x17 => self.frame_counter.setControl(value),
         else => {},
@@ -92,11 +100,13 @@ pub fn step(self: *Self) void {
         self.pulse1.stepFrame(some_frame);
         self.pulse2.stepFrame(some_frame);
         self.triangle.stepFrame(some_frame);
+        self.noise.stepFrame(some_frame);
     }
 
     self.pulse1.stepCycle();
     self.pulse2.stepCycle();
     self.triangle.stepCycle();
+    self.noise.stepCycle();
 
     self.sample_cycles -= clock_multiplier;
 
@@ -106,9 +116,10 @@ pub fn step(self: *Self) void {
         const pulse1: u5 = self.pulse1.sample();
         const pulse2: u5 = self.pulse2.sample();
         const triangle: u8 = self.triangle.sample();
+        const noise: u8 = self.noise.sample();
 
         const pulse = pulse_table[pulse1 + pulse2];
-        const tnd = tnd_table[triangle * 3];
+        const tnd = tnd_table[triangle * 3 + noise * 2];
         const sample = pulse + tnd;
 
         self.samples.appendAssumeCapacity(.{ sample, sample });
