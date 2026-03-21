@@ -3,6 +3,7 @@ const fw = @import("framework");
 const processor = @import("processor");
 const Cartridge = @import("./Cartridge.zig");
 const Apu = @import("./Apu.zig");
+const Irq = @import("./Irq.zig");
 const Joypad = @import("./Joypad.zig");
 const Ppu = @import("./Ppu.zig");
 
@@ -17,6 +18,7 @@ const Self = @This();
 
 cpu: Cpu,
 dma: Dma = .{},
+irq: Irq,
 cycles: u64 = 0,
 mdr: u8 = 0,
 wram: *[wram_size]u8,
@@ -35,6 +37,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
 
     self.* = .{
         .cpu = .init(true),
+        .irq = .init(),
         .wram = wram[0..wram_size],
         .ppu = try .init(arena),
         .apu = try .init(arena),
@@ -105,11 +108,10 @@ fn readInner(self: *Self, address: u16) u8 {
     } else if (address < 0x4020) {
         @branchHint(.unlikely);
 
-        if ((address & 0xfffe) == 0x4016) {
+        if (address == 0x4015) {
+            self.mdr = self.apu.read(self.mdr);
+        } else if ((address & 0xfffe) == 0x4016) {
             self.mdr = self.joypad.read(address, self.mdr);
-        } else {
-            fw.log.trace("TODO: APU reads", .{});
-            self.mdr = 0;
         }
     }
 
@@ -140,7 +142,7 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
         } else if (address == 0x4016) {
             self.joypad.write(value);
         } else {
-            fw.log.trace("TODO: APU writes", .{});
+            self.apu.write(address, value);
         }
     }
 }

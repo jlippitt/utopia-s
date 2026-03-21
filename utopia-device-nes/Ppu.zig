@@ -79,7 +79,7 @@ pub fn read(self: *Self, address: u16) u8 {
             const value: u8 = @bitCast(self.status);
             self.status.vblank = false;
             fw.log.trace("VBlank: {}", .{self.status.vblank});
-            self.getDevice().cpu.clearNmi();
+            self.getDevice().cpu.setNmi(false);
             self.write_toggle = false;
             break :blk value;
         },
@@ -119,11 +119,11 @@ pub fn write(self: *Self, address: u16, value: u8) void {
             self.tmp_address.name_table_y = @intFromBool(fw.num.bit(value, 1));
             fw.log.debug("VRAM TMP Address: {X:04}", .{self.tmp_address.get()});
 
-            if (self.ctrl.nmi_output and !prev_nmi_output and self.status.vblank) {
-                self.getDevice().cpu.raiseNmi();
-            } else {
-                self.getDevice().cpu.clearNmi();
-            }
+            self.getDevice().cpu.setNmi(
+                self.ctrl.nmi_output and
+                    !prev_nmi_output and
+                    self.status.vblank,
+            );
         },
         1 => {
             self.mask = @bitCast(value);
@@ -211,7 +211,7 @@ pub fn step(self: *Self) void {
             self.status.sprite_overflow = false;
             fw.log.trace("Sprite Overflow: {}", .{self.status.sprite_overflow});
 
-            self.getDevice().cpu.clearNmi();
+            self.getDevice().cpu.setNmi(false);
         } else if (self.line == vblank_line) {
             @branchHint(.unlikely);
 
@@ -219,7 +219,7 @@ pub fn step(self: *Self) void {
             fw.log.trace("VBlank: {}", .{self.status.vblank});
 
             if (self.ctrl.nmi_output) {
-                self.getDevice().cpu.raiseNmi();
+                self.getDevice().cpu.setNmi(true);
             }
         }
     }

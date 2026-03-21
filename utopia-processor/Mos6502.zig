@@ -23,7 +23,8 @@ pub const Flags = packed struct(u8) {
 pub const Interrupt = packed struct(u8) {
     reset: bool = false,
     nmi: bool = false,
-    irq: u6 = 0,
+    irq: bool = false,
+    __: u5 = 0,
 };
 
 pub const Interface = struct {
@@ -69,12 +70,12 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
     });
 }
 
-pub fn clearNmi(self: *Self) void {
-    self.int_active.nmi = false;
+pub fn setNmi(self: *Self, active: bool) void {
+    self.int_active.nmi = active;
 }
 
-pub fn raiseNmi(self: *Self) void {
-    self.int_active.nmi = true;
+pub fn setIrq(self: *Self, active: bool) void {
+    self.int_active.irq = active;
 }
 
 pub fn step(self: *Self, comptime iface: Interface) void {
@@ -90,7 +91,7 @@ pub fn step(self: *Self, comptime iface: Interface) void {
             self.int_active.nmi = false;
             interrupt.nmi(iface, self);
         } else {
-            fw.log.todo("IRQ", .{});
+            interrupt.irq(iface, self);
         }
 
         self.int_polled = .{};
@@ -103,11 +104,10 @@ pub fn step(self: *Self, comptime iface: Interface) void {
 }
 
 pub fn poll(self: *Self) void {
-    self.int_polled = self.int_active;
-
-    if (self.flags.i) {
-        self.int_polled.irq = 0;
-    }
+    // Interrupt and Flags structures are arranged so that IRQ signal and
+    // IRQ inhibit flag are both bit 3 (0x04)
+    self.int_polled = @bitCast(@as(u8, @bitCast(self.int_active)) &
+        ~(@as(u8, @bitCast(self.flags)) & 0x04));
 }
 
 pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
