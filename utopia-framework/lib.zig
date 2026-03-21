@@ -31,7 +31,7 @@ pub const VideoState = struct {
     pixel_data: []const u8,
 };
 
-pub const Sample = [2]i16;
+pub const Sample = [2]f32;
 
 pub const AudioState = struct {
     sample_rate: u32,

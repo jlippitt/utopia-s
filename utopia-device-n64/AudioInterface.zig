@@ -154,7 +154,11 @@ pub fn handleSampleEvent(self: *Self) void {
 
         const left = fw.mem.readBe(i16, rdram, self.dma_active.dram_addr);
         const right = fw.mem.readBe(i16, rdram, self.dma_active.dram_addr +% 2);
-        self.sample_buffer.appendAssumeCapacity(.{ left, right });
+
+        self.sample_buffer.appendAssumeCapacity(.{
+            @as(f32, @floatFromInt(left)) / 32768.0,
+            @as(f32, @floatFromInt(right)) / 32768.0,
+        });
 
         self.dma_active.dram_addr +%= 4;
         self.dma_active.len -= 4;
@@ -171,7 +175,7 @@ pub fn handleSampleEvent(self: *Self) void {
             }
         }
     } else {
-        self.sample_buffer.appendAssumeCapacity(.{ 0, 0 });
+        self.sample_buffer.appendAssumeCapacity(.{ 0.0, 0.0 });
     }
 
     self.getDevice().clock.schedule(.ai_sample, self.cycles_per_sample);

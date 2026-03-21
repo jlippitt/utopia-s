@@ -8,6 +8,11 @@ const frame_timings: std.enums.EnumArray(Mode, [6]u32) = .init(.{
     .step5 = .{ 7457, 7456, 7458, 7458, 7452, 1 },
 });
 
+pub const Frame = enum(u1) {
+    quarter,
+    half,
+};
+
 const Self = @This();
 
 ctrl: Control = .{},
@@ -30,7 +35,7 @@ pub fn setControl(self: *Self, value: u8) void {
     self.delay_cycles = 2 - @as(u32, @intCast(self.getDevice().cycles & 1));
 }
 
-pub fn step(self: *Self) ?Event {
+pub fn step(self: *Self) ?Frame {
     if (self.delay_cycles > 0) {
         @branchHint(.unlikely);
         self.delay_cycles -= 1;
@@ -55,7 +60,7 @@ pub fn step(self: *Self) ?Event {
         return null;
     }
 
-    const event: ?Event = switch (self.frame_number) {
+    const event: ?Frame = switch (self.frame_number) {
         0 => blk: {
             self.frame_number = 1;
             break :blk .quarter;
@@ -122,9 +127,4 @@ const Control = packed struct(u8) {
     __: u6 = 0,
     irq_inhibit: bool = false,
     mode: Mode = .step4,
-};
-
-const Event = enum(u1) {
-    quarter,
-    half,
 };

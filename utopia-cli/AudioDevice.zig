@@ -2,10 +2,10 @@ const std = @import("std");
 const sdl3 = @import("sdl3");
 const utopia = @import("utopia");
 
-const format: sdl3.audio.Format = .signed_16_bit_little_endian;
+const format: sdl3.audio.Format = .floating_32_bit_little_endian;
 const num_channels = 2;
 
-const silence: utopia.Sample = .{ 0, 0 };
+const silence: utopia.Sample = .{ 0.0, 0.0 };
 
 const Self = @This();
 
@@ -66,7 +66,7 @@ pub fn setSampleRate(self: *Self, sample_rate: u32) error{SdlError}!void {
     self.sample_rate = sample_rate;
 }
 
-pub fn queueAudioData(self: *Self, sample_data: []const [2]i16) error{SdlError}!void {
+pub fn queueAudioData(self: *Self, sample_data: []const utopia.Sample) error{SdlError}!void {
     if (sample_data.len == 0) {
         return;
     }
