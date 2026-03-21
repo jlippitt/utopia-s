@@ -74,12 +74,6 @@ pub fn main() !void {
             switch (event) {
                 .quit => break :outer,
                 .window_display_changed => try video.onWindowDisplayChanged(),
-                .key_down => |key| if (key.scancode) |scancode| {
-                    switch (scancode) {
-                        .escape => break :outer,
-                        else => {},
-                    }
-                },
                 .gamepad_button_down => |button| switch (button.button) {
                     inline else => |field| @field(controller_state.button, @tagName(field)) = true,
                 },
@@ -90,6 +84,15 @@ pub fn main() !void {
                     inline else => |field| @field(controller_state.axis, @tagName(field)) =
                         @as(f32, @floatFromInt(axis.value)) /
                         (std.math.maxInt(@TypeOf(axis.value)) + 1),
+                },
+                .key_down => |key| if (key.scancode) |scancode| {
+                    switch (scancode) {
+                        .escape => break :outer,
+                        else => setKeyState(&controller_state, scancode, true),
+                    }
+                },
+                .key_up => |key| if (key.scancode) |scancode| {
+                    setKeyState(&controller_state, scancode, false);
                 },
                 else => {},
             }
@@ -135,5 +138,25 @@ fn sdlError(err: ?[:0]const u8) void {
         std.debug.print("SDL Error: {s}\n", .{err_string});
     } else {
         std.debug.print("SDL Error: Unknown\n", .{});
+    }
+}
+
+fn setKeyState(state: *utopia.ControllerState, key: sdl3.Scancode, pressed: bool) void {
+    const buttons = &state.button;
+
+    const button: ?*bool = switch (key) {
+        .x => &buttons.south,
+        .z => &buttons.west,
+        .space => &buttons.back,
+        .return_key => &buttons.start,
+        .up => &buttons.dpad_up,
+        .down => &buttons.dpad_down,
+        .left => &buttons.dpad_left,
+        .right => &buttons.dpad_right,
+        else => null,
+    };
+
+    if (button) |some_button| {
+        some_button.* = pressed;
     }
 }
