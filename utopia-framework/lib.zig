@@ -10,14 +10,9 @@ pub const processor = @import("./processor.zig");
 
 pub const default_sample_rate = 48000;
 
-pub const CliArgType = union(enum) {
-    positional: void,
-    flag: ?u8,
-};
-
 pub const CliArg = struct {
+    short_name: ?u8,
     desc: []const u8,
-    type: CliArgType,
 };
 
 pub const InitError = std.mem.Allocator.Error ||

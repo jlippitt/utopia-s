@@ -16,25 +16,7 @@ const m_cycle = 4;
 var test_rom_buf: [256]u8 = undefined;
 var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
 
-pub const Args = struct {
-    pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
-        .{
-            "boot-rom-path", fw.CliArg{
-                .desc = "Path to boot ROM",
-                .type = .{ .flag = 'b' },
-            },
-        },
-        .{
-            "rom-path", fw.CliArg{
-                .desc = "Path to ROM file",
-                .type = .{ .positional = {} },
-            },
-        },
-    });
-
-    boot_rom_path: ?[]const u8,
-    rom_path: []const u8,
-};
+pub const Args = struct {};
 
 const Self = @This();
 
@@ -49,23 +31,13 @@ gpu: Gpu,
 rom: []const u8,
 arena: std.heap.ArenaAllocator,
 
-pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
+pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+    _ = args;
+
     var arena = std.heap.ArenaAllocator.init(allocator);
 
-    const rom = try fw.fs.readFileAlloc(
-        arena.allocator(),
-        args.rom_path,
-    );
-
-    const boot_rom_path = args.boot_rom_path orelse {
-        fw.log.err("Running this device without a boot ROM is not yet supported", .{});
-        return error.ArgError;
-    };
-
-    const boot_rom = try fw.fs.readFileAlloc(
-        arena.allocator(),
-        boot_rom_path,
-    );
+    const rom = try vfs.readRom(&arena);
+    const boot_rom = try vfs.readBios(&arena, "dmg_boot.bin");
 
     const wram = try arena.allocator().alloc(u8, wram_size);
     const hram = try arena.allocator().alloc(u8, hram_size);

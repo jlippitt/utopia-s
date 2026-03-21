@@ -21,25 +21,7 @@ const max_rom_size = 1024 * 1024 * 1024; // 1GiB
 const rdram_size = 8 * 1024 * 1024; // 8MiB
 const systest_output_size = 512;
 
-pub const Args = struct {
-    pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
-        .{
-            "pifdata-path", fw.CliArg{
-                .desc = "Path to PIFDATA bios file",
-                .type = .{ .flag = 'p' },
-            },
-        },
-        .{
-            "rom-path", fw.CliArg{
-                .desc = "Path to ROM file",
-                .type = .{ .positional = {} },
-            },
-        },
-    });
-
-    pifdata_path: ?[]const u8,
-    rom_path: []const u8,
-};
+pub const Args = struct {};
 
 const Page = enum {
     rdram_registers,
@@ -98,25 +80,13 @@ arena: std.heap.ArenaAllocator,
 
 // utopia.Device methods
 
-pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
+pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+    _ = args;
+
     var arena = std.heap.ArenaAllocator.init(allocator);
 
-    const rom = try fw.fs.readFileAllocAligned(
-        arena.allocator(),
-        args.rom_path,
-        .@"8",
-    );
-
-    const pifdata_path = args.pifdata_path orelse {
-        fw.log.err("Running this device without a 'pifdata' ROM is not yet supported", .{});
-        return error.ArgError;
-    };
-
-    const pifdata = try fw.fs.readFileAllocAligned(
-        arena.allocator(),
-        pifdata_path,
-        .@"4",
-    );
+    const rom = try vfs.readRomAligned(&arena, .@"8");
+    const pifdata = try vfs.readBiosAligned(&arena, "pifdata.bin", .@"4");
 
     const rdram = try arena.allocator().alignedAlloc(u8, .@"4", rdram_size);
 

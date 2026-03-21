@@ -9,18 +9,7 @@ const Cpu = fw.processor.Mos6502;
 const wram_size = 2048;
 const wram_mask = wram_size - 1;
 
-pub const Args = struct {
-    pub const cli = std.StaticStringMap(fw.CliArg).initComptime(.{
-        .{
-            "rom-path", fw.CliArg{
-                .desc = "Path to ROM file",
-                .type = .{ .positional = {} },
-            },
-        },
-    });
-
-    rom_path: []const u8,
-};
+pub const Args = struct {};
 
 const Self = @This();
 
@@ -34,13 +23,12 @@ apu: Apu,
 cartridge: Cartridge,
 arena: std.heap.ArenaAllocator,
 
-pub fn init(allocator: std.mem.Allocator, args: Args) fw.InitError!fw.Device {
+pub fn init(allocator: std.mem.Allocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+    _ = args;
+
     var arena = std.heap.ArenaAllocator.init(allocator);
 
-    const rom = try fw.fs.readFileAlloc(
-        arena.allocator(),
-        args.rom_path,
-    );
+    const rom = try vfs.readRom(&arena);
 
     const wram = try arena.allocator().alloc(u8, wram_size);
 

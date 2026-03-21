@@ -5,6 +5,7 @@ const cli = @import("./cli.zig");
 const VideoDevice = @import("./VideoDevice.zig");
 const AudioDevice = @import("./AudioDevice.zig");
 const FpsCounter = @import("./FpsCounter.zig");
+const Vfs = @import("./Vfs.zig");
 const logger = @import("./logger.zig");
 
 pub const panic = std.debug.FullPanic(panicHandler);
@@ -31,7 +32,9 @@ pub fn main() !void {
     try sdl3.init(.everything);
     defer sdl3.quit(.everything);
 
-    var device = try device_args.initDevice(allocator);
+    const vfs = Vfs.init(app_args.rom_path, app_args.bios_path);
+
+    var device = try device_args.initDevice(allocator, &vfs);
     defer device.deinit();
 
     var video = try VideoDevice.init(device.getVideoState().resolution);

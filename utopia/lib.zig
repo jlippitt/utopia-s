@@ -4,10 +4,7 @@ const Gb = @import("device-gb");
 const N64 = @import("device-n64");
 const Nes = @import("device-nes");
 
-pub const log = struct {
-    pub const Level = fw.log.Level;
-    pub const Interface = fw.log.Interface;
-};
+pub const log = fw.log;
 
 pub const Device = fw.Device;
 pub const InitError = fw.InitError;
@@ -32,11 +29,11 @@ pub const DeviceArgs = union(DeviceType) {
     n64: N64.Args,
     nes: Nes.Args,
 
-    pub fn initDevice(self: Self, allocator: std.mem.Allocator) InitError!Device {
+    pub fn initDevice(self: Self, allocator: std.mem.Allocator, vfs: anytype) InitError!Device {
         return switch (self) {
-            .gb => |device_args| try Gb.init(allocator, device_args),
-            .n64 => |device_args| try N64.init(allocator, device_args),
-            .nes => |device_args| try Nes.init(allocator, device_args),
+            .gb => |device_args| try Gb.init(allocator, vfs, device_args),
+            .n64 => |device_args| try N64.init(allocator, vfs, device_args),
+            .nes => |device_args| try Nes.init(allocator, vfs, device_args),
         };
     }
 };
