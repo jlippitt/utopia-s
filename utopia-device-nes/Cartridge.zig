@@ -4,6 +4,7 @@ const NROM = @import("./Cartridge/NROM.zig");
 const UxROM = @import("./Cartridge/UxROM.zig");
 const CNROM = @import("./Cartridge/CNROM.zig");
 const AxROM = @import("./Cartridge/AxROM.zig");
+const MMC1 = @import("./Cartridge/MMC1.zig");
 
 const ines_string: []const u8 = &.{ 0x4e, 0x45, 0x53, 0x1a };
 
@@ -97,6 +98,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, O
 
     self.mapper = switch (mapper_number) {
         0 => try NROM.init(arena, &self),
+        1 => try MMC1.init(arena, &self),
         2 => try UxROM.init(arena, &self),
         3 => try CNROM.init(arena, &self),
         7 => try AxROM.init(arena, &self),
@@ -194,6 +196,13 @@ pub fn mapPrgRam(self: *Self, start: u32, len: u32, page_offset: i32) void {
 pub fn mapPrgRegisterWrite(self: *Self, start: u32, len: u32) void {
     for (start..(start + len)) |index| {
         self.prg_write_mapping[index] = .register;
+    }
+}
+
+pub fn unmapPrg(self: *Self, start: u32, len: u32) void {
+    for (start..(start + len)) |index| {
+        self.prg_read_mapping[index] = .open_bus;
+        self.prg_write_mapping[index] = .open_bus;
     }
 }
 

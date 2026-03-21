@@ -1,8 +1,6 @@
 const std = @import("std");
 const Cartridge = @import("../Cartridge.zig");
 
-const prg_rom_bank_size = 4;
-
 const Self = @This();
 
 pub fn init(
@@ -26,6 +24,6 @@ pub fn init(
 pub fn writeRegister(self: *Self, cartridge: *Cartridge, address: u16, value: u8) void {
     _ = self;
     _ = address;
-    cartridge.mapPrgRom(8, 4, @as(i32, value & 0x0f) * prg_rom_bank_size);
+    cartridge.mapPrgRom(8, 4, @as(i32, value & 0x0f) * 4);
     cartridge.printMappings();
 }
