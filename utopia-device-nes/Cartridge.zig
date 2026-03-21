@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const NROM = @import("./Cartridge/NROM.zig");
+const UxROM = @import("./Cartridge/UxROM.zig");
 
 const ines_string: []const u8 = &.{ 0x4e, 0x45, 0x53, 0x1a };
 
@@ -94,6 +95,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, O
 
     self.mapper = switch (mapper_number) {
         0 => try NROM.init(arena, &self),
+        2 => try UxROM.init(arena, &self),
         else => fw.log.unimplemented("INES mapper: {d}", .{mapper_number}),
     };
 
@@ -115,13 +117,13 @@ pub fn readPrg(self: *const Self, address: u16, prev_value: u8) u8 {
     };
 }
 
-pub fn writePrg(self: *const Self, address: u16, value: u8) void {
+pub fn writePrg(self: *Self, address: u16, value: u8) void {
     const page = self.prg_write_mapping[@as(u4, @truncate(address >> 12))];
 
     return switch (page) {
         .rom => fw.log.warn("Write to PRG ROM area: {X:04} <= {X:02}", .{ address, value }),
         .ram => |offset| self.prg_ram[offset | (address & 0x0fff)] = value,
-        .register => fw.log.todo("Mapper register writes", .{}),
+        .register => self.mapper.writeRegister(self, address, value),
         .open_bus => {},
     };
 }
@@ -160,8 +162,11 @@ pub fn writeVram(self: *Self, value: u8) void {
     }
 }
 
-pub fn mapPrgRom(self: *Self, start: u32, len: u32, page_offset: u32) void {
-    var offset = page_offset * prg_page_size;
+pub fn mapPrgRom(self: *Self, start: u32, len: u32, page_offset: i32) void {
+    var offset: u32 = if (page_offset >= 0)
+        @as(u32, @intCast(page_offset)) * prg_page_size
+    else
+        @as(u32, @intCast(self.prg_rom.len)) - (@as(u32, @intCast(-page_offset)) * prg_page_size);
 
     for (start..(start + len)) |index| {
         self.prg_read_mapping[index] = .{ .rom = offset & self.prg_rom_mask };
@@ -169,8 +174,11 @@ pub fn mapPrgRom(self: *Self, start: u32, len: u32, page_offset: u32) void {
     }
 }
 
-pub fn mapPrgRam(self: *Self, start: u32, len: u32, page_offset: u32) void {
-    var offset = page_offset * prg_page_size;
+pub fn mapPrgRam(self: *Self, start: u32, len: u32, page_offset: i32) void {
+    var offset: u32 = if (page_offset >= 0)
+        @as(u32, @intCast(page_offset)) * prg_page_size
+    else
+        @as(u32, @intCast(self.prg_ram.len)) - (@as(u32, @intCast(-page_offset)) * prg_page_size);
 
     for (start..(start + len)) |index| {
         self.prg_read_mapping[index] = .{ .ram = offset & prg_ram_mask };
@@ -179,8 +187,17 @@ pub fn mapPrgRam(self: *Self, start: u32, len: u32, page_offset: u32) void {
     }
 }
 
-pub fn mapChr(self: *Self, start: u32, len: u32, page_offset: u32) void {
-    var offset = page_offset * chr_page_size;
+pub fn mapPrgRegisterWrite(self: *Self, start: u32, len: u32) void {
+    for (start..(start + len)) |index| {
+        self.prg_write_mapping[index] = .register;
+    }
+}
+
+pub fn mapChr(self: *Self, start: u32, len: u32, page_offset: i32) void {
+    var offset: u32 = if (page_offset >= 0)
+        @as(u32, @intCast(page_offset)) * chr_page_size
+    else
+        @as(u32, @intCast(self.chr_data.len)) - (@as(u32, @intCast(-page_offset)) * chr_page_size);
 
     for (start..(start + len)) |index| {
         self.chr_mapping[index] = offset & self.chr_mask;
@@ -230,10 +247,24 @@ pub const Mapper = struct {
             fn deinit(self: *T) void {
                 _ = self;
             }
+
+            fn writeRegister(self: *T, cartridge: *Self, address: u16, value: u8) void {
+                _ = self;
+                _ = cartridge;
+                _ = address;
+                _ = value;
+                fw.log.panic("Register write not implemented for this mapper", .{});
+            }
         };
 
         return struct {
             deinit: *const fn (self: *T) void = defaults.deinit,
+            writeRegister: *const fn (
+                self: *T,
+                cartridge: *Self,
+                address: u16,
+                value: u8,
+            ) void = defaults.writeRegister,
         };
     }
 
@@ -252,8 +283,24 @@ pub const Mapper = struct {
                 return @call(.always_inline, iface.deinit, .{self});
             }
 
+            fn writeRegisterImpl(
+                ptr: *anyopaque,
+                cartridge: *Self,
+                address: u16,
+                value: u8,
+            ) void {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.writeRegister, .{
+                    self,
+                    cartridge,
+                    address,
+                    value,
+                });
+            }
+
             const vtable = Interface(anyopaque){
                 .deinit = deinitImpl,
+                .writeRegister = writeRegisterImpl,
             };
         };
 
@@ -265,5 +312,9 @@ pub const Mapper = struct {
 
     pub fn deinit(self: @This()) void {
         return self.vtable.deinit(self.ptr);
+    }
+
+    pub fn writeRegister(self: @This(), cartridge: *Self, address: u16, value: u8) void {
+        return self.vtable.writeRegister(self.ptr, cartridge, address, value);
     }
 };
