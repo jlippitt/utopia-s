@@ -108,7 +108,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .mi = .init(),
         .vi = vi,
         .ai = ai,
-        .pi = .init(rom),
+        .pi = try .init(arena, vfs, rom),
         .ri = .init(),
         .si = try .init(arena, vfs, cic.getSeed()),
         .systest_output = systest_output[0..systest_output_size],
@@ -164,6 +164,7 @@ pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void
 }
 
 fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    try self.pi.save(allocator, vfs);
     try self.si.save(allocator, vfs);
 }
 
