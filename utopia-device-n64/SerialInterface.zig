@@ -7,6 +7,8 @@ const pif_ram_begin = 0x7c0;
 const pif_ram_size = pif_size - pif_ram_begin;
 const cmd_byte = 0x7ff;
 
+const eeprom_block_size = 8;
+
 const Self = @This();
 
 pifdata: *align(4) [pif_size]u8,
@@ -15,17 +17,32 @@ dram_addr: u24 = 0,
 status: Status = .{},
 controller_state: [4]u8 = @splat(0),
 joybus_program: [64]u8 = @splat(0),
+eeprom: []u8,
+eeprom_dirty: bool = false,
 
-pub fn init(pifdata: []align(4) u8, cic_seed: u32) Self {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, cic_seed: u32) fw.Vfs.Error!Self {
+    const pifdata = try vfs.readBiosAligned(arena.allocator(), "pifdata.bin", .@"4");
+
     // Command byte should be zero at reset
     pifdata[cmd_byte] = 0;
 
     // CIC seed should be present at reset
     fw.mem.writeBe(u32, pifdata, 0x7e4, cic_seed);
 
+    // TODO: Support 16K EEPROM
+    const eeprom = try arena.allocator().alloc(u8, 512);
+    try vfs.readSave(arena.allocator(), "eeprom", eeprom);
+
     return .{
         .pifdata = pifdata[0..pif_size],
+        .eeprom = eeprom,
     };
+}
+
+pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    if (self.eeprom_dirty) {
+        try vfs.writeSave(allocator, "eeprom", self.eeprom);
+    }
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -324,11 +341,29 @@ fn queryJoybus(
             try recv_data.appendBounded(crc8(send_data[3..35]));
         },
         0x04 => {
-            // TODO: EEPROM saves
-            try recv_data.appendSliceBounded(&[1]u8{0} ** 8);
+            fw.log.debug("Joybus Query: EEPROM read", .{});
+
+            const start = @as(usize, send_data[1]) * eeprom_block_size;
+            const end = start + eeprom_block_size;
+
+            const data = if (end < self.eeprom.len)
+                self.eeprom[start..end]
+            else
+                &[1]u8{0} ** 8;
+
+            try recv_data.appendSliceBounded(data);
         },
         0x05 => {
-            // TODO: EEPROM saves
+            fw.log.debug("Joybus Query: EEPROM write", .{});
+
+            const start = @as(usize, send_data[1]) * eeprom_block_size;
+            const end = start + eeprom_block_size;
+
+            if (end < self.eeprom.len) {
+                @memcpy(self.eeprom[start..end], send_data[2..10]);
+                self.eeprom_dirty = true;
+            }
+
             try recv_data.appendBounded(0);
         },
         else => |cmd| fw.log.unimplemented("Joybus command: {X:02}", .{cmd}),

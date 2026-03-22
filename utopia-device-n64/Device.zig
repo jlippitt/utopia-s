@@ -83,8 +83,6 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
     _ = args;
 
     const rom = try vfs.readRomAligned(arena.allocator(), .@"8");
-    const pifdata = try vfs.readBiosAligned(arena.allocator(), "pifdata.bin", .@"4");
-
     const rdram = try arena.allocator().alignedAlloc(u8, .@"4", rdram_size);
 
     const cic = Cic.init(rom[0x0040..0x1000]);
@@ -112,7 +110,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .ai = ai,
         .pi = .init(rom),
         .ri = .init(),
-        .si = .init(pifdata, cic.getSeed()),
+        .si = try .init(arena, vfs, cic.getSeed()),
         .systest_output = systest_output[0..systest_output_size],
     };
 
@@ -166,9 +164,7 @@ pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void
 }
 
 fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
-    _ = self;
-    _ = allocator;
-    _ = vfs;
+    try self.si.save(allocator, vfs);
 }
 
 // CPU methods
