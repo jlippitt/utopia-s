@@ -1,11 +1,16 @@
 const std = @import("std");
 const Device = @import("./Device.zig");
 const fw = @import("framework");
+const Mempak = @import("./SerialInterface/Mempak.zig");
 
 const pif_size = 0x800;
 const pif_ram_begin = 0x7c0;
 const pif_ram_size = pif_size - pif_ram_begin;
 const cmd_byte = 0x7ff;
+
+const mempak_size = 32768;
+const mempak_page_size = 256;
+const mempak_block_size = 32;
 
 const eeprom_block_size = 8;
 
@@ -17,7 +22,8 @@ dram_addr: u24 = 0,
 status: Status = .{},
 controller_state: [4]u8 = @splat(0),
 joybus_program: [64]u8 = @splat(0),
-eeprom: []u8,
+mempak: Mempak,
+eeprom_data: []u8,
 eeprom_dirty: bool = false,
 
 pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, cic_seed: u32) fw.Vfs.Error!Self {
@@ -30,19 +36,25 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, cic_seed: u32) fw.Vfs.
     fw.mem.writeBe(u32, pifdata, 0x7e4, cic_seed);
 
     // TODO: Support 16K EEPROM
-    const eeprom = try arena.allocator().alloc(u8, 512);
-    try vfs.readSave(arena.allocator(), "eeprom", eeprom);
+    const eeprom_data = try arena.allocator().alloc(u8, 512);
+    _ = try vfs.readSave(arena.allocator(), "eeprom", eeprom_data);
 
     return .{
         .pifdata = pifdata[0..pif_size],
-        .eeprom = eeprom,
+        .mempak = try .init(arena, vfs),
+        .eeprom_data = eeprom_data,
     };
 }
 
 pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
-    if (self.eeprom_dirty) {
-        try vfs.writeSave(allocator, "eeprom", self.eeprom);
+    try self.mempak.save(allocator, vfs);
+
+    if (!self.eeprom_dirty) {
+        return;
     }
+
+    try vfs.writeSave(allocator, "eeprom", self.eeprom_data);
+    self.eeprom_dirty = false;
 }
 
 pub fn read(self: *Self, address: u32) u32 {
@@ -203,11 +215,11 @@ fn processPifCommand(self: *Self) void {
         return;
     }
 
-    var result: u8 = 0;
+    var result = cmd;
 
     if ((cmd & 0x01) != 0) {
         @memcpy(&self.joybus_program, self.pifdata[pif_ram_begin..]);
-        fw.log.trace("Joybus configured", .{});
+        fw.log.debug("PIF Joybus Configured", .{});
     }
 
     if ((cmd & 0x02) != 0) {
@@ -243,11 +255,11 @@ fn executeJoybusProgram(self: *Self) void {
             break;
         }
 
-        if ((send_len & 0xc0) != 0) {
+        if ((send_len & 0x80) != 0) {
             continue;
         }
 
-        if (send_len == 0) {
+        if (send_len == 0 or (send_len & 0xc0) != 0) {
             channel += 1;
             continue;
         }
@@ -293,7 +305,7 @@ fn executeJoybusProgram(self: *Self) void {
         channel += 1;
     }
 
-    fw.log.debug("PIF Joybus Input: {any}", .{pif_ram});
+    fw.log.debug("PIF Joybus Output: {any}", .{pif_ram});
 }
 
 fn queryJoybus(
@@ -310,12 +322,13 @@ fn queryJoybus(
 
             switch (channel) {
                 0 => {
-                    // TODO: Controller pak
-                    try recv_data.appendSliceBounded(&.{ 0x05, 0x00, 0x02 });
+                    try recv_data.appendSliceBounded(&.{ 0x05, 0x00, 0x01 });
                 },
-                1, 2, 3 => {}, // TODO: Multiple controller support
+                1, 2, 3 => {
+                    // TODO: Multiple controller support
+                    try recv_data.appendSliceBounded(&.{ 0x00, 0x00, 0x00 });
+                },
                 4 => {
-                    // TODO: EEPROM saves
                     // For now, always report 4KiB of EEPROM
                     try recv_data.appendSliceBounded(&.{ 0x00, 0x80, 0x00 });
                 },
@@ -331,36 +344,45 @@ fn queryJoybus(
                 else => fw.log.panic("Invalid joybus channel: {}", .{channel}),
             }
         },
-        0x03 => {
-            fw.log.debug("Joybus Query: Write Controller Accessor ({})", .{channel});
+        0x02 => {
+            fw.log.debug("Joybus Query: Read Controller Accessory ({})", .{channel});
 
             if (channel >= 4) {
                 fw.log.panic("Invalid joybus channel: {}", .{channel});
             }
 
-            try recv_data.appendBounded(crc8(send_data[3..35]));
+            try self.mempak.read(channel, &recv_data, send_data);
+        },
+        0x03 => {
+            fw.log.debug("Joybus Query: Write Controller Accessory ({})", .{channel});
+
+            if (channel >= 4) {
+                fw.log.panic("Invalid joybus channel: {}", .{channel});
+            }
+
+            try self.mempak.write(channel, &recv_data, send_data);
         },
         0x04 => {
-            fw.log.debug("Joybus Query: EEPROM read", .{});
+            fw.log.debug("Joybus Query: Read EEPROM", .{});
 
             const start = @as(usize, send_data[1]) * eeprom_block_size;
             const end = start + eeprom_block_size;
 
-            const data = if (end < self.eeprom.len)
-                self.eeprom[start..end]
+            const data = if (end < self.eeprom_data.len)
+                self.eeprom_data[start..][0..eeprom_block_size]
             else
-                &[1]u8{0} ** 8;
+                &[1]u8{0} ** eeprom_block_size;
 
             try recv_data.appendSliceBounded(data);
         },
         0x05 => {
-            fw.log.debug("Joybus Query: EEPROM write", .{});
+            fw.log.debug("Joybus Query: Write EEPROM", .{});
 
             const start = @as(usize, send_data[1]) * eeprom_block_size;
-            const end = start + eeprom_block_size;
+            const data = send_data[2..][0..eeprom_block_size];
 
-            if (end < self.eeprom.len) {
-                @memcpy(self.eeprom[start..end], send_data[2..10]);
+            if (start < self.eeprom_data.len) {
+                @memcpy(self.eeprom_data[start..][0..eeprom_block_size], data);
                 self.eeprom_dirty = true;
             }
 
@@ -370,26 +392,6 @@ fn queryJoybus(
     }
 
     return recv_data.items;
-}
-
-fn crc8(data: []const u8) u8 {
-    var result: u8 = 0;
-
-    for (data, 0..) |byte, index| {
-        for (0..8) |bit| {
-            const xor_tap: u8 = if ((result & 0x80) != 0) 0x85 else 0;
-
-            result <<= 1;
-
-            if (index < data.len and (byte & (@as(u8, 0x80) >> @intCast(bit))) != 0) {
-                result |= 1;
-            }
-
-            result ^= xor_tap;
-        }
-    }
-
-    return result;
 }
 
 const Status = packed struct(u32) {

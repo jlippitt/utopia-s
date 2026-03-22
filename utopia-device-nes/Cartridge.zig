@@ -93,7 +93,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs) InitError!Self {
     fw.log.debug("Battery Backed Save: {}", .{prg_ram_save});
 
     if (prg_ram_save) {
-        try vfs.readSave(arena.allocator(), null, prg_ram);
+        _ = try vfs.readSave(arena.allocator(), null, prg_ram);
     }
 
     const ci_ram = try arena.allocator().alloc(u8, ci_ram_size);

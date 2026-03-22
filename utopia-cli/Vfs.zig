@@ -60,17 +60,19 @@ pub fn readSave(
     allocator: std.mem.Allocator,
     save_type: ?[]const u8,
     data: []u8,
-) utopia.Vfs.Error!void {
+) utopia.Vfs.Error!usize {
     const path = try self.getSaveFilePath(allocator, save_type);
     defer allocator.free(path);
 
-    _ = std.fs.cwd().readFile(path, data) catch |err| switch (err) {
-        error.FileNotFound => {},
+    const bytes_read = std.fs.cwd().readFile(path, data) catch |err| switch (err) {
+        error.FileNotFound => &.{},
         else => {
             utopia.log.err("Failed to read file '{s}': {t}", .{ path, err });
             return error.VfsError;
         },
     };
+
+    return bytes_read.len;
 }
 
 pub fn writeSave(

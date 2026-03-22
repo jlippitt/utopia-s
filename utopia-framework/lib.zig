@@ -200,7 +200,7 @@ pub const Vfs = struct {
                 allocator: std.mem.Allocator,
                 save_type: ?[]const u8,
                 data: []u8,
-            ) Error!void,
+            ) Error!usize,
             writeSave: *const fn (
                 self: *T,
                 allocator: std.mem.Allocator,
@@ -260,7 +260,7 @@ pub const Vfs = struct {
                 allocator: std.mem.Allocator,
                 save_type: ?[]const u8,
                 data: []u8,
-            ) Error!void {
+            ) Error!usize {
                 const self: *T = @ptrCast(@alignCast(ptr));
                 return @call(.always_inline, iface.readSave, .{
                     self,
@@ -334,7 +334,7 @@ pub const Vfs = struct {
         allocator: std.mem.Allocator,
         save_type: ?[]const u8,
         data: []u8,
-    ) Error!void {
+    ) Error!usize {
         return self.vtable.readSave(self.ptr, allocator, save_type, data);
     }
 

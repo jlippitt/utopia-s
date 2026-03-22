@@ -21,7 +21,7 @@ pub fn init(
     rom: []align(8) const u8,
 ) fw.Vfs.Error!Self {
     const sram = try arena.allocator().alignedAlloc(u8, .@"4", sram_size);
-    try vfs.readSave(arena.allocator(), "sram", sram);
+    _ = try vfs.readSave(arena.allocator(), "sram", sram);
 
     return .{
         .rom = rom,
@@ -30,9 +30,12 @@ pub fn init(
 }
 
 pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
-    if (self.sram_dirty) {
-        try vfs.writeSave(allocator, "sram", self.sram);
+    if (!self.sram_dirty) {
+        return;
     }
+
+    try vfs.writeSave(allocator, "sram", self.sram);
+    self.sram_dirty = false;
 }
 
 pub fn read(self: *Self, address: u32) u32 {
