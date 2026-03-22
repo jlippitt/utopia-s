@@ -31,11 +31,11 @@ hram: *[hram_size]u8,
 gpu: Gpu,
 rom: []const u8,
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    const rom = try vfs.readRom(arena);
-    const boot_rom = try vfs.readBios(arena, "dmg_boot.bin");
+    const rom = try vfs.readRom(arena.allocator());
+    const boot_rom = try vfs.readBios(arena.allocator(), "dmg_boot.bin");
 
     const wram = try arena.allocator().alloc(u8, wram_size);
     const hram = try arena.allocator().alloc(u8, hram_size);
@@ -58,6 +58,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .getVideoState = getVideoState,
         .getAudioState = getAudioState,
         .updateControllerState = updateControllerState,
+        .save = save,
     });
 }
 
@@ -104,6 +105,12 @@ fn getAudioState(self: *const Self) fw.AudioState {
 fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     _ = self;
     _ = state;
+}
+
+fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    _ = self;
+    _ = allocator;
+    _ = vfs;
 }
 
 fn idle(cpu: *Cpu) void {

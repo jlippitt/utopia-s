@@ -13,13 +13,10 @@ pub const CliArg = struct {
     desc: []const u8,
 };
 
-pub const InitError = std.mem.Allocator.Error ||
-    std.fs.File.OpenError ||
-    std.fs.File.ReadError ||
-    error{
-        ArgError,
-        SdlError,
-    };
+pub const InitError = Vfs.Error || error{
+    ArgError,
+    SdlError,
+};
 
 pub const Resolution = struct {
     x: u32,
@@ -92,6 +89,7 @@ pub const Device = struct {
             getVideoState: *const fn (self: *const T) VideoState,
             getAudioState: *const fn (self: *const T) AudioState,
             updateControllerState: *const fn (self: *T, state: *const ControllerState) void,
+            save: *const fn (self: *T, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void,
         };
     }
 
@@ -132,12 +130,18 @@ pub const Device = struct {
                 return @call(.always_inline, iface.updateControllerState, .{ self, state });
             }
 
+            fn saveImpl(ptr: *anyopaque, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.save, .{ self, allocator, vfs });
+            }
+
             const vtable = Interface(anyopaque){
                 .deinit = deinitImpl,
                 .runFrame = runFrameImpl,
                 .getVideoState = getVideoStateImpl,
                 .getAudioState = getAudioStateImpl,
                 .updateControllerState = updateControllerStateImpl,
+                .save = saveImpl,
             };
         };
 
@@ -165,5 +169,181 @@ pub const Device = struct {
 
     pub fn updateControllerState(self: *Self, state: *const ControllerState) void {
         return self.vtable.updateControllerState(self.ptr, state);
+    }
+
+    pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void {
+        return self.vtable.save(self.ptr, allocator, vfs);
+    }
+};
+
+pub const Vfs = struct {
+    pub const Error = std.mem.Allocator.Error || error{
+        VfsError,
+    };
+
+    pub fn Interface(comptime T: type) type {
+        return struct {
+            deinit: *const fn (self: *T, allocator: std.mem.Allocator) void,
+            readRom: *const fn (
+                self: *T,
+                allocator: std.mem.Allocator,
+                alignment: std.mem.Alignment,
+            ) Error![]u8,
+            readBios: *const fn (
+                self: *T,
+                allocator: std.mem.Allocator,
+                file_name: []const u8,
+                alignment: std.mem.Alignment,
+            ) Error![]u8,
+            readSave: *const fn (
+                self: *T,
+                allocator: std.mem.Allocator,
+                save_type: ?[]const u8,
+                data: []u8,
+            ) Error!void,
+            writeSave: *const fn (
+                self: *T,
+                allocator: std.mem.Allocator,
+                save_type: ?[]const u8,
+                data: []const u8,
+            ) Error!void,
+        };
+    }
+
+    const Self = @This();
+
+    ptr: *anyopaque,
+    vtable: *const Interface(anyopaque),
+
+    pub fn init(
+        inner: anytype,
+        comptime iface: Interface(@typeInfo(@TypeOf(inner)).pointer.child),
+    ) Self {
+        const T = @typeInfo(@TypeOf(inner)).pointer.child;
+
+        const gen = struct {
+            fn deinitImpl(ptr: *anyopaque, allocator: std.mem.Allocator) void {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.deinit, .{ self, allocator });
+            }
+
+            fn readRomImpl(
+                ptr: *anyopaque,
+                allocator: std.mem.Allocator,
+                alignment: std.mem.Alignment,
+            ) Error![]u8 {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.readRom, .{
+                    self,
+                    allocator,
+                    alignment,
+                });
+            }
+
+            fn readBiosImpl(
+                ptr: *anyopaque,
+                allocator: std.mem.Allocator,
+                file_name: []const u8,
+                alignment: std.mem.Alignment,
+            ) Error![]u8 {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.readBios, .{
+                    self,
+                    allocator,
+                    file_name,
+                    alignment,
+                });
+            }
+
+            fn readSaveImpl(
+                ptr: *anyopaque,
+                allocator: std.mem.Allocator,
+                save_type: ?[]const u8,
+                data: []u8,
+            ) Error!void {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.readSave, .{
+                    self,
+                    allocator,
+                    save_type,
+                    data,
+                });
+            }
+
+            fn writeSaveImpl(
+                ptr: *anyopaque,
+                allocator: std.mem.Allocator,
+                save_type: ?[]const u8,
+                data: []const u8,
+            ) Error!void {
+                const self: *T = @ptrCast(@alignCast(ptr));
+                return @call(.always_inline, iface.writeSave, .{
+                    self,
+                    allocator,
+                    save_type,
+                    data,
+                });
+            }
+
+            const vtable = Interface(anyopaque){
+                .deinit = deinitImpl,
+                .readRom = readRomImpl,
+                .readBios = readBiosImpl,
+                .readSave = readSaveImpl,
+                .writeSave = writeSaveImpl,
+            };
+        };
+
+        return .{
+            .ptr = inner,
+            .vtable = &gen.vtable,
+        };
+    }
+
+    pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+        return self.vtable.deinit(self.ptr, allocator);
+    }
+
+    pub fn readRom(self: Self, allocator: std.mem.Allocator) Error![]u8 {
+        return self.vtable.readRom(self.ptr, allocator, .of(u8));
+    }
+
+    pub fn readRomAligned(
+        self: Self,
+        allocator: std.mem.Allocator,
+        comptime alignment: std.mem.Alignment,
+    ) Error![]align(alignment.toByteUnits()) u8 {
+        return @alignCast(try self.vtable.readRom(self.ptr, allocator, alignment));
+    }
+
+    pub fn readBios(self: Self, allocator: std.mem.Allocator, file_name: []const u8) Error![]u8 {
+        return self.vtable.readBios(self.ptr, allocator, file_name, .of(u8));
+    }
+
+    pub fn readBiosAligned(
+        self: Self,
+        allocator: std.mem.Allocator,
+        file_name: []const u8,
+        comptime alignment: std.mem.Alignment,
+    ) Error![]align(alignment.toByteUnits()) u8 {
+        return @alignCast(try self.vtable.readBios(self.ptr, allocator, file_name, alignment));
+    }
+
+    pub fn readSave(
+        self: Self,
+        allocator: std.mem.Allocator,
+        save_type: ?[]const u8,
+        data: []u8,
+    ) Error!void {
+        return self.vtable.readSave(self.ptr, allocator, save_type, data);
+    }
+
+    pub fn writeSave(
+        self: Self,
+        allocator: std.mem.Allocator,
+        save_type: ?[]const u8,
+        data: []const u8,
+    ) Error!void {
+        return self.vtable.writeSave(self.ptr, allocator, save_type, data);
     }
 };

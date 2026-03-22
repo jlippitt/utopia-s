@@ -24,6 +24,10 @@ const chr_page_size = 1024;
 var test_rom_buf: [256]u8 = undefined;
 var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
 
+const InitError = fw.Vfs.Error || error{
+    ArgError,
+};
+
 const Self = @This();
 
 prg_read_mapping: [16]PrgMapping = @splat(.open_bus),
@@ -31,6 +35,8 @@ prg_write_mapping: [16]PrgMapping = @splat(.open_bus),
 prg_rom: []const u8,
 prg_rom_mask: u32,
 prg_ram: []u8,
+prg_ram_save: bool = false,
+prg_ram_dirty: bool = false,
 vram_address: u15 = 0,
 chr_mapping: [8]u32 = @splat(0),
 chr_data: []u8,
@@ -40,7 +46,9 @@ name_mapping: [4]NameMapping,
 ci_ram: *[ci_ram_size]u8,
 mapper: Mapper,
 
-pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, OutOfMemory }!Self {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs) InitError!Self {
+    const rom = try vfs.readRom(arena.allocator());
+
     if (!std.mem.eql(u8, ines_string, rom[0..4])) {
         fw.log.panic("Not a valid INES ROM", .{});
     }
@@ -80,12 +88,21 @@ pub fn init(arena: *std.heap.ArenaAllocator, rom: []const u8) error{ ArgError, O
     };
 
     const prg_ram = try arena.allocator().alloc(u8, prg_ram_size);
+
+    const prg_ram_save = fw.num.bit(rom[6], 1);
+    fw.log.debug("Battery Backed Save: {}", .{prg_ram_save});
+
+    if (prg_ram_save) {
+        try vfs.readSave(arena.allocator(), null, prg_ram);
+    }
+
     const ci_ram = try arena.allocator().alloc(u8, ci_ram_size);
 
     var self: Self = .{
         .prg_rom = prg_rom,
         .prg_rom_mask = prg_rom_mask,
         .prg_ram = prg_ram,
+        .prg_ram_save = prg_ram_save,
         .chr_data = chr_data,
         .chr_mask = chr_mask,
         .chr_writable = chr_writable,
@@ -112,6 +129,15 @@ pub fn deinit(self: *Self) void {
     self.mapper.deinit();
 }
 
+pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    if (!self.prg_ram_save or !self.prg_ram_dirty) {
+        return;
+    }
+
+    try vfs.writeSave(allocator, null, self.prg_ram);
+    self.prg_ram_dirty = false;
+}
+
 pub fn readPrg(self: *const Self, address: u16, prev_value: u8) u8 {
     const page = self.prg_read_mapping[@as(u4, @truncate(address >> 12))];
 
@@ -128,7 +154,10 @@ pub fn writePrg(self: *Self, address: u16, value: u8) void {
 
     return switch (page) {
         .rom => fw.log.warn("Write to PRG ROM area: {X:04} <= {X:02}", .{ address, value }),
-        .ram => |offset| self.prg_ram[offset | (address & 0x0fff)] = value,
+        .ram => |offset| {
+            self.prg_ram[offset | (address & 0x0fff)] = value;
+            self.prg_ram_dirty = true;
+        },
         .register => self.mapper.writeRegister(self, address, value),
         .open_bus => {},
     };

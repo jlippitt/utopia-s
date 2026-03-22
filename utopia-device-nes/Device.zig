@@ -27,10 +27,9 @@ apu: Apu,
 joypad: Joypad,
 cartridge: Cartridge,
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    const rom = try vfs.readRom(arena);
     const wram = try arena.allocator().alloc(u8, wram_size);
 
     const self = try arena.allocator().create(Self);
@@ -42,7 +41,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .ppu = try .init(arena),
         .apu = try .init(arena),
         .joypad = .init(),
-        .cartridge = try .init(arena, rom),
+        .cartridge = try .init(arena, vfs),
     };
 
     return .init(self, .{
@@ -51,6 +50,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .getVideoState = getVideoState,
         .getAudioState = getAudioState,
         .updateControllerState = updateControllerState,
+        .save = save,
     });
 }
 
@@ -82,6 +82,10 @@ fn getAudioState(self: *const Self) fw.AudioState {
 
 fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     self.joypad.update(state);
+}
+
+fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    try self.cartridge.save(allocator, vfs);
 }
 
 fn read(cpu: *Cpu, address: u16) u8 {

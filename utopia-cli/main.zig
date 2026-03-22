@@ -32,12 +32,18 @@ pub fn main() !void {
     try sdl3.init(.everything);
     defer sdl3.quit(.everything);
 
-    const vfs = Vfs.init(app_args.rom_path, app_args.bios_path);
+    const vfs = try Vfs.init(
+        allocator,
+        app_args.rom_path,
+        app_args.bios_path,
+        app_args.save_path,
+    );
+    defer vfs.deinit(allocator);
 
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    var device = try device_args.initDevice(&arena, &vfs);
+    var device = try device_args.initDevice(&arena, vfs);
     defer device.deinit();
 
     var video = try VideoDevice.init(device.getVideoState().resolution);
@@ -67,6 +73,7 @@ pub fn main() !void {
 
     var fps_counter = try FpsCounter.init();
     var timer = try std.time.Timer.start();
+    var last_save_time = std.time.timestamp();
     var delay_time: i64 = 0;
 
     outer: while (true) {
@@ -124,8 +131,19 @@ pub fn main() !void {
             }
         }
 
+        {
+            const now = std.time.timestamp();
+
+            if ((now - last_save_time) >= app_args.save_interval) {
+                try device.save(allocator, vfs);
+                last_save_time = now;
+            }
+        }
+
         try video.setFps(fps_counter.update());
     }
+
+    try device.save(allocator, vfs);
 }
 
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {

@@ -7,6 +7,7 @@ const Nes = @import("device-nes");
 pub const log = fw.log;
 
 pub const Device = fw.Device;
+pub const Vfs = fw.Vfs;
 pub const InitError = fw.InitError;
 pub const Resolution = fw.Resolution;
 pub const VideoState = fw.VideoState;
@@ -29,7 +30,7 @@ pub const DeviceArgs = union(DeviceType) {
     n64: N64.Args,
     nes: Nes.Args,
 
-    pub fn initDevice(self: Self, arena: *std.heap.ArenaAllocator, vfs: anytype) InitError!Device {
+    pub fn initDevice(self: Self, arena: *std.heap.ArenaAllocator, vfs: Vfs) InitError!Device {
         return switch (self) {
             .gb => |device_args| try Gb.init(arena, vfs, device_args),
             .n64 => |device_args| try N64.init(arena, vfs, device_args),

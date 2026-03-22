@@ -2,9 +2,13 @@ const std = @import("std");
 const clap = @import("clap");
 const utopia = @import("utopia");
 
+const default_save_interval = 30;
+
 const AppArgs = struct {
     rom_path: []const u8,
     bios_path: ?[]const u8,
+    save_path: ?[]const u8,
+    save_interval: u32,
     no_fps_limit: bool,
 };
 
@@ -12,12 +16,15 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
     const parsers = .{
         .device = clap.parsers.enumeration(utopia.DeviceType),
         .path = clap.parsers.string,
+        .seconds = clap.parsers.int(u32, 10),
     };
 
     const params = comptime clap.parseParamsComptime(
-        \\-b, --bios-path <path> Path to BIOS ROM files
-        \\-n, --no-fps-limit     Disable FPS limiter (also disables audio)
-        \\-h, --help             Display this help and exit
+        \\-b, --bios-path <path>        Path to BIOS files
+        \\-s, --save-path <path>        Path to save files
+        \\-i, --save-interval <seconds> How often save data is synced to filesystem
+        \\-n, --no-fps-limit            Disable FPS limiter (also disables audio)
+        \\-h, --help                    Display this help and exit
         \\<device>
         \\
     );
@@ -61,6 +68,8 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
     const app_args: AppArgs = .{
         .rom_path = rom_path,
         .bios_path = res.args.@"bios-path",
+        .save_path = res.args.@"save-path",
+        .save_interval = res.args.@"save-interval" orelse default_save_interval,
         .no_fps_limit = res.args.@"no-fps-limit" != 0,
     };
 

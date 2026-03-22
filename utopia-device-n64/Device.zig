@@ -79,11 +79,11 @@ systest_output: *[systest_output_size]u8,
 
 // utopia.Device methods
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitError!fw.Device {
+pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    const rom = try vfs.readRomAligned(arena, .@"8");
-    const pifdata = try vfs.readBiosAligned(arena, "pifdata.bin", .@"4");
+    const rom = try vfs.readRomAligned(arena.allocator(), .@"8");
+    const pifdata = try vfs.readBiosAligned(arena.allocator(), "pifdata.bin", .@"4");
 
     const rdram = try arena.allocator().alignedAlloc(u8, .@"4", rdram_size);
 
@@ -122,6 +122,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: anytype, args: Args) fw.InitEr
         .getVideoState = getVideoState,
         .getAudioState = getAudioState,
         .updateControllerState = updateControllerState,
+        .save = save,
     });
 }
 
@@ -162,6 +163,12 @@ pub fn getAudioState(self: *const Self) fw.AudioState {
 
 pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     self.si.updateControllerState(state);
+}
+
+fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    _ = self;
+    _ = allocator;
+    _ = vfs;
 }
 
 // CPU methods
