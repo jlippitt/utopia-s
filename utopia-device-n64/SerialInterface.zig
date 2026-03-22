@@ -8,10 +8,6 @@ const pif_ram_begin = 0x7c0;
 const pif_ram_size = pif_size - pif_ram_begin;
 const cmd_byte = 0x7ff;
 
-const mempak_size = 32768;
-const mempak_page_size = 256;
-const mempak_block_size = 32;
-
 const eeprom_block_size = 8;
 
 const Self = @This();
