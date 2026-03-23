@@ -9,6 +9,9 @@ const dots_per_line = 456;
 const vblank_line = 144;
 const total_lines = 154;
 
+const vram_size = 8192;
+const vram_mask = vram_size - 1;
+
 const Self = @This();
 
 ctrl: Control = .{},
@@ -21,9 +24,14 @@ obj_palette: [2]u8 = @splat(0),
 window_y: u8 = 0,
 window_x: u8 = 0,
 dot: u32 = 0,
+vram: *[vram_size]u8,
 
-pub fn init() Self {
-    return .{};
+pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    const vram = try arena.allocator().alloc(u8, vram_size);
+
+    return .{
+        .vram = vram[0..vram_size],
+    };
 }
 
 pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -94,6 +102,14 @@ pub fn write(self: *Self, address: u8, value: u8) void {
         },
         else => fw.log.todo("GPU register write: {X:02}", .{address}),
     }
+}
+
+pub fn readVram(self: *Self, address: u16) u8 {
+    return self.vram[address & vram_mask];
+}
+
+pub fn writeVram(self: *Self, address: u16, value: u8) void {
+    self.vram[address & vram_mask] = value;
 }
 
 pub fn step(self: *Self, cycles: u64) void {

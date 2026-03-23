@@ -48,7 +48,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .boot_rom = boot_rom[0..boot_rom_size],
         .wram = wram[0..wram_size],
         .hram = hram[0..hram_size],
-        .gpu = .init(),
+        .gpu = try .init(arena),
         .rom = rom,
     };
 
@@ -135,7 +135,7 @@ fn read(cpu: *Cpu, address: u16) u8 {
     }
 
     if (address < 0xa000) {
-        fw.log.todo("VRAM reads", .{});
+        return self.gpu.readVram(address);
     }
 
     if (address < 0xc000) {
@@ -167,7 +167,7 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
     }
 
     if (address < 0xa000) {
-        fw.log.trace("TODO: VRAM writes", .{});
+        self.gpu.writeVram(address, value);
         return;
     }
 
