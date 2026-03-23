@@ -98,6 +98,7 @@ pub fn main() !void {
                 .key_down => |key| if (key.scancode) |scancode| {
                     switch (scancode) {
                         .escape => break :outer,
+                        .func11 => try video.toggleFullScreen(),
                         else => setKeyState(&controller_state, scancode, true),
                     }
                 },
