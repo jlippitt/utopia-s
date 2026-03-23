@@ -23,8 +23,14 @@ pub const Resolution = struct {
     y: u32,
 };
 
+pub const ScaleMode = enum(u1) {
+    integer,
+    float,
+};
+
 pub const VideoState = struct {
     resolution: Resolution,
+    scale_mode: ScaleMode,
     pixel_data: []const u8,
 };
 

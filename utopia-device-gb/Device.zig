@@ -89,6 +89,7 @@ fn getVideoState(self: *const Self) fw.VideoState {
 
     return .{
         .resolution = .{ .x = width, .y = height },
+        .scale_mode = .integer,
         .pixel_data = &[1]u8{0} ** (width * height * 4),
     };
 }

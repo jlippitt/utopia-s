@@ -9,12 +9,17 @@ const Self = @This();
 window: sdl3.video.Window,
 renderer: sdl3.render.Renderer,
 texture: sdl3.render.Texture,
-resolution: utopia.Resolution,
 dst_rect: sdl3.rect.FRect,
+resolution: utopia.Resolution,
+scale_mode: utopia.ScaleMode,
 full_screen: bool,
 
-pub fn init(resolution: utopia.Resolution, full_screen: bool) error{SdlError}!Self {
-    const init_size = try getBestSize(resolution, null, full_screen);
+pub fn init(
+    resolution: utopia.Resolution,
+    scale_mode: utopia.ScaleMode,
+    full_screen: bool,
+) error{SdlError}!Self {
+    const init_size = try getBestSize(resolution, scale_mode, null, full_screen);
 
     const window = try sdl3.video.Window.init(app_name, init_size.w, init_size.h, .{
         .fullscreen = full_screen,
@@ -30,6 +35,7 @@ pub fn init(resolution: utopia.Resolution, full_screen: bool) error{SdlError}!Se
     const dst_rect = try resizeWindow(
         window,
         resolution,
+        scale_mode,
         full_screen,
     );
 
@@ -37,8 +43,9 @@ pub fn init(resolution: utopia.Resolution, full_screen: bool) error{SdlError}!Se
         .window = window,
         .renderer = renderer,
         .texture = texture,
-        .resolution = resolution,
         .dst_rect = dst_rect,
+        .resolution = resolution,
+        .scale_mode = scale_mode,
         .full_screen = full_screen,
     };
 }
@@ -50,21 +57,45 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn onWindowDisplayChanged(self: *Self) error{SdlError}!void {
-    self.dst_rect = try resizeWindow(self.window, self.resolution, self.full_screen);
+    self.dst_rect = try resizeWindow(
+        self.window,
+        self.resolution,
+        self.scale_mode,
+        self.full_screen,
+    );
 }
 
 pub fn toggleFullScreen(self: *Self) error{SdlError}!void {
     self.full_screen = !self.full_screen;
+
     try self.window.setFullscreen(self.full_screen);
-    self.dst_rect = try resizeWindow(self.window, self.resolution, self.full_screen);
+
+    self.dst_rect = try resizeWindow(
+        self.window,
+        self.resolution,
+        self.scale_mode,
+        self.full_screen,
+    );
 }
 
-pub fn setResolution(self: *Self, resolution: utopia.Resolution) error{SdlError}!void {
-    if (resolution.x == self.resolution.x and resolution.y == self.resolution.y) {
+pub fn setResolution(
+    self: *Self,
+    resolution: utopia.Resolution,
+    scale_mode: utopia.ScaleMode,
+) error{SdlError}!void {
+    if (resolution.x == self.resolution.x and
+        resolution.y == self.resolution.y and
+        scale_mode == self.scale_mode)
+    {
         return;
     }
 
-    self.dst_rect = try resizeWindow(self.window, resolution, self.full_screen);
+    self.dst_rect = try resizeWindow(
+        self.window,
+        resolution,
+        self.scale_mode,
+        self.full_screen,
+    );
 
     self.texture.deinit();
     self.texture = try createTexture(self.renderer, resolution);
@@ -99,10 +130,11 @@ fn createTexture(
 fn resizeWindow(
     window: sdl3.video.Window,
     src_size: utopia.Resolution,
+    scale_mode: utopia.ScaleMode,
     full_screen: bool,
 ) error{SdlError}!sdl3.rect.FRect {
     const display = try window.getDisplayForWindow();
-    const dst_rect = try getBestSize(src_size, display, full_screen);
+    const dst_rect = try getBestSize(src_size, scale_mode, display, full_screen);
 
     if (!full_screen) {
         try window.setSize(dst_rect.w, dst_rect.h);
@@ -114,6 +146,7 @@ fn resizeWindow(
 
 fn getBestSize(
     min_size: utopia.Resolution,
+    scale_mode: utopia.ScaleMode,
     active_display: ?sdl3.video.Display,
     full_screen: bool,
 ) !sdl3.rect.Rect(u32) {
@@ -129,13 +162,30 @@ fn getBestSize(
         .y = @intCast(bounds.h),
     };
 
-    const x_scale = max_size.x / min_size.x;
-    const y_scale = max_size.y / min_size.y;
-    const scale = @min(x_scale, y_scale);
+    const dst_size: utopia.Resolution = switch (scale_mode) {
+        .integer => blk: {
+            const x_scale = max_size.x / min_size.x;
+            const y_scale = max_size.y / min_size.y;
+            const scale = @min(x_scale, y_scale);
 
-    const dst_size: utopia.Resolution = .{
-        .x = min_size.x * scale,
-        .y = min_size.y * scale,
+            break :blk .{
+                .x = min_size.x * scale,
+                .y = min_size.y * scale,
+            };
+        },
+        .float => blk: {
+            const min_size_x_f32: f32 = @floatFromInt(min_size.x);
+            const min_size_y_f32: f32 = @floatFromInt(min_size.y);
+
+            const x_scale = @as(f32, @floatFromInt(max_size.x)) / min_size_x_f32;
+            const y_scale = @as(f32, @floatFromInt(max_size.y)) / min_size_y_f32;
+            const scale = @min(x_scale, y_scale);
+
+            break :blk .{
+                .x = @intFromFloat(min_size_x_f32 * scale),
+                .y = @intFromFloat(min_size_y_f32 * scale),
+            };
+        },
     };
 
     const dst_rect: sdl3.rect.Rect(u32) = if (full_screen)

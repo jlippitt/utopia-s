@@ -49,6 +49,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, clock: *Clock) !Self {
 pub fn getVideoState(self: *const Self) fw.VideoState {
     return .{
         .resolution = self.resolution,
+        .scale_mode = .float,
         .pixel_data = self.pixels,
     };
 }

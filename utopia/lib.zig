@@ -10,6 +10,7 @@ pub const Device = fw.Device;
 pub const Vfs = fw.Vfs;
 pub const InitError = fw.InitError;
 pub const Resolution = fw.Resolution;
+pub const ScaleMode = fw.ScaleMode;
 pub const VideoState = fw.VideoState;
 pub const Sample = fw.Sample;
 pub const AudioState = fw.AudioState;

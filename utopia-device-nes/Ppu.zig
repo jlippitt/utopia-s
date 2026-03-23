@@ -56,6 +56,7 @@ pub fn format(self: *const @This(), writer: *std.Io.Writer) std.Io.Writer.Error!
 pub fn getVideoState(self: *const Self) fw.VideoState {
     return .{
         .resolution = .{ .x = width, .y = clipped_height },
+        .scale_mode = .integer,
         .pixel_data = self.pixels[(width * overscan * 4)..][0..(width * clipped_height * 4)],
     };
 }
