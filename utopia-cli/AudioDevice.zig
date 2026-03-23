@@ -12,6 +12,7 @@ const Self = @This();
 stream: sdl3.audio.Stream,
 sample_rate: u32,
 last_sample: utopia.Sample = silence,
+lost_sample_count: u64 = 0,
 
 pub fn init(sample_rate: u32) error{SdlError}!Self {
     const device = sdl3.audio.Device.default_playback;
@@ -25,8 +26,8 @@ pub fn init(sample_rate: u32) error{SdlError}!Self {
     const stream = try device.openStream(spec, void, null, null);
     errdefer stream.deinit();
 
-    // Add approx 50ms of silence at the start of the queue to help reduce popping
-    for (0..(sample_rate / 20)) |_| {
+    // Add approx 100ms of silence at the start of the queue to help reduce popping
+    for (0..(sample_rate / 10)) |_| {
         try stream.putData(@ptrCast(&silence));
     }
 
@@ -41,7 +42,7 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn play(self: *Self) error{SdlError}!void {
-    self.stream.setGetCallback(utopia.Sample, getCallback, &self.last_sample);
+    self.stream.setGetCallback(Self, getCallback, self);
     try self.stream.resumeDevice();
 }
 
@@ -75,19 +76,29 @@ pub fn queueAudioData(self: *Self, sample_data: []const utopia.Sample) error{Sdl
     self.last_sample = sample_data[sample_data.len - 1];
 }
 
+pub fn pollLostSamples(self: *Self) u64 {
+    const result = self.lost_sample_count;
+    self.lost_sample_count = 0;
+    return result;
+}
+
 fn getCallback(
-    last_sample: ?*utopia.Sample,
+    user_data: ?*Self,
     stream: sdl3.audio.Stream,
     additional_amount: usize,
     total_amount: usize,
 ) void {
     _ = total_amount;
 
+    var self = user_data.?;
+
     std.debug.assert((additional_amount % 4) == 0);
 
     for (0..(additional_amount / 4)) |_| {
-        stream.putData(@ptrCast(&last_sample.?.*)) catch |err| {
+        stream.putData(@ptrCast(&self.last_sample)) catch |err| {
             std.debug.panic("Failed to queue audio data in callback: {t}", .{err});
         };
     }
+
+    self.lost_sample_count += additional_amount / 4;
 }

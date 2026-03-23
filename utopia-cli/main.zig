@@ -129,8 +129,10 @@ pub fn main() !void {
             try audio.setSampleRate(audio_state.sample_rate);
             try audio.queueAudioData(audio_state.sample_data);
 
-            const expected_duration = (@as(u64, audio_state.sample_data.len) * std.time.ns_per_s) /
-                (audio_state.sample_rate);
+            const sample_count: u64 = audio_state.sample_data.len;
+            const lost_sample_count = audio.pollLostSamples();
+            const expected_duration = ((sample_count + lost_sample_count) * std.time.ns_per_s) /
+                audio_state.sample_rate;
             const actual_duration = timer.lap();
             delay_time += @intCast(expected_duration);
             delay_time -= @intCast(actual_duration);
