@@ -9,6 +9,7 @@ const AppArgs = struct {
     bios_path: ?[]const u8,
     save_path: ?[]const u8,
     save_interval: u32,
+    full_screen: bool,
     no_fps_limit: bool,
 };
 
@@ -23,6 +24,7 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
         \\-b, --bios-path <path>        Path to BIOS files
         \\-s, --save-path <path>        Path to save files
         \\-i, --save-interval <seconds> How often save data is synced to filesystem
+        \\-f, --full-screen             Start in full screen mode
         \\-n, --no-fps-limit            Disable FPS limiter (also disables audio)
         \\-h, --help                    Display this help and exit
         \\<device>
@@ -70,6 +72,7 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
         .bios_path = res.args.@"bios-path",
         .save_path = res.args.@"save-path",
         .save_interval = res.args.@"save-interval" orelse default_save_interval,
+        .full_screen = res.args.@"full-screen" != 0,
         .no_fps_limit = res.args.@"no-fps-limit" != 0,
     };
 

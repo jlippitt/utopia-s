@@ -46,7 +46,10 @@ pub fn main() !void {
     var device = try device_args.initDevice(&arena, vfs);
     defer device.deinit();
 
-    var video = try VideoDevice.init(device.getVideoState().resolution);
+    var video = try VideoDevice.init(
+        device.getVideoState().resolution,
+        app_args.full_screen,
+    );
     defer video.deinit();
 
     var maybe_audio: ?AudioDevice = if (!app_args.no_fps_limit)
