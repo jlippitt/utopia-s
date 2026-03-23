@@ -2,15 +2,25 @@ const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 
-const vram_begin = 80;
-const hblank_begin = 240; // TODO: This will vary
-const dots_per_line = 456;
+const render_cycle = 80;
+const cycles_per_line = 456;
 
 const vblank_line = 144;
 const total_lines = 154;
 
 const vram_size = 8192;
 const vram_mask = vram_size - 1;
+
+const width = 256;
+const height = 240;
+const pixel_array_size = width * height * 4;
+
+const colors: [4]fw.color.Abgr32 = .{
+    .{ .r = 0xff, .g = 0xff, .b = 0xff, .a = 0xff },
+    .{ .r = 0xaa, .g = 0xaa, .b = 0xaa, .a = 0xff },
+    .{ .r = 0x55, .g = 0x55, .b = 0x55, .a = 0xff },
+    .{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xff },
+};
 
 const Self = @This();
 
@@ -23,19 +33,40 @@ bg_palette: u8 = 0,
 obj_palette: [2]u8 = @splat(0),
 window_y: u8 = 0,
 window_x: u8 = 0,
+cycle: u32 = 0,
 dot: u32 = 0,
+pixels: *[pixel_array_size]u8,
+pixel_index: u32 = 0,
 vram: *[vram_size]u8,
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
+    const pixels = try arena.allocator().alloc(u8, pixel_array_size);
     const vram = try arena.allocator().alloc(u8, vram_size);
 
     return .{
+        .pixels = pixels[0..pixel_array_size],
         .vram = vram[0..vram_size],
     };
 }
 
 pub fn format(self: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try writer.print("V={d} H={d}", .{ self.line, self.dot });
+    try writer.print("V={d} H={d}", .{ self.line, self.cycle });
+}
+
+pub fn getVideoState(self: *const Self) fw.VideoState {
+    return .{
+        .resolution = .{ .x = width, .y = height },
+        .scale_mode = .integer,
+        .pixel_data = self.pixels,
+    };
+}
+
+pub fn frameDone(self: *const Self) bool {
+    return self.pixel_index >= pixel_array_size;
+}
+
+pub fn beginFrame(self: *Self) void {
+    self.pixel_index = 0;
 }
 
 pub fn read(self: *Self, address: u8) u8 {
@@ -62,9 +93,9 @@ pub fn write(self: *Self, address: u8, value: u8) void {
             fw.log.debug("LCD Control: {any}", .{self.ctrl});
 
             if (!self.ctrl.lcd_enable and prev_lcd_enable) {
-                self.status.mode = .oam;
+                self.status.mode = .oam_search;
                 self.line = 0;
-                self.dot = 0;
+                self.cycle = 0;
             }
         },
         0x41 => {
@@ -120,51 +151,64 @@ pub fn step(self: *Self, cycles: u64) void {
     for (0..cycles) |_| {
         switch (self.status.mode) {
             .hblank => {
-                if (self.dot == dots_per_line) {
-                    self.dot = 0;
+                if (self.cycle == cycles_per_line) {
+                    self.cycle = 0;
                     self.line += 1;
 
                     if (self.line == vblank_line) {
                         self.status.mode = .vblank;
                         self.getDevice().interrupt.raise(.vblank);
                     } else {
-                        self.status.mode = .oam;
+                        self.status.mode = .oam_search;
                     }
                 } else {
-                    self.dot += 1;
+                    self.cycle += 1;
                 }
             },
             .vblank => {
-                if (self.dot == dots_per_line) {
-                    self.dot = 0;
+                if (self.cycle == cycles_per_line) {
+                    self.cycle = 0;
                     self.line += 1;
 
                     if (self.line == total_lines) {
                         self.line = 0;
-                        self.status.mode = .oam;
+                        self.status.mode = .oam_search;
                     }
                 } else {
-                    self.dot += 1;
+                    self.cycle += 1;
                 }
             },
-            .oam => {
+            .oam_search => {
                 // TODO: Select sprites
-                if (self.dot == vram_begin) {
-                    self.status.mode = .vram;
+                if (self.cycle == render_cycle) {
+                    self.status.mode = .render;
+                    self.dot = 0;
                 }
 
-                self.dot += 1;
+                self.cycle += 1;
             },
-            .vram => {
-                // TODO: Render
-                if (self.dot == hblank_begin) {
+            .render => {
+                if (self.render()) {
                     self.status.mode = .hblank;
                 }
 
-                self.dot += 1;
+                self.cycle += 1;
             },
         }
     }
+}
+
+fn render(self: *Self) bool {
+    self.drawPixel(0);
+    self.dot += 1;
+    return self.dot == width;
+}
+
+fn drawPixel(self: *Self, color_index: u2) void {
+    const color = colors[color_index];
+    const pixel: *[4]u8 = self.pixels[self.pixel_index..][0..4];
+    pixel.* = @bitCast(color);
+    self.pixel_index += 4;
 }
 
 fn getDevice(self: *Self) *Device {
@@ -185,16 +229,16 @@ const Control = packed struct(u8) {
 const Mode = enum(u2) {
     hblank,
     vblank,
-    oam,
-    vram,
+    oam_search,
+    render,
 };
 
 const Status = packed struct(u8) {
-    mode: Mode = .oam,
+    mode: Mode = .oam_search,
     lyc: bool = false,
     int_hblank: bool = false,
     int_vblank: bool = false,
-    int_oam: bool = false,
+    int_oam_search: bool = false,
     int_lyc: bool = false,
     __: bool = false,
 };

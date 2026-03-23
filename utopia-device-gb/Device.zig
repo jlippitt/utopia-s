@@ -67,7 +67,9 @@ fn deinit(self: *Self) void {
 }
 
 fn runFrame(self: *Self) void {
-    for (0..(4_194_304 / 4 / 60)) |_| {
+    self.gpu.beginFrame();
+
+    while (!self.gpu.frameDone()) {
         self.cpu.step(.{
             .idle = idle,
             .read = read,
@@ -82,16 +84,7 @@ fn runFrame(self: *Self) void {
 }
 
 fn getVideoState(self: *const Self) fw.VideoState {
-    _ = self;
-
-    const width = 160;
-    const height = 144;
-
-    return .{
-        .resolution = .{ .x = width, .y = height },
-        .scale_mode = .integer,
-        .pixel_data = &[1]u8{0} ** (width * height * 4),
-    };
+    return self.gpu.getVideoState();
 }
 
 fn getAudioState(self: *const Self) fw.AudioState {
