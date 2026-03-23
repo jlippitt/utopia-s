@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
+const background = @import("./Gpu/background.zig");
 
 const render_cycle = 80;
 const cycles_per_line = 456;
@@ -11,8 +12,8 @@ const total_lines = 154;
 const vram_size = 8192;
 const vram_mask = vram_size - 1;
 
-const width = 256;
-const height = 240;
+const width = 160;
+const height = 144;
 const pixel_array_size = width * height * 4;
 
 const colors: [4]fw.color.Abgr32 = .{
@@ -34,10 +35,11 @@ obj_palette: [2]u8 = @splat(0),
 window_y: u8 = 0,
 window_x: u8 = 0,
 cycle: u32 = 0,
-dot: u32 = 0,
+dot: u8 = 0,
 pixels: *[pixel_array_size]u8,
 pixel_index: u32 = 0,
 vram: *[vram_size]u8,
+bg: background.State = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     const pixels = try arena.allocator().alloc(u8, pixel_array_size);
@@ -183,6 +185,7 @@ pub fn step(self: *Self, cycles: u64) void {
                 if (self.cycle == render_cycle) {
                     self.status.mode = .render;
                     self.dot = 0;
+                    self.bg.reset(self.scroll_x);
                 }
 
                 self.cycle += 1;
@@ -199,8 +202,17 @@ pub fn step(self: *Self, cycles: u64) void {
 }
 
 fn render(self: *Self) bool {
-    self.drawPixel(0);
+    background.loadTiles(self);
+
+    const pixel_value = self.bg.popPixel() orelse {
+        return false;
+    };
+
+    const bg_color: u2 = @truncate(self.bg_palette >> (@as(u3, pixel_value) << 1));
+
+    self.drawPixel(bg_color);
     self.dot += 1;
+
     return self.dot == width;
 }
 
@@ -219,10 +231,10 @@ const Control = packed struct(u8) {
     bg_enable: bool = false,
     obj_enable: bool = false,
     obj_size: bool = false,
-    bg_tile_map: bool = false,
+    bg_tile_map: u1 = 0,
     bg_chr_map: bool = false,
     window_enable: bool = false,
-    window_tile_map: bool = false,
+    window_tile_map: u1 = 0,
     lcd_enable: bool = false,
 };
 
