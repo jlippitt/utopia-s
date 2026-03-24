@@ -29,7 +29,7 @@ pub fn init(
     const renderer = try sdl3.render.Renderer.init(window, null);
     errdefer renderer.deinit();
 
-    const texture = try createTexture(renderer, resolution);
+    const texture = try createTexture(renderer, resolution, scale_mode);
     errdefer texture.deinit();
 
     const dst_rect = try resizeWindow(
@@ -98,7 +98,7 @@ pub fn setResolution(
     );
 
     self.texture.deinit();
-    self.texture = try createTexture(self.renderer, resolution);
+    self.texture = try createTexture(self.renderer, resolution, scale_mode);
 
     self.resolution = resolution;
 }
@@ -118,7 +118,13 @@ pub fn update(self: *Self, pixel_data: []const u8) error{SdlError}!void {
 fn createTexture(
     renderer: sdl3.render.Renderer,
     size: utopia.Resolution,
+    scale_mode: utopia.ScaleMode,
 ) error{SdlError}!sdl3.render.Texture {
+    try renderer.setDefaultTextureScaleMode(switch (scale_mode) {
+        .integer => .pixel_art,
+        .float => .linear,
+    });
+
     return renderer.createTexture(
         .packed_xbgr_8_8_8_8,
         .streaming,
