@@ -2,6 +2,7 @@ const std = @import("std");
 const fw = @import("framework");
 const Device = @import("./Device.zig");
 const background = @import("./Gpu/background.zig");
+const object = @import("./Gpu/object.zig");
 
 const render_cycle = 80;
 const cycles_per_line = 456;
@@ -43,6 +44,7 @@ pixel_index: u32 = 0,
 vram: *[vram_size]u8,
 oam: *[oam_size]u8,
 bg: background.State = .{},
+obj: object.State = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     const pixels = try arena.allocator().alloc(u8, pixel_array_size);
@@ -194,8 +196,8 @@ pub fn step(self: *Self, cycles: u64) void {
                 }
             },
             .oam_search => {
-                // TODO: Select sprites
                 if (self.cycle == render_cycle) {
+                    object.selectSprites(self);
                     self.status.mode = .render;
                     self.dot = 0;
                     self.bg.reset(self.scroll_x);
