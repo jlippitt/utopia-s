@@ -143,7 +143,7 @@ pub fn loadTiles(gpu: *Gpu) bool {
             gpu.tile_latch.chr_high = gpu.vram[address];
             gpu.obj.load_step += 1;
         },
-        6 => if (gpu.obj.fifo_len == 0) {
+        6 => {
             gpu.obj.tile = gpu.tile_latch;
             gpu.obj.fifo_len = 8;
             gpu.obj.load_step = 0;
