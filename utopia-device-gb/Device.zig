@@ -55,7 +55,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .hram = hram[0..hram_size],
         .timer = .init(),
         .gpu = try .init(arena),
-        .cartridge = .init(rom),
+        .cartridge = try .init(arena, rom),
     };
 
     return .init(self, .{
@@ -157,9 +157,9 @@ fn readNormal(self: *Self, address: u16) u8 {
         if (address < 0x0100 and self.boot_rom_enable) {
             @branchHint(.unlikely);
             return self.boot_rom[address];
-        } else {
-            return self.cartridge.readRom(address);
         }
+
+        return self.cartridge.readRom(address);
     }
 
     if (address < 0xa000) {
@@ -167,10 +167,11 @@ fn readNormal(self: *Self, address: u16) u8 {
     }
 
     if (address < 0xc000) {
-        fw.log.todo("ERAM reads", .{});
+        return self.cartridge.readRam(address);
     }
 
     if (address < 0xfe00) {
+        @branchHint(.likely);
         return self.wram[address & wram_mask];
     }
 
@@ -209,7 +210,8 @@ fn writeRestricted(self: *Self, address: u16, value: u8) void {
 fn writeNormal(self: *Self, address: u16, value: u8) void {
     if (address < 0x8000) {
         @branchHint(.unlikely);
-        fw.log.warn("TODO: Mapper writes", .{});
+        self.cartridge.writeRegister(address, value);
+        return;
     }
 
     if (address < 0xa000) {
@@ -218,10 +220,12 @@ fn writeNormal(self: *Self, address: u16, value: u8) void {
     }
 
     if (address < 0xc000) {
-        fw.log.todo("ERAM writes", .{});
+        self.cartridge.writeRam(address, value);
+        return;
     }
 
     if (address < 0xfe00) {
+        @branchHint(.likely);
         self.wram[address & wram_mask] = value;
         return;
     }
