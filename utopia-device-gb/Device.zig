@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const processor = @import("processor");
+const Cartridge = @import("./Cartridge.zig");
 const Gpu = @import("./Gpu.zig");
 const Interrupt = @import("./Interrupt.zig");
 const Timer = @import("./Timer.zig");
@@ -33,7 +34,7 @@ wram: *[wram_size]u8,
 hram: *[hram_size]u8,
 timer: Timer,
 gpu: Gpu,
-rom: []const u8,
+cartridge: Cartridge,
 
 pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
     _ = args;
@@ -54,7 +55,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .hram = hram[0..hram_size],
         .timer = .init(),
         .gpu = try .init(arena),
-        .rom = rom,
+        .cartridge = .init(rom),
     };
 
     return .init(self, .{
@@ -157,7 +158,7 @@ fn readNormal(self: *Self, address: u16) u8 {
             @branchHint(.unlikely);
             return self.boot_rom[address];
         } else {
-            return self.rom[address & 0x7fff];
+            return self.cartridge.readRom(address);
         }
     }
 
