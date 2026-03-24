@@ -35,9 +35,10 @@ bc: u16 = 0,
 de: u16 = 0,
 hl: u16 = 0,
 sp: u16 = 0,
+interrupt: u5 = 0,
+halted: bool = false,
 ime: bool = false,
 ime_next: bool = false,
-interrupt: u5 = 0,
 
 pub fn init() Self {
     return .{};
@@ -64,6 +65,15 @@ pub fn setInterrupt(self: *Self, interrupt: u5) void {
 }
 
 pub fn step(self: *Self, comptime iface: Interface) void {
+    if (self.halted) {
+        if (self.interrupt == 0) {
+            self.idle(iface);
+            return;
+        }
+
+        self.halted = false;
+    }
+
     if (self.interrupt != 0 and self.ime) {
         const index: u3 = @ctz(self.interrupt);
         iface.clearInterrupt(self, @as(u5, 1) << index);
@@ -302,7 +312,7 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
     ops[0x73] = bind(load.ld, .{ .HL_indirect, .E });
     ops[0x74] = bind(load.ld, .{ .HL_indirect, .H });
     ops[0x75] = bind(load.ld, .{ .HL_indirect, .L });
-    // ops[0x76] = bind(control.halt, .{});
+    ops[0x76] = bind(control.halt, .{});
     ops[0x77] = bind(load.ld, .{ .HL_indirect, .A });
 
     // 0x78

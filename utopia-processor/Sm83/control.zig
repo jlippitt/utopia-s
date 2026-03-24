@@ -118,3 +118,9 @@ pub fn rst(address: u8, comptime iface: Core.Interface, core: *Core) void {
     core.pushWord(iface, core.pc);
     core.pc = address;
 }
+
+pub fn halt(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("HALT", .{});
+    core.halted = true;
+}
