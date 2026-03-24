@@ -133,6 +133,7 @@ pub fn write(self: *Self, address: u8, value: u8) void {
             self.scroll_x = value;
             fw.log.debug("Scroll X: {d}", .{self.scroll_x});
         },
+        0x44 => {}, // Read-only
         0x45 => {
             self.line_compare = value;
             fw.log.debug("Line Compare: {d}", .{self.line_compare});
