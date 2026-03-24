@@ -38,6 +38,7 @@ status: Status = .{},
 scroll_y: u8 = 0,
 scroll_x: u8 = 0,
 line: u8 = 0,
+line_compare: u8 = 0,
 bg_palette: u8 = 0,
 obj_palette: [2]u8 = @splat(0),
 window_y: u8 = 0,
@@ -92,6 +93,7 @@ pub fn read(self: *Self, address: u8) u8 {
         0x42 => self.scroll_y,
         0x43 => self.scroll_x,
         0x44 => self.line,
+        0x45 => self.line_compare,
         0x47 => self.bg_palette,
         0x48 => self.obj_palette[0],
         0x49 => self.obj_palette[1],
@@ -130,6 +132,10 @@ pub fn write(self: *Self, address: u8, value: u8) void {
         0x43 => {
             self.scroll_x = value;
             fw.log.debug("Scroll X: {d}", .{self.scroll_x});
+        },
+        0x45 => {
+            self.line_compare = value;
+            fw.log.debug("Line Compare: {d}", .{self.line_compare});
         },
         0x46 => self.getDevice().requestOamDma(value),
         0x47 => {
@@ -181,14 +187,13 @@ pub fn step(self: *Self, cycles: u64) void {
         switch (self.status.mode) {
             .hblank => {
                 if (self.cycle == cycles_per_line) {
-                    self.cycle = 0;
-                    self.line += 1;
+                    self.nextLine();
 
                     if (self.line == vblank_line) {
-                        self.status.mode = .vblank;
+                        self.nextMode(.vblank);
                         self.getDevice().interrupt.raise(.vblank);
                     } else {
-                        self.status.mode = .oam_search;
+                        self.nextMode(.oam_search);
                     }
                 } else {
                     self.cycle += 1;
@@ -196,12 +201,10 @@ pub fn step(self: *Self, cycles: u64) void {
             },
             .vblank => {
                 if (self.cycle == cycles_per_line) {
-                    self.cycle = 0;
-                    self.line += 1;
+                    self.nextLine();
 
-                    if (self.line == total_lines) {
-                        self.line = 0;
-                        self.status.mode = .oam_search;
+                    if (self.line == 0) {
+                        self.nextMode(.oam_search);
                     }
                 } else {
                     self.cycle += 1;
@@ -210,7 +213,7 @@ pub fn step(self: *Self, cycles: u64) void {
             .oam_search => {
                 if (self.cycle == render_cycle) {
                     object.selectSprites(self);
-                    self.status.mode = .render;
+                    self.nextMode(.render);
                     self.dot = 0;
                     self.bg.beginLine(self.scroll_x);
                     self.obj.beginLine();
@@ -220,12 +223,40 @@ pub fn step(self: *Self, cycles: u64) void {
             },
             .render => {
                 if (self.render()) {
-                    self.status.mode = .hblank;
+                    self.nextMode(.hblank);
                 }
 
                 self.cycle += 1;
             },
         }
+    }
+}
+
+fn nextLine(self: *Self) void {
+    self.cycle = 0;
+    self.line += 1;
+
+    if (self.line == total_lines) {
+        self.line = 0;
+    }
+
+    if (self.line == self.line_compare and self.status.int_lyc) {
+        self.getDevice().interrupt.raise(.lcd_stat);
+    }
+}
+
+fn nextMode(self: *Self, mode: Mode) void {
+    self.status.mode = mode;
+
+    const interrupt = switch (mode) {
+        .hblank => self.status.int_hblank,
+        .vblank => self.status.int_vblank,
+        .oam_search => self.status.int_oam,
+        .render => false,
+    };
+
+    if (interrupt) {
+        self.getDevice().interrupt.raise(.lcd_stat);
     }
 }
 
@@ -301,7 +332,7 @@ const Status = packed struct(u8) {
     lyc: bool = false,
     int_hblank: bool = false,
     int_vblank: bool = false,
-    int_oam_search: bool = false,
+    int_oam: bool = false,
     int_lyc: bool = false,
     __: bool = false,
 };
