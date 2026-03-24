@@ -21,6 +21,13 @@ pub const State = struct {
         self.load_step = 0;
     }
 
+    pub fn pushTile(self: *Self, tile: Gpu.Tile) void {
+        self.tile = tile;
+        self.fifo_len = 8;
+        self.load_step = 0;
+        self.coarse_x +%= 1;
+    }
+
     pub fn popPixel(self: *Self) ?u2 {
         if (self.fifo_len == 0) {
             return null;
@@ -36,10 +43,10 @@ pub const State = struct {
         self.tile.chr_low = std.math.rotl(u8, self.tile.chr_low, 1);
         self.tile.chr_high = std.math.rotl(u8, self.tile.chr_high, 1);
 
-        const low: u1 = @truncate(self.tile.chr_low);
-        const high: u1 = @truncate(self.tile.chr_high);
+        const chr_low: u1 = @truncate(self.tile.chr_low);
+        const chr_high: u1 = @truncate(self.tile.chr_high);
 
-        return (@as(u2, high) << 1) | low;
+        return (@as(u2, chr_high) << 1) | chr_low;
     }
 };
 
@@ -59,10 +66,7 @@ pub fn loadTiles(gpu: *Gpu) void {
             gpu.bg.load_step += 1;
         },
         6 => if (gpu.bg.fifo_len == 0) {
-            gpu.bg.tile = gpu.tile_latch;
-            gpu.bg.fifo_len = 8;
-            gpu.bg.load_step = 0;
-            gpu.bg.coarse_x +%= 1;
+            gpu.bg.pushTile(gpu.tile_latch);
         },
         7 => unreachable,
     }

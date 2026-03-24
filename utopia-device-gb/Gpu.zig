@@ -242,13 +242,11 @@ fn render(self: *Self) bool {
 
     const color: u2 = blk: {
         if (self.obj.popPixel()) |pixel| {
-            const sprite = self.obj.currentSprite();
-
             if (self.ctrl.obj_enable and
-                pixel != 0 and
-                (!sprite.attr.below_bg or bg_pixel == 0))
+                pixel.value != 0 and
+                (!pixel.below_bg or bg_pixel == 0))
             {
-                break :blk getColor(self.obj_palette[sprite.attr.palette], pixel);
+                break :blk getColor(self.obj_palette[pixel.palette], pixel.value);
             }
         }
 

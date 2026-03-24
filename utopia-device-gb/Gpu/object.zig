@@ -6,7 +6,7 @@ const max_sprites_per_line = 10;
 
 const SpriteAttributes = packed struct(u8) {
     __: u4 = 0,
-    palette: u1 = 0,
+    palette: bool = false,
     flip_x: bool = false,
     flip_y: bool = false,
     below_bg: bool = false,
@@ -19,6 +19,19 @@ const Sprite = struct {
     attr: SpriteAttributes = .{},
 };
 
+const Tile = struct {
+    chr_low: u8 = 0,
+    chr_high: u8 = 0,
+    below_bg: u8 = 0,
+    palette: u8 = 0,
+};
+
+pub const Pixel = struct {
+    value: u2,
+    below_bg: bool,
+    palette: u1,
+};
+
 pub const State = struct {
     const Self = @This();
 
@@ -26,7 +39,7 @@ pub const State = struct {
     read_index: u8 = 0,
     load_step: u3 = 0,
     fifo_len: u8 = 0,
-    tile: Gpu.Tile = .{},
+    tile: Tile = .{},
     sprites: [10]Sprite = @splat(.{}),
 
     pub fn beginLine(self: *Self) void {
@@ -35,34 +48,52 @@ pub const State = struct {
         self.fifo_len = 0;
     }
 
-    pub fn currentSprite(self: *const Self) *const Sprite {
-        return &self.sprites[self.read_index - 1];
+    pub fn pushTile(self: *Self, tile: Gpu.Tile, attr: SpriteAttributes) void {
+        var chr_low = tile.chr_low;
+        var chr_high = tile.chr_high;
+
+        if (!attr.flip_x) {
+            chr_low = @bitReverse(chr_low);
+            chr_high = @bitReverse(chr_high);
+        }
+
+        const below_bg = std.math.boolMask(u8, attr.below_bg);
+        const palette = std.math.boolMask(u8, attr.palette);
+
+        const write_mask = ~(self.tile.chr_low | self.tile.chr_high);
+
+        fw.num.writeMasked(u8, &self.tile.chr_low, chr_low, write_mask);
+        fw.num.writeMasked(u8, &self.tile.chr_high, chr_high, write_mask);
+        fw.num.writeMasked(u8, &self.tile.below_bg, below_bg, write_mask);
+        fw.num.writeMasked(u8, &self.tile.palette, palette, write_mask);
+
+        self.fifo_len = 8;
+        self.load_step = 0;
+        self.read_index += 1;
     }
 
-    pub fn popPixel(self: *Self) ?u2 {
+    pub fn popPixel(self: *Self) ?Pixel {
         if (self.fifo_len == 0) {
             return null;
         }
 
         self.fifo_len -= 1;
 
-        if (self.currentSprite().attr.flip_x) {
-            const low: u1 = @truncate(self.tile.chr_low);
-            const high: u1 = @truncate(self.tile.chr_high);
+        const chr_low: u1 = @truncate(self.tile.chr_low);
+        const chr_high: u1 = @truncate(self.tile.chr_high);
+        const below_bg = fw.num.bit(self.tile.below_bg, 0);
+        const palette: u1 = @truncate(self.tile.palette);
 
-            self.tile.chr_low >>= 1;
-            self.tile.chr_high >>= 1;
+        self.tile.chr_low >>= 1;
+        self.tile.chr_high >>= 1;
+        self.tile.below_bg >>= 1;
+        self.tile.palette >>= 1;
 
-            return (@as(u2, high) << 1) | low;
-        }
-
-        self.tile.chr_low = std.math.rotl(u8, self.tile.chr_low, 1);
-        self.tile.chr_high = std.math.rotl(u8, self.tile.chr_high, 1);
-
-        const low: u1 = @truncate(self.tile.chr_low);
-        const high: u1 = @truncate(self.tile.chr_high);
-
-        return (@as(u2, high) << 1) | low;
+        return .{
+            .value = (@as(u2, chr_high) << 1) | chr_low,
+            .below_bg = below_bg,
+            .palette = palette,
+        };
     }
 };
 
@@ -143,12 +174,7 @@ pub fn loadTiles(gpu: *Gpu) bool {
             gpu.tile_latch.chr_high = gpu.vram[address];
             gpu.obj.load_step += 1;
         },
-        6 => {
-            gpu.obj.tile = gpu.tile_latch;
-            gpu.obj.fifo_len = 8;
-            gpu.obj.load_step = 0;
-            gpu.obj.read_index += 1;
-        },
+        6 => gpu.obj.pushTile(gpu.tile_latch, sprite.attr),
         7 => unreachable,
     }
 
