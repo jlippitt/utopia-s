@@ -26,6 +26,11 @@ const colors: [4]fw.color.Abgr32 = .{
     .{ .r = 0x00, .g = 0x00, .b = 0x00, .a = 0xff },
 };
 
+pub const Tile = struct {
+    chr_low: u8 = 0,
+    chr_high: u8 = 0,
+};
+
 const Self = @This();
 
 ctrl: Control = .{},
@@ -43,6 +48,8 @@ pixels: *[pixel_array_size]u8,
 pixel_index: u32 = 0,
 vram: *[vram_size]u8,
 oam: *[oam_size]u8,
+name_latch: u8 = 0,
+tile_latch: Tile = .{},
 bg: background.State = .{},
 obj: object.State = .{},
 
@@ -200,7 +207,8 @@ pub fn step(self: *Self, cycles: u64) void {
                     object.selectSprites(self);
                     self.status.mode = .render;
                     self.dot = 0;
-                    self.bg.reset(self.scroll_x);
+                    self.bg.beginLine(self.scroll_x);
+                    self.obj.beginLine();
                 }
 
                 self.cycle += 1;
@@ -217,15 +225,36 @@ pub fn step(self: *Self, cycles: u64) void {
 }
 
 fn render(self: *Self) bool {
+    if (object.loadTiles(self)) {
+        return false;
+    }
+
     background.loadTiles(self);
 
-    const pixel_value = self.bg.popPixel() orelse {
+    const bg_pixel = self.bg.popPixel() orelse {
         return false;
     };
 
-    const bg_color: u2 = @truncate(self.bg_palette >> (@as(u3, pixel_value) << 1));
+    const color: u2 = blk: {
+        if (self.obj.popPixel()) |pixel| {
+            const sprite = self.obj.currentSprite();
 
-    self.drawPixel(bg_color);
+            // if (self.ctrl.obj_enable and
+            //     pixel != 0 and
+            //     (!sprite.attr.below_bg or bg_pixel == 0))
+            // {
+            break :blk getColor(self.obj_palette[sprite.attr.palette], pixel);
+            // }
+        }
+
+        if (self.ctrl.bg_enable) {
+            break :blk getColor(self.bg_palette, bg_pixel);
+        }
+
+        break :blk 0;
+    };
+
+    self.drawPixel(color);
     self.dot += 1;
 
     return self.dot == width;
@@ -240,6 +269,10 @@ fn drawPixel(self: *Self, color_index: u2) void {
 
 fn getDevice(self: *Self) *Device {
     return @alignCast(@fieldParentPtr("gpu", self));
+}
+
+fn getColor(palette: u8, index: u2) u2 {
+    return @truncate(palette >> (@as(u3, index) << 1));
 }
 
 const Control = packed struct(u8) {
