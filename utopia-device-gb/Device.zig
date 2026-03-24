@@ -3,6 +3,7 @@ const fw = @import("framework");
 const processor = @import("processor");
 const Gpu = @import("./Gpu.zig");
 const Interrupt = @import("./Interrupt.zig");
+const Timer = @import("./Timer.zig");
 
 const Cpu = processor.Sm83;
 
@@ -30,6 +31,7 @@ boot_rom_enable: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
 hram: *[hram_size]u8,
+timer: Timer,
 gpu: Gpu,
 rom: []const u8,
 
@@ -50,6 +52,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .boot_rom = boot_rom[0..boot_rom_size],
         .wram = wram[0..wram_size],
         .hram = hram[0..hram_size],
+        .timer = .init(),
         .gpu = try .init(arena),
         .rom = rom,
     };
@@ -258,7 +261,7 @@ fn readIoNormal(self: *Self, address: u8) u8 {
     return switch (address) {
         0x00 => 0xff, // TODO: Joypad,
         0x01, 0x02 => 0, // TODO: Serial port
-        0x04...0x07 => 0, // TODO: Timer
+        0x04...0x07 => self.timer.read(address),
         0x0f => self.interrupt.getFlags(),
         0x10...0x3f => 0, // TODO: APU
         0x40...0x4f => self.gpu.read(address),
@@ -299,7 +302,7 @@ fn writeIoNormal(self: *Self, address: u8, value: u8) void {
             // TODO: Serial port
             test_rom_writer.interface.flush() catch {};
         },
-        0x04...0x07 => {}, // TODO: Timer
+        0x04...0x07 => self.timer.write(address, value),
         0x0f => self.interrupt.setFlags(value),
         0x10...0x3f => {}, // TODO: APU
         0x40...0x4f => self.gpu.write(address, value),
@@ -320,6 +323,7 @@ fn clearInterrupt(cpu: *Cpu, interrupt: u5) void {
 
 fn step(self: *Self) void {
     self.cycles += m_cycle;
+    self.timer.step(m_cycle);
     self.gpu.step(m_cycle);
 }
 
