@@ -109,9 +109,14 @@ pub fn write(self: *Self, address: u8, value: u8) void {
             fw.log.debug("LCD Control: {any}", .{self.ctrl});
 
             if (!self.ctrl.lcd_enable and prev_lcd_enable) {
-                self.status.mode = .oam_search;
+                fw.log.debug("Screen Off", .{});
+                self.status.mode = .hblank;
                 self.line = 0;
                 self.cycle = 0;
+                self.pixel_index = 0;
+            } else if (self.ctrl.lcd_enable and !prev_lcd_enable) {
+                fw.log.debug("Screen Off", .{});
+                self.status.mode = .oam_search;
             }
         },
         0x41 => {
