@@ -24,6 +24,8 @@ const Self = @This();
 cpu: Cpu,
 cycles: u64 = 0,
 interrupt: Interrupt,
+dma_active: bool = false,
+dma_address: u16 = 0,
 boot_rom_enable: bool = true,
 boot_rom: *const [boot_rom_size]u8,
 wram: *[wram_size]u8,
@@ -83,11 +85,11 @@ fn runFrame(self: *Self) void {
     }
 }
 
-fn getVideoState(self: *const Self) fw.VideoState {
+pub fn getVideoState(self: *const Self) fw.VideoState {
     return self.gpu.getVideoState();
 }
 
-fn getAudioState(self: *const Self) fw.AudioState {
+pub fn getAudioState(self: *const Self) fw.AudioState {
     _ = self;
 
     return .{
@@ -96,26 +98,55 @@ fn getAudioState(self: *const Self) fw.AudioState {
     };
 }
 
-fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
+pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     _ = self;
     _ = state;
 }
 
-fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
     _ = self;
     _ = allocator;
     _ = vfs;
 }
 
+pub fn requestOamDma(self: *Self, address: u8) void {
+    self.dma_active = true;
+    self.dma_address = @as(u16, address) << 8;
+    fw.log.trace("DMA Transfer Begin", .{});
+}
+
 fn idle(cpu: *Cpu) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
     self.step();
+
+    if (self.dma_active) {
+        @branchHint(.unlikely);
+        self.transferDma();
+    }
 }
 
 fn read(cpu: *Cpu, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
     self.step();
 
+    if (self.dma_active) {
+        @branchHint(.unlikely);
+        self.transferDma();
+        return self.readRestricted(address);
+    }
+
+    return self.readNormal(address);
+}
+
+fn readRestricted(self: *Self, address: u16) u8 {
+    if (address >= 0xff00) {
+        return self.readIoRestricted(@truncate(address));
+    }
+
+    return 0xff;
+}
+
+fn readNormal(self: *Self, address: u16) u8 {
     if (address < 0x8000) {
         @branchHint(.likely);
 
@@ -140,11 +171,11 @@ fn read(cpu: *Cpu, address: u16) u8 {
     }
 
     if (address >= 0xff00) {
-        return self.readIoInner(@truncate(address));
+        return self.readIoNormal(@truncate(address));
     }
 
     if (address < 0xfea0) {
-        fw.log.todo("OAM reads", .{});
+        return self.gpu.readOam(@truncate(address));
     }
 
     return 0;
@@ -154,6 +185,24 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
     self.step();
 
+    if (self.dma_active) {
+        @branchHint(.unlikely);
+        self.transferDma();
+        self.writeRestricted(address, value);
+        return;
+    }
+
+    self.writeNormal(address, value);
+}
+
+fn writeRestricted(self: *Self, address: u16, value: u8) void {
+    if (address >= 0xff00) {
+        self.writeIoRestricted(@truncate(address), value);
+        return;
+    }
+}
+
+fn writeNormal(self: *Self, address: u16, value: u8) void {
     if (address < 0x8000) {
         @branchHint(.unlikely);
         fw.log.warn("TODO: Mapper writes", .{});
@@ -174,22 +223,38 @@ fn write(cpu: *Cpu, address: u16, value: u8) void {
     }
 
     if (address >= 0xff00) {
-        self.writeIoInner(@truncate(address), value);
+        self.writeIoNormal(@truncate(address), value);
         return;
     }
 
     if (address < 0xfea0) {
-        fw.log.trace("TODO: OAM writes", .{});
+        self.gpu.writeOam(@truncate(address), value);
+        return;
     }
 }
 
 fn readIo(cpu: *Cpu, address: u8) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
     self.step();
-    return self.readIoInner(address);
+
+    if (self.dma_active) {
+        @branchHint(.unlikely);
+        self.transferDma();
+        return self.readIoRestricted(address);
+    }
+
+    return self.readIoNormal(address);
 }
 
-fn readIoInner(self: *Self, address: u8) u8 {
+fn readIoRestricted(self: *Self, address: u8) u8 {
+    if (address >= 0x80 and address <= 0xfe) {
+        return self.hram[address & hram_mask];
+    }
+
+    return 0xff;
+}
+
+fn readIoNormal(self: *Self, address: u8) u8 {
     return switch (address) {
         0x00 => 0xff, // TODO: Joypad,
         0x01, 0x02 => 0, // TODO: Serial port
@@ -206,10 +271,24 @@ fn readIoInner(self: *Self, address: u8) u8 {
 fn writeIo(cpu: *Cpu, address: u8, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
     self.step();
-    self.writeIoInner(address, value);
+
+    if (self.dma_active) {
+        @branchHint(.unlikely);
+        self.transferDma();
+        return self.writeIoRestricted(address, value);
+    }
+
+    self.writeIoNormal(address, value);
 }
 
-fn writeIoInner(self: *Self, address: u8, value: u8) void {
+fn writeIoRestricted(self: *Self, address: u8, value: u8) void {
+    if (address >= 0x80 and address <= 0xfe) {
+        self.hram[address & hram_mask] = value;
+        return;
+    }
+}
+
+fn writeIoNormal(self: *Self, address: u8, value: u8) void {
     switch (address) {
         0x00 => {}, // TODO: Joypad
         0x01 => {
@@ -242,4 +321,23 @@ fn clearInterrupt(cpu: *Cpu, interrupt: u5) void {
 fn step(self: *Self) void {
     self.cycles += m_cycle;
     self.gpu.step(m_cycle);
+}
+
+fn transferDma(self: *Self) void {
+    const oam_address: u8 = @truncate(self.dma_address);
+    const value = self.readNormal(self.dma_address);
+
+    fw.log.trace("DMA Transfer: OAM:{X:02} <= {X:02} <= {X:04}", .{
+        oam_address,
+        value,
+        self.dma_address,
+    });
+
+    self.gpu.writeOam(oam_address, value);
+    self.dma_address +%= 1;
+
+    if ((self.dma_address & 0xff) == 0xa0) {
+        self.dma_active = false;
+        fw.log.trace("DMA Transfer End", .{});
+    }
 }

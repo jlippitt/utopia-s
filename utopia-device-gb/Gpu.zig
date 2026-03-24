@@ -12,6 +12,8 @@ const total_lines = 154;
 const vram_size = 8192;
 const vram_mask = vram_size - 1;
 
+const oam_size = 160;
+
 const width = 160;
 const height = 144;
 const pixel_array_size = width * height * 4;
@@ -39,15 +41,18 @@ dot: u8 = 0,
 pixels: *[pixel_array_size]u8,
 pixel_index: u32 = 0,
 vram: *[vram_size]u8,
+oam: *[oam_size]u8,
 bg: background.State = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) error{OutOfMemory}!Self {
     const pixels = try arena.allocator().alloc(u8, pixel_array_size);
     const vram = try arena.allocator().alloc(u8, vram_size);
+    const oam = try arena.allocator().alloc(u8, oam_size);
 
     return .{
         .pixels = pixels[0..pixel_array_size],
         .vram = vram[0..vram_size],
+        .oam = oam[0..oam_size],
     };
 }
 
@@ -112,7 +117,7 @@ pub fn write(self: *Self, address: u8, value: u8) void {
             self.scroll_x = value;
             fw.log.debug("Scroll X: {d}", .{self.scroll_x});
         },
-        0x46 => {}, // TODO: OAM DMA
+        0x46 => self.getDevice().requestOamDma(value),
         0x47 => {
             self.bg_palette = value;
             fw.log.debug("BG Palette: {X:02}", .{self.bg_palette});
@@ -143,6 +148,14 @@ pub fn readVram(self: *Self, address: u16) u8 {
 
 pub fn writeVram(self: *Self, address: u16, value: u8) void {
     self.vram[address & vram_mask] = value;
+}
+
+pub fn readOam(self: *Self, address: u8) u8 {
+    return self.oam[address];
+}
+
+pub fn writeOam(self: *Self, address: u8, value: u8) void {
+    self.oam[address] = value;
 }
 
 pub fn step(self: *Self, cycles: u64) void {
