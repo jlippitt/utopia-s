@@ -117,8 +117,10 @@ pub fn write(self: *Self, address: u8, value: u8) void {
                 self.cycle = 0;
                 self.pixel_index = 0;
             } else if (self.ctrl.lcd_enable and !prev_lcd_enable) {
-                fw.log.debug("Screen Off", .{});
-                self.status.mode = .oam_search;
+                fw.log.debug("Screen On", .{});
+                self.nextMode(.oam_search);
+                self.bg.beginFrame();
+                self.renderBegin();
             }
         },
         0x41 => {
@@ -195,6 +197,7 @@ pub fn step(self: *Self, cycles: u64) void {
                         self.getDevice().interrupt.raise(.vblank);
                     } else {
                         self.nextMode(.oam_search);
+                        self.renderBegin();
                     }
                 } else {
                     self.cycle += 1;
@@ -206,6 +209,8 @@ pub fn step(self: *Self, cycles: u64) void {
 
                     if (self.line == 0) {
                         self.nextMode(.oam_search);
+                        self.bg.beginFrame();
+                        self.renderBegin();
                     }
                 } else {
                     self.cycle += 1;
@@ -215,15 +220,12 @@ pub fn step(self: *Self, cycles: u64) void {
                 if (self.cycle == render_cycle) {
                     object.selectSprites(self);
                     self.nextMode(.render);
-                    self.dot = 0;
-                    self.bg.beginLine(self.scroll_x);
-                    self.obj.beginLine();
                 }
 
                 self.cycle += 1;
             },
             .render => {
-                if (self.render()) {
+                if (self.renderPixel()) {
                     self.nextMode(.hblank);
                 }
 
@@ -261,7 +263,13 @@ fn nextMode(self: *Self, mode: Mode) void {
     }
 }
 
-fn render(self: *Self) bool {
+fn renderBegin(self: *Self) void {
+    self.dot = 0;
+    self.obj.beginLine();
+    background.beginLine(self);
+}
+
+fn renderPixel(self: *Self) bool {
     if (object.loadTiles(self)) {
         return false;
     }
