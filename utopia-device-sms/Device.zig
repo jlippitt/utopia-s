@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const processor = @import("processor");
+const Cartridge = @import("./Cartridge.zig");
 
 const ram_size = 8192;
 const ram_mask = ram_size - 1;
@@ -13,14 +14,14 @@ const Self = @This();
 
 cpu: Cpu,
 mem_ctrl: MemoryControl = .{},
+mdr: u8 = 0,
 cycles: u64 = 0,
 ram: *[ram_size]u8,
-rom: []const u8,
+cartridge: Cartridge,
 
 pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
     _ = args;
 
-    const rom = try vfs.readRom(arena.allocator());
     const ram = try arena.allocator().alloc(u8, ram_size);
 
     const self = try arena.allocator().create(Self);
@@ -28,7 +29,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
     self.* = .{
         .cpu = .init(),
         .ram = ram[0..ram_size],
-        .rom = rom,
+        .cartridge = try .init(arena, vfs),
     };
 
     return .init(self, .{
@@ -109,22 +110,25 @@ fn read(cpu: *Cpu, address: u16) u8 {
 }
 
 fn readInner(self: *Self, address: u16) u8 {
+    self.mdr = self.cartridge.read(address, self.mdr);
+
     if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
-        return self.ram[address & ram_mask];
+        self.mdr = self.ram[address & ram_mask];
     }
 
-    return self.rom[address];
+    return self.mdr;
 }
 
 fn write(cpu: *Cpu, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
     self.cycles += 3;
+    self.mdr = value;
+
+    self.cartridge.write(address, value);
 
     if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
         self.ram[address & ram_mask] = value;
     }
-
-    fw.log.todo("Writes to mapper registers", .{});
 }
 
 const MemoryControl = packed struct(u8) {
