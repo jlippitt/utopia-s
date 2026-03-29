@@ -270,7 +270,7 @@ pub fn main(comptime iface: Core.Interface) [256]*const Core.Instruction {
     // ops[0xc1] = bind(load.pop, .BC);
     // ops[0xc9] = bind(control.ret, .{});
     // ops[0xd1] = bind(load.pop, .DE);
-    // ops[0xd9] = bind(control.reti, .{});
+    ops[0xd9] = bind(load.exx, .{});
     // ops[0xe1] = bind(load.pop, .HL);
     // ops[0xe9] = bind(control.jpHl, .{});
     // ops[0xf1] = bind(load.pop, .AF);

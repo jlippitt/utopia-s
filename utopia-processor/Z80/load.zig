@@ -1,3 +1,4 @@
+const std = @import("std");
 const fw = @import("framework");
 const Core = @import("../Z80.zig");
 const address = @import("./address.zig");
@@ -43,3 +44,11 @@ pub fn ld16(comptime dst: address.Mode16, comptime iface: Core.Interface, core: 
 //     core.idle(iface);
 //     core.pushWord(iface, src.read(core));
 // }
+
+pub fn exx(comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("EXX", .{});
+    std.mem.swap(u16, &core.bc, &core.bc_alt);
+    std.mem.swap(u16, &core.de, &core.de_alt);
+    std.mem.swap(u16, &core.hl, &core.hl_alt);
+}
