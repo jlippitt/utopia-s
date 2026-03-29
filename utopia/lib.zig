@@ -3,6 +3,7 @@ const fw = @import("framework");
 const Gb = @import("device-gb");
 const N64 = @import("device-n64");
 const Nes = @import("device-nes");
+const Sms = @import("device-sms");
 
 pub const log = fw.log;
 
@@ -22,6 +23,7 @@ pub const DeviceType = enum {
     gb,
     n64,
     nes,
+    sms,
 };
 
 pub const DeviceArgs = union(DeviceType) {
@@ -30,12 +32,14 @@ pub const DeviceArgs = union(DeviceType) {
     gb: Gb.Args,
     n64: N64.Args,
     nes: Nes.Args,
+    sms: Sms.Args,
 
     pub fn initDevice(self: Self, arena: *std.heap.ArenaAllocator, vfs: Vfs) InitError!Device {
         return switch (self) {
             .gb => |device_args| try Gb.init(arena, vfs, device_args),
             .n64 => |device_args| try N64.init(arena, vfs, device_args),
             .nes => |device_args| try Nes.init(arena, vfs, device_args),
+            .sms => |device_args| try Sms.init(arena, vfs, device_args),
         };
     }
 };

@@ -54,6 +54,15 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const utopia_device_sms = b.addModule("utopia-device-sms", .{
+        .root_source_file = b.path("utopia-device-sms/Device.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "framework", .module = utopia_framework },
+            .{ .name = "processor", .module = utopia_processor },
+        },
+    });
+
     const utopia = b.addModule("utopia", .{
         .root_source_file = b.path("utopia/lib.zig"),
         .target = target,
@@ -62,6 +71,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "device-gb", .module = utopia_device_gb },
             .{ .name = "device-n64", .module = utopia_device_n64 },
             .{ .name = "device-nes", .module = utopia_device_nes },
+            .{ .name = "device-sms", .module = utopia_device_sms },
         },
     });
 
