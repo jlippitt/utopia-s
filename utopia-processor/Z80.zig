@@ -1,10 +1,10 @@
 const std = @import("std");
 const fw = @import("framework");
-const alu = @import("./Sm83/alu.zig");
-const bit = @import("./Sm83/bit.zig");
-const control = @import("./Sm83/control.zig");
-const implied = @import("./Sm83/implied.zig");
-const load = @import("./Sm83/load.zig");
+// const alu = @import("./Z80/alu.zig");
+// const bit = @import("./Z80/bit.zig");
+// const control = @import("./Z80/control.zig");
+const implied = @import("./Z80/implied.zig");
+// const load = @import("./Z80/load.zig");
 
 pub const Flags = packed struct(u8) {
     c: bool = true,
@@ -45,6 +45,7 @@ r: u8 = undefined,
 im: u2 = 0,
 iff1: bool = false,
 iff2: bool = false,
+iff_delay: bool = false,
 
 pub fn init() Self {
     return .{};
@@ -68,6 +69,10 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
 }
 
 pub fn step(self: *Self, comptime iface: Interface) void {
+    // TODO: Interrupt check
+
+    self.iff_delay = false;
+
     self.decode(iface)(self);
 }
 
@@ -427,8 +432,8 @@ fn opTable(comptime iface: Interface) [256]*const Instruction {
 
     // // 0xc0+3
     // ops[0xc3] = bind(control.jp, .{});
-    // ops[0xf3] = bind(implied.di, .{});
-    // ops[0xfb] = bind(implied.ei, .{});
+    ops[0xf3] = bind(implied.di, .{});
+    ops[0xfb] = bind(implied.ei, .{});
 
     // // 0xc0+4
     // ops[0xc4] = bind(control.callConditional, .NZ);
