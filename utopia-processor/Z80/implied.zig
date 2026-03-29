@@ -23,6 +23,12 @@ pub fn ei(comptime iface: Core.Interface, core: *Core) void {
     core.iff_delay = true;
 }
 
+pub fn im(comptime mode: u2, comptime iface: Core.Interface, core: *Core) void {
+    _ = iface;
+    fw.log.trace("IM {d}", .{mode});
+    core.im = mode;
+}
+
 // pub fn scf(comptime iface: Core.Interface, core: *Core) void {
 //     _ = iface;
 //     fw.log.trace("SCF", .{});
