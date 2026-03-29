@@ -17,6 +17,7 @@ pub const Interface = struct {
     idle: fn (self: *Self, cycles: u64) void,
     fetch: fn (self: *Self, address: u16) u8,
     read: fn (self: *Self, address: u16) u8,
+    write: fn (self: *Self, address: u16, value: u8) void,
 };
 
 pub const Instruction = fn (core: *Self) void;
@@ -95,10 +96,10 @@ pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
     return value;
 }
 
-// pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
-//     fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
-//     iface.write(self, address, value);
-// }
+pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
+    fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
+    iface.write(self, address, value);
+}
 
 // pub fn readIo(self: *Self, comptime iface: Interface, address: u8) u8 {
 //     const value = iface.readIo(self, address);

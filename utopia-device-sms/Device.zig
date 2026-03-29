@@ -51,6 +51,7 @@ fn runFrame(self: *Self) void {
             .idle = idle,
             .fetch = fetch,
             .read = read,
+            .write = write,
         });
 
         fw.log.trace("{f} T={d}", .{ self.cpu, self.cycles });
@@ -113,6 +114,17 @@ fn readInner(self: *Self, address: u16) u8 {
     }
 
     return self.rom[address];
+}
+
+fn write(cpu: *Cpu, address: u16, value: u8) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.cycles += 3;
+
+    if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
+        self.ram[address & ram_mask] = value;
+    }
+
+    fw.log.todo("Writes to mapper registers", .{});
 }
 
 const MemoryControl = packed struct(u8) {
