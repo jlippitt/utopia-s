@@ -2,7 +2,7 @@ const fw = @import("framework");
 const Core = @import("../Z80.zig");
 // const alu = @import("./alu.zig");
 // const bit = @import("./bit.zig");
-// const control = @import("./control.zig");
+const control = @import("./control.zig");
 const implied = @import("./implied.zig");
 const load = @import("./load.zig");
 
@@ -20,11 +20,11 @@ pub fn main(comptime iface: Core.Interface) [256]*const Core.Instruction {
     // // 0x00+0
     // ops[0x00] = bind(implied.nop, .{});
     // ops[0x08] = bind(load.ldAbsoluteSp, .{});
-    // ops[0x18] = bind(control.jr, .{});
-    // ops[0x20] = bind(control.jrConditional, .NZ);
-    // ops[0x28] = bind(control.jrConditional, .Z);
-    // ops[0x30] = bind(control.jrConditional, .NC);
-    // ops[0x38] = bind(control.jrConditional, .C);
+    ops[0x18] = bind(control.jr, .{});
+    ops[0x20] = bind(control.jrConditional, .NZ);
+    ops[0x28] = bind(control.jrConditional, .Z);
+    ops[0x30] = bind(control.jrConditional, .NC);
+    ops[0x38] = bind(control.jrConditional, .C);
 
     // // 0x00+1
     ops[0x01] = bind(load.ld16, .BC);

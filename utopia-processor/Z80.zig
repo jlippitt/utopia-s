@@ -14,6 +14,7 @@ pub const Flags = packed struct(u8) {
 };
 
 pub const Interface = struct {
+    idle: fn (self: *Self, cycles: u64) void,
     fetch: fn (self: *Self, address: u16) u8,
     read: fn (self: *Self, address: u16) u8,
 };
@@ -83,10 +84,10 @@ pub fn fetch(self: *Self, comptime iface: Interface) u8 {
     return value;
 }
 
-// pub fn idle(self: *Self, comptime iface: Interface) void {
-//     fw.log.trace("  IO", .{});
-//     iface.idle(self);
-// }
+pub fn idle(self: *Self, comptime iface: Interface, cycles: u64) void {
+    fw.log.trace("  IO", .{});
+    iface.idle(self, cycles);
+}
 
 pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
     const value = iface.read(self, address);

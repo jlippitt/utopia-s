@@ -48,6 +48,7 @@ fn deinit(self: *Self) void {
 fn runFrame(self: *Self) void {
     for (0..(3579540 / 60 / 4)) |_| {
         self.cpu.step(.{
+            .idle = idle,
             .fetch = fetch,
             .read = read,
         });
@@ -87,6 +88,11 @@ fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!voi
     _ = self;
     _ = allocator;
     _ = vfs;
+}
+
+fn idle(cpu: *Cpu, cycles: u64) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.cycles += cycles;
 }
 
 fn fetch(cpu: *Cpu, address: u16) u8 {
