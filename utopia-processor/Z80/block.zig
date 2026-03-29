@@ -22,7 +22,7 @@ pub fn out(comptime op: OutOp, comptime iface: Core.Interface, core: *Core) void
     fw.log.trace("{t}", .{op});
 
     iface.idle(core, 1);
-    const b: u8 = @truncate(core.bc >> 8);
+    const b = @as(u8, @truncate(core.bc >> 8)) -% 1;
     core.bc = (core.bc & 0xff) | (@as(u16, b) << 8);
 
     const value = core.read(iface, core.hl);

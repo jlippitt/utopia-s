@@ -136,6 +136,7 @@ fn writeIo(cpu: *Cpu, address: u16, value: u8) void {
     self.cycles += Cpu.io_cycles;
 
     switch (@as(u8, @truncate(address))) {
+        0x40...0x7f => {}, // TODO: PSG
         else => |port| fw.log.unimplemented("IO Write: {X:02} <= {X:02}", .{ port, value }),
     }
 }
