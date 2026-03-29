@@ -13,6 +13,7 @@ const Self = @This();
 
 cpu: Cpu,
 mem_ctrl: MemoryControl = .{},
+cycles: u64 = 0,
 ram: *[ram_size]u8,
 rom: []const u8,
 
@@ -48,9 +49,10 @@ fn runFrame(self: *Self) void {
     for (0..(3579540 / 60 / 4)) |_| {
         self.cpu.step(.{
             .fetch = fetch,
+            .read = read,
         });
 
-        fw.log.trace("{f}", .{self.cpu});
+        fw.log.trace("{f} T={d}", .{ self.cpu, self.cycles });
     }
 }
 
@@ -89,7 +91,17 @@ fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!voi
 
 fn fetch(cpu: *Cpu, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.cycles += 4;
+    return self.readInner(address);
+}
 
+fn read(cpu: *Cpu, address: u16) u8 {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.cycles += 3;
+    return self.readInner(address);
+}
+
+fn readInner(self: *Self, address: u16) u8 {
     if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
         return self.ram[address & ram_mask];
     }

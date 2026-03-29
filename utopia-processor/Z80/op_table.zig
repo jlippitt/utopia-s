@@ -4,7 +4,7 @@ const Core = @import("../Z80.zig");
 // const bit = @import("./bit.zig");
 // const control = @import("./control.zig");
 const implied = @import("./implied.zig");
-// const load = @import("./load.zig");
+const load = @import("./load.zig");
 
 const BindFn = fn (comptime func: anytype, comptime args: anytype) Core.Instruction;
 
@@ -27,13 +27,13 @@ pub fn main(comptime iface: Core.Interface) [256]*const Core.Instruction {
     // ops[0x38] = bind(control.jrConditional, .C);
 
     // // 0x00+1
-    // ops[0x01] = bind(load.ld16, .BC);
+    ops[0x01] = bind(load.ld16, .BC);
     // ops[0x09] = bind(alu.add16, .BC);
-    // ops[0x11] = bind(load.ld16, .DE);
+    ops[0x11] = bind(load.ld16, .DE);
     // ops[0x19] = bind(alu.add16, .DE);
-    // ops[0x21] = bind(load.ld16, .HL);
+    ops[0x21] = bind(load.ld16, .HL);
     // ops[0x29] = bind(alu.add16, .HL);
-    // ops[0x31] = bind(load.ld16, .SP);
+    ops[0x31] = bind(load.ld16, .SP);
     // ops[0x39] = bind(alu.add16, .SP);
 
     // // 0x00+2

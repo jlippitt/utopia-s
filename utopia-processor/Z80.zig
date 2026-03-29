@@ -15,6 +15,7 @@ pub const Flags = packed struct(u8) {
 
 pub const Interface = struct {
     fetch: fn (self: *Self, address: u16) u8,
+    read: fn (self: *Self, address: u16) u8,
 };
 
 pub const Instruction = fn (core: *Self) void;
@@ -47,7 +48,7 @@ pub fn init() Self {
 }
 
 pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try writer.print("A={X:02} BC={X:04} DE={X:04} HL={X:04} IX={X:04} IY={X:04} SP={X:04} PC={X:04} F={c}{c}{c}{c}", .{
+    try writer.print("A={X:02} BC={X:04} DE={X:04} HL={X:04} IX={X:04} IY={X:04} SP={X:04} PC={X:04} F={c}{c}{c}{c}{c}{c}{c}{c}", .{
         self.a,
         self.bc,
         self.de,
@@ -56,9 +57,13 @@ pub fn format(self: *const Self, writer: *std.Io.Writer) std.Io.Writer.Error!voi
         self.iy,
         self.sp,
         self.pc,
+        @as(u8, if (self.flags.s) 'S' else '-'),
         @as(u8, if (self.flags.z) 'Z' else '-'),
-        @as(u8, if (self.flags.n) 'N' else '-'),
+        @as(u8, if (self.flags.y) 'Y' else '-'),
         @as(u8, if (self.flags.h) 'H' else '-'),
+        @as(u8, if (self.flags.x) 'X' else '-'),
+        @as(u8, if (self.flags.p) 'P' else '-'),
+        @as(u8, if (self.flags.n) 'N' else '-'),
         @as(u8, if (self.flags.c) 'C' else '-'),
     });
 }
@@ -83,11 +88,11 @@ pub fn fetch(self: *Self, comptime iface: Interface) u8 {
 //     iface.idle(self);
 // }
 
-// pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
-//     const value = iface.read(self, address);
-//     fw.log.trace("  {X:04} => {X:02}", .{ address, value });
-//     return value;
-// }
+pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
+    const value = iface.read(self, address);
+    fw.log.trace("  {X:04} => {X:02}", .{ address, value });
+    return value;
+}
 
 // pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
 //     fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
@@ -105,17 +110,17 @@ pub fn fetch(self: *Self, comptime iface: Interface) u8 {
 //     iface.writeIo(self, address, value);
 // }
 
-// pub fn nextByte(self: *Self, comptime iface: Interface) u8 {
-//     const value = self.read(iface, self.pc);
-//     self.pc +%= 1;
-//     return value;
-// }
+pub fn nextByte(self: *Self, comptime iface: Interface) u8 {
+    const value = self.read(iface, self.pc);
+    self.pc +%= 1;
+    return value;
+}
 
-// pub fn nextWord(self: *Self, comptime iface: Interface) u16 {
-//     const lo = self.nextByte(iface);
-//     const hi = self.nextByte(iface);
-//     return (@as(u16, hi) << 8) | lo;
-// }
+pub fn nextWord(self: *Self, comptime iface: Interface) u16 {
+    const lo = self.nextByte(iface);
+    const hi = self.nextByte(iface);
+    return (@as(u16, hi) << 8) | lo;
+}
 
 // pub fn popWord(self: *Self, comptime iface: Interface) u16 {
 //     const lo = self.read(iface, self.sp);
