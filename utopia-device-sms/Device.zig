@@ -52,6 +52,8 @@ fn runFrame(self: *Self) void {
             .idle = idle,
             .read = read,
             .write = write,
+            .readIo = readIo,
+            .writeIo = writeIo,
         });
 
         fw.log.trace("{f} T={d}", .{ self.cpu, self.cycles });
@@ -96,9 +98,9 @@ fn idle(cpu: *Cpu, cycles: u64) void {
     self.cycles += cycles;
 }
 
-fn read(cpu: *Cpu, cycles: u64, address: u16) u8 {
+fn read(cpu: *Cpu, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
-    self.cycles += cycles;
+    self.cycles += Cpu.mem_cycles;
     self.mdr = self.cartridge.read(address, self.mdr);
 
     if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
@@ -108,15 +110,33 @@ fn read(cpu: *Cpu, cycles: u64, address: u16) u8 {
     return self.mdr;
 }
 
-fn write(cpu: *Cpu, cycles: u64, address: u16, value: u8) void {
+fn write(cpu: *Cpu, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
-    self.cycles += cycles;
+    self.cycles += Cpu.mem_cycles;
     self.mdr = value;
 
     self.cartridge.write(address, value);
 
     if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
         self.ram[address & ram_mask] = value;
+    }
+}
+
+fn readIo(cpu: *Cpu, address: u16) u8 {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.cycles += Cpu.io_cycles;
+
+    return switch (@as(u8, @truncate(address))) {
+        else => |port| fw.log.unimplemented("IO Read: {X:02}", .{port}),
+    };
+}
+
+fn writeIo(cpu: *Cpu, address: u16, value: u8) void {
+    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
+    self.cycles += Cpu.io_cycles;
+
+    switch (@as(u8, @truncate(address))) {
+        else => |port| fw.log.unimplemented("IO Write: {X:02} <= {X:02}", .{ port, value }),
     }
 }
 

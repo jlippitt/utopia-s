@@ -15,10 +15,7 @@ pub fn ld(
 
 pub fn ld16(comptime dst: address.Mode16, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("LD {f}, u16", .{dst});
-    const lo = core.next(iface, 3);
-    const hi = core.next(iface, 3);
-    const result = (@as(u16, hi) << 8) | lo;
-    dst.write(core, result);
+    dst.write(core, core.nextWord(iface));
 }
 
 // pub fn ldSpHl(comptime iface: Core.Interface, core: *Core) void {

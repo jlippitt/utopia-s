@@ -2,6 +2,9 @@ const std = @import("std");
 const fw = @import("framework");
 const op_table = @import("./Z80/op_table.zig");
 
+pub const mem_cycles = 3;
+pub const io_cycles = 4;
+
 pub const Flags = packed struct(u8) {
     c: bool = true,
     n: bool = true,
@@ -15,8 +18,10 @@ pub const Flags = packed struct(u8) {
 
 pub const Interface = struct {
     idle: fn (self: *Self, cycles: u64) void,
-    read: fn (self: *Self, cycles: u64, address: u16) u8,
-    write: fn (self: *Self, cycles: u64, address: u16, value: u8) void,
+    read: fn (self: *Self, address: u16) u8,
+    write: fn (self: *Self, address: u16, value: u8) void,
+    readIo: fn (self: *Self, address: u16) u8,
+    writeIo: fn (self: *Self, address: u16, value: u8) void,
 };
 
 pub const Instruction = fn (core: *Self) void;
@@ -82,32 +87,38 @@ pub fn idle(self: *Self, comptime iface: Interface, cycles: u64) void {
     iface.idle(self, cycles);
 }
 
-pub fn read(self: *Self, comptime iface: Interface, cycles: u64, address: u16) u8 {
-    const value = iface.read(self, cycles, address);
+pub fn read(self: *Self, comptime iface: Interface, address: u16) u8 {
+    const value = iface.read(self, address);
     fw.log.trace("  {X:04} => {X:02}", .{ address, value });
     return value;
 }
 
-pub fn write(self: *Self, comptime iface: Interface, cycles: u64, address: u16, value: u8) void {
+pub fn write(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
     fw.log.trace("  {X:04} <= {X:02}", .{ address, value });
-    iface.write(self, cycles, address, value);
+    iface.write(self, address, value);
 }
 
-// pub fn readIo(self: *Self, comptime iface: Interface, address: u8) u8 {
-//     const value = iface.readIo(self, address);
-//     fw.log.trace("  FF{X:02} => {X:02}", .{ address, value });
-//     return value;
-// }
+pub fn readIo(self: *Self, comptime iface: Interface, address: u16) u8 {
+    const value = iface.readIo(self, address);
+    fw.log.trace("  IO:{X:04} => {X:02}", .{ address, value });
+    return value;
+}
 
-// pub fn writeIo(self: *Self, comptime iface: Interface, address: u8, value: u8) void {
-//     fw.log.trace("  FF{X:02} <= {X:02}", .{ address, value });
-//     iface.writeIo(self, address, value);
-// }
+pub fn writeIo(self: *Self, comptime iface: Interface, address: u16, value: u8) void {
+    fw.log.trace("  IO:{X:04} <= {X:02}", .{ address, value });
+    iface.writeIo(self, address, value);
+}
 
-pub fn next(self: *Self, comptime iface: Interface, cycles: u64) u8 {
-    const value = self.read(iface, cycles, self.pc);
+pub fn nextByte(self: *Self, comptime iface: Interface) u8 {
+    const value = self.read(iface, self.pc);
     self.pc +%= 1;
     return value;
+}
+
+pub fn nextWord(self: *Self, comptime iface: Interface) u16 {
+    const lo = self.nextByte(iface);
+    const hi = self.nextByte(iface);
+    return (@as(u16, hi) << 8) | lo;
 }
 
 // pub fn popWord(self: *Self, comptime iface: Interface) u16 {
@@ -120,19 +131,25 @@ pub fn next(self: *Self, comptime iface: Interface, cycles: u64) u8 {
 
 pub fn pushWord(self: *Self, comptime iface: Interface, value: u16) void {
     self.sp -%= 1;
-    self.write(iface, 3, self.sp, @truncate(value >> 8));
+    self.write(iface, self.sp, @truncate(value >> 8));
     self.sp -%= 1;
-    self.write(iface, 3, self.sp, @truncate(value));
+    self.write(iface, self.sp, @truncate(value));
+}
+
+fn fetch(self: *Self, comptime iface: Interface) u8 {
+    const value = self.nextByte(iface);
+    iface.idle(self, 1);
+    return value;
 }
 
 fn decode(self: *Self, comptime iface: Interface) *const Instruction {
     @setEvalBranchQuota(2000);
 
-    const opcode = self.next(iface, 4);
+    const opcode = self.fetch(iface);
 
     return switch (opcode) {
-        0xcb => (comptime op_table.cb(iface))[self.next(iface, 4)],
-        0xed => (comptime op_table.ed(iface))[self.next(iface, 4)],
+        0xcb => (comptime op_table.cb(iface))[self.fetch(iface)],
+        0xed => (comptime op_table.ed(iface))[self.fetch(iface)],
         else => (comptime op_table.main(iface))[opcode],
     };
 }

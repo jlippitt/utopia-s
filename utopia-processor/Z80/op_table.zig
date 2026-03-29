@@ -2,6 +2,7 @@ const fw = @import("framework");
 const Core = @import("../Z80.zig");
 // const alu = @import("./alu.zig");
 // const bit = @import("./bit.zig");
+const block = @import("./block.zig");
 const control = @import("./control.zig");
 const implied = @import("./implied.zig");
 const load = @import("./load.zig");
@@ -471,6 +472,12 @@ pub fn ed(comptime iface: Core.Interface) [256]*const Core.Instruction {
     ops[0x6e] = bind(implied.im, .{0});
     ops[0x76] = bind(implied.im, .{1});
     ops[0x7e] = bind(implied.im, .{2});
+
+    // 0x80+3
+    ops[0xa3] = bind(block.out, .{.OUTI});
+    ops[0xab] = bind(block.out, .{.OUTD});
+    ops[0xb3] = bind(block.out, .{.OTIR});
+    ops[0xbb] = bind(block.out, .{.OTDR});
 
     return ops;
 }
