@@ -19,14 +19,14 @@ const Condition = enum {
 
 pub fn jr(comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("JR i8", .{});
-    const offset = core.nextByte(iface);
+    const offset = core.next(iface, 3);
     core.idle(iface, 5);
     core.pc +%= fw.num.signExtend(u16, offset);
 }
 
 pub fn jrConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
     fw.log.trace("JR {t}, i8", .{cond});
-    const offset = core.nextByte(iface);
+    const offset = core.next(iface, 3);
 
     if (cond.apply(&core.flags)) {
         fw.log.trace("  Branch taken", .{});
@@ -63,27 +63,29 @@ pub fn jrConditional(comptime cond: Condition, comptime iface: Core.Interface, c
 //     }
 // }
 
-// pub fn call(comptime iface: Core.Interface, core: *Core) void {
-//     fw.log.trace("CALL u16", .{});
-//     const target = core.nextWord(iface);
-//     core.idle(iface);
-//     core.pushWord(iface, core.pc);
-//     core.pc = target;
-// }
+pub fn call(comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("CALL u16", .{});
+    const lo = core.next(iface, 3);
+    const hi = core.next(iface, 4);
+    const target = (@as(u16, hi) << 8) | lo;
+    core.pushWord(iface, core.pc);
+    core.pc = target;
+}
 
-// pub fn callConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
-//     fw.log.trace("CALL {t}, u16", .{cond});
-//     const target = core.nextWord(iface);
+pub fn callConditional(comptime cond: Condition, comptime iface: Core.Interface, core: *Core) void {
+    fw.log.trace("CALL {t}, u16", .{cond});
+    const lo = core.next(iface, 3);
+    const hi = core.next(iface, 4);
+    const target = (@as(u16, hi) << 8) | lo;
 
-//     if (cond.apply(&core.flags)) {
-//         fw.log.trace("  Branch taken", .{});
-//         core.idle(iface);
-//         core.pushWord(iface, core.pc);
-//         core.pc = target;
-//     } else {
-//         fw.log.trace("  Branch not taken", .{});
-//     }
-// }
+    if (cond.apply(&core.flags)) {
+        fw.log.trace("  Branch taken", .{});
+        core.pushWord(iface, core.pc);
+        core.pc = target;
+    } else {
+        fw.log.trace("  Branch not taken", .{});
+    }
+}
 
 // pub fn ret(comptime iface: Core.Interface, core: *Core) void {
 //     fw.log.trace("RET", .{});

@@ -37,11 +37,11 @@ pub const Mode8 = enum {
             .E => @truncate(core.de),
             .H => @truncate(core.hl >> 8),
             .L => @truncate(core.hl),
-            .immediate => core.nextByte(iface),
-            .absolute => core.read(iface, core.nextWord(iface)),
-            .BC_indirect => core.read(iface, core.bc),
-            .DE_indirect => core.read(iface, core.de),
-            .HL_indirect => core.read(iface, core.hl),
+            .immediate => core.next(iface, 3),
+            .absolute => core.read(iface, 3, absolute(iface, core)),
+            .BC_indirect => core.read(iface, 3, core.bc),
+            .DE_indirect => core.read(iface, 3, core.de),
+            .HL_indirect => core.read(iface, 3, core.hl),
         };
     }
 
@@ -55,10 +55,10 @@ pub const Mode8 = enum {
             .H => core.hl = (core.hl & 0xff) | (@as(u16, value) << 8),
             .L => core.hl = (core.hl & 0xff00) | @as(u16, value),
             .immediate => @compileError("Cannot write to immediate address"),
-            .absolute => core.write(iface, core.nextWord(iface), value),
-            .BC_indirect => core.write(iface, core.bc, value),
-            .DE_indirect => core.write(iface, core.de, value),
-            .HL_indirect => core.write(iface, core.hl, value),
+            .absolute => core.write(iface, 3, absolute(iface, core), value),
+            .BC_indirect => core.write(iface, 3, core.bc, value),
+            .DE_indirect => core.write(iface, 3, core.de, value),
+            .HL_indirect => core.write(iface, 3, core.hl, value),
         };
     }
 };
@@ -99,3 +99,9 @@ pub const Mode16 = enum {
         }
     }
 };
+
+fn absolute(comptime iface: Core.Interface, core: *Core) u16 {
+    const lo = core.next(iface, 3);
+    const hi = core.next(iface, 3);
+    return (@as(u16, hi) << 8) | lo;
+}

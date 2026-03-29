@@ -292,14 +292,14 @@ pub fn main(comptime iface: Core.Interface) [256]*const Core.Instruction {
     ops[0xfb] = bind(implied.ei, .{});
 
     // // 0xc0+4
-    // ops[0xc4] = bind(control.callConditional, .NZ);
-    // ops[0xcc] = bind(control.callConditional, .Z);
-    // ops[0xd4] = bind(control.callConditional, .NC);
-    // ops[0xdc] = bind(control.callConditional, .C);
+    ops[0xc4] = bind(control.callConditional, .NZ);
+    ops[0xcc] = bind(control.callConditional, .Z);
+    ops[0xd4] = bind(control.callConditional, .NC);
+    ops[0xdc] = bind(control.callConditional, .C);
 
     // // 0xc0+5
     // ops[0xc5] = bind(load.push, .BC);
-    // ops[0xcd] = bind(control.call, .{});
+    ops[0xcd] = bind(control.call, .{});
     // ops[0xd5] = bind(load.push, .DE);
     // ops[0xe5] = bind(load.push, .HL);
     // ops[0xf5] = bind(load.push, .AF);

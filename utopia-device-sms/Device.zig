@@ -50,7 +50,6 @@ fn runFrame(self: *Self) void {
     for (0..(3579540 / 60 / 4)) |_| {
         self.cpu.step(.{
             .idle = idle,
-            .fetch = fetch,
             .read = read,
             .write = write,
         });
@@ -97,19 +96,9 @@ fn idle(cpu: *Cpu, cycles: u64) void {
     self.cycles += cycles;
 }
 
-fn fetch(cpu: *Cpu, address: u16) u8 {
+fn read(cpu: *Cpu, cycles: u64, address: u16) u8 {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
-    self.cycles += 4;
-    return self.readInner(address);
-}
-
-fn read(cpu: *Cpu, address: u16) u8 {
-    const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
-    self.cycles += 3;
-    return self.readInner(address);
-}
-
-fn readInner(self: *Self, address: u16) u8 {
+    self.cycles += cycles;
     self.mdr = self.cartridge.read(address, self.mdr);
 
     if (address >= 0xc000 and !self.mem_ctrl.ram_disable) {
@@ -119,9 +108,9 @@ fn readInner(self: *Self, address: u16) u8 {
     return self.mdr;
 }
 
-fn write(cpu: *Cpu, address: u16, value: u8) void {
+fn write(cpu: *Cpu, cycles: u64, address: u16, value: u8) void {
     const self: *Self = @alignCast(@fieldParentPtr("cpu", cpu));
-    self.cycles += 3;
+    self.cycles += cycles;
     self.mdr = value;
 
     self.cartridge.write(address, value);
