@@ -2,15 +2,15 @@
     .name = .utopia,
     .version = "0.0.0",
     .fingerprint = 0x5f4175fb25838ca2,
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.11.0.tar.gz",
-            .hash = "clap-0.11.0-oBajB-HnAQDPCKYzwF7rO3qDFwRcD39Q0DALlTSz5H7e",
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.12.0.tar.gz",
+            .hash = "clap-0.12.0-oBajB7foAQDqlSwaSG5g0yq7xGbQARUsBk5T64gAOqP5",
         },
         .sdl3 = .{
-            .url = "git+https://codeberg.org/7Games/zig-sdl3?ref=v0.1.7#318706d40fd56dbc67ad58a5a1be5c935ceb8585",
-            .hash = "sdl3-0.1.7-NmT1Q00HJwBQEXnwv_YWydIXUCKazlnPDACaXwwVQoHo",
+            .url = "git+https://codeberg.org/7Games/zig-sdl3?ref=v0.2.1#7cf436e4a8622a0232e53ea5cb4df82e8cadaaaa",
+            .hash = "sdl3-0.2.1-NmT1Q9YZKAAmuTV7fFuZHwH2jFQtw2uvVahQSMSD6DbK",
         },
     },
     .paths = .{
