@@ -61,13 +61,21 @@ pub fn set(self: *Self, reg: Register, value: @Vector(8, u16)) void {
     fw.log.trace("  {t}: {any}", .{ reg, value });
 }
 
-pub fn getLane(self: *const Self, reg: Register, index: usize) u16 {
-    return self.get(reg)[index ^ 7];
+pub fn getLane(self: *const Self, reg: Register, index: u3) u16 {
+    const result = self.get(reg);
+
+    return switch (index ^ 7) {
+        inline else => |lane| result[lane],
+    };
 }
 
-pub fn setLane(self: *Self, reg: Register, index: usize, value: u16) void {
+pub fn setLane(self: *Self, reg: Register, index: u3, value: u16) void {
     var result = self.get(reg);
-    result[index ^ 7] = value;
+
+    switch (index ^ 7) {
+        inline else => |lane| result[lane] = value,
+    }
+
     self.set(reg, result);
 }
 

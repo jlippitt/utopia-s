@@ -29,14 +29,14 @@ pub fn vmov(core: *Core, word: u32) void {
     cp2.setAccLow(cp2.broadcast(args.vt, args.vt_el));
 
     // Weird lane shenanigans that only occur on VMOV
-    const vt_lane = switch (args.vt_el) {
+    const vt_lane: u3 = @truncate(switch (args.vt_el) {
         0...1 => args.vd_el & 7,
         2...3 => (args.vd_el & 6) | (args.vt_el & 1),
         4...7 => (args.vd_el & 4) | (args.vt_el & 3),
         else => args.vt_el & 7,
-    };
+    });
 
-    const vd_lane = args.vd_el & 7;
+    const vd_lane: u3 = @truncate(args.vd_el & 7);
 
     cp2.setLane(args.vd, vd_lane, cp2.getLane(args.vt, vt_lane));
 }
@@ -94,8 +94,8 @@ pub fn reciprocal(comptime op: ReciprocalOp) Core.Instruction {
 
             cp2.setAccLow(cp2.broadcast(args.vt, args.vt_el));
 
-            const vt_lane = args.vt_el & 7;
-            const vd_lane = args.vd_el & 7;
+            const vt_lane: u3 = @truncate(args.vt_el & 7);
+            const vd_lane: u3 = @truncate(args.vd_el & 7);
 
             const value = cp2.getLane(args.vt, vt_lane);
 

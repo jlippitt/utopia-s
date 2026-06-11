@@ -213,7 +213,7 @@ fn loadPacked(
     for (0..8) |index| {
         const byte_address = start +% (base_offset +% @as(u4, @intCast(index)));
         const byte_value = core.readData(u8, byte_address);
-        core.cp2.setLane(vt, index, @as(u16, byte_value) << shift);
+        core.cp2.setLane(vt, @truncate(index), @as(u16, byte_value) << shift);
     }
 }
 
@@ -233,9 +233,9 @@ fn storePacked(
         const byte_offset = @as(u4, @intCast(index)) +% el;
 
         const byte_value: u8 = @truncate(if (byte_offset < 8)
-            core.cp2.getLane(vt, byte_offset) >> shift_lo
+            core.cp2.getLane(vt, @truncate(byte_offset)) >> shift_lo
         else
-            core.cp2.getLane(vt, byte_offset & 7) >> shift_hi);
+            core.cp2.getLane(vt, @truncate(byte_offset & 7)) >> shift_hi);
 
         core.writeData(u8, address +% @as(u12, @intCast(index)), byte_value);
     }
