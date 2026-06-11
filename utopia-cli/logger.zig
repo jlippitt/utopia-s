@@ -20,27 +20,39 @@ else
     default_level;
 
 const File = struct {
-    handle: std.fs.File,
-    writer: std.fs.File.Writer,
+    handle: std.Io.File,
+    writer: std.Io.File.Writer,
     buffer: [buffer_size]u8,
 };
 
-threadlocal var files: std.ArrayListUnmanaged(File) = .empty;
-threadlocal var span_map: std.StringHashMapUnmanaged(*std.fs.File.Writer) = .empty;
-threadlocal var stack: std.ArrayListUnmanaged(*std.fs.File.Writer) = .empty;
+const Logger = struct {
+    io: std.Io,
+    files: std.ArrayListUnmanaged(File),
+    span_map: std.StringHashMapUnmanaged(*std.Io.File.Writer),
+    stack: std.ArrayListUnmanaged(*std.Io.File.Writer),
+};
 
-pub fn init(allocator: std.mem.Allocator) !void {
+threadlocal var logger: Logger = undefined;
+
+pub fn init(io: std.Io, allocator: std.mem.Allocator) !void {
     if (comptime @intFromEnum(max_level) < @intFromEnum(utopia.log.Level.debug)) {
         return;
     }
 
-    try std.fs.cwd().makePath(log_path);
+    logger = .{
+        .io = io,
+        .files = .empty,
+        .span_map = .empty,
+        .stack = .empty,
+    };
 
-    try files.ensureTotalCapacity(allocator, max_files);
-    try span_map.ensureTotalCapacity(allocator, max_files);
-    try stack.ensureTotalCapacity(allocator, max_files);
+    try std.Io.Dir.cwd().createDirPath(io, log_path);
 
-    stack.appendAssumeCapacity(try createLogFile("main"));
+    try logger.files.ensureTotalCapacity(allocator, max_files);
+    try logger.span_map.ensureTotalCapacity(allocator, max_files);
+    try logger.stack.ensureTotalCapacity(allocator, max_files);
+
+    logger.stack.appendAssumeCapacity(try createLogFile("main"));
 }
 
 pub fn deinit() void {
@@ -48,14 +60,14 @@ pub fn deinit() void {
         return;
     }
 
-    for (files.items) |*file| {
+    for (logger.files.items) |*file| {
         file.writer.interface.flush() catch {};
-        file.handle.close();
+        file.handle.close(logger.io);
     }
 
-    stack.clearRetainingCapacity();
-    span_map.clearRetainingCapacity();
-    files.clearRetainingCapacity();
+    logger.stack.clearRetainingCapacity();
+    logger.span_map.clearRetainingCapacity();
+    logger.files.clearRetainingCapacity();
 }
 
 pub fn enabled(comptime level: utopia.log.Level) bool {
@@ -71,7 +83,7 @@ pub fn record(comptime level: utopia.log.Level, comptime fmt: []const u8, args: 
         return;
     }
 
-    stack.getLast().interface.print(fmt ++ "\n", args) catch {};
+    logger.stack.getLast().interface.print(fmt ++ "\n", args) catch {};
 }
 
 pub fn pushContext(name: []const u8) void {
@@ -79,7 +91,7 @@ pub fn pushContext(name: []const u8) void {
         return;
     }
 
-    stack.appendAssumeCapacity(span_map.get(name) orelse createLogFile(name) catch |err| {
+    logger.stack.appendAssumeCapacity(logger.span_map.get(name) orelse createLogFile(name) catch |err| {
         std.debug.panic("Failed to create log file '{s}': {t}", .{ name, err });
     });
 }
@@ -89,12 +101,12 @@ pub fn popContext() void {
         return;
     }
 
-    _ = stack.pop() orelse {
+    _ = logger.stack.pop() orelse {
         std.debug.panic("Called 'popContext' with empty context stack", .{});
     };
 }
 
-fn createLogFile(name: []const u8) !*std.fs.File.Writer {
+fn createLogFile(name: []const u8) !*std.Io.File.Writer {
     var path_buf: [256]u8 = undefined;
 
     const path = try std.fmt.bufPrint(&path_buf, "{s}/{s}.log", .{
@@ -102,11 +114,11 @@ fn createLogFile(name: []const u8) !*std.fs.File.Writer {
         name,
     });
 
-    const file = files.addOneAssumeCapacity();
-    file.handle = try std.fs.cwd().createFile(path, .{});
-    file.writer = file.handle.writer(&file.buffer);
+    const file = logger.files.addOneAssumeCapacity();
+    file.handle = try std.Io.Dir.cwd().createFile(logger.io, path, .{});
+    file.writer = file.handle.writer(logger.io, &file.buffer);
 
-    span_map.putAssumeCapacity(name, &file.writer);
+    logger.span_map.putAssumeCapacity(name, &file.writer);
 
     return &file.writer;
 }

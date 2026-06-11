@@ -17,15 +17,13 @@ pub const utopia_logger: utopia.log.Interface = .{
     .popContext = logger.popContext,
 };
 
-pub fn main() !void {
-    const allocator = std.heap.c_allocator;
-
-    logger.init(allocator) catch |err| {
+pub fn main(init: std.process.Init) !void {
+    logger.init(init.io, init.arena.allocator()) catch |err| {
         std.debug.panic("Failed to initialize logger: {t}", .{err});
     };
     defer logger.deinit();
 
-    const app_args, const device_args = try cli.parse(allocator) orelse return;
+    const app_args, const device_args = try cli.parse(init.gpa) orelse return;
 
     sdl3.errors.error_callback = sdlError;
 
@@ -33,17 +31,14 @@ pub fn main() !void {
     defer sdl3.quit(.everything);
 
     const vfs = try Vfs.init(
-        allocator,
+        init.arena.allocator(),
         app_args.rom_path,
         app_args.bios_path,
         app_args.save_path,
     );
-    defer vfs.deinit(allocator);
+    defer vfs.deinit(init.arena.allocator());
 
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    defer arena.deinit();
-
-    var device = try device_args.initDevice(&arena, vfs);
+    var device = try device_args.initDevice(init.arena, vfs);
     defer device.deinit();
 
     var video = blk: {
@@ -146,7 +141,7 @@ pub fn main() !void {
             const now = std.time.timestamp();
 
             if ((now - last_save_time) >= app_args.save_interval) {
-                try device.save(allocator, vfs);
+                try device.save(init.gpa, vfs);
                 last_save_time = now;
             }
         }
@@ -154,7 +149,7 @@ pub fn main() !void {
         try video.setFps(fps_counter.update());
     }
 
-    try device.save(allocator, vfs);
+    try device.save(init.gpa, vfs);
 }
 
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {
