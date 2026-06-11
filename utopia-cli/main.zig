@@ -17,6 +17,8 @@ pub const utopia_logger: utopia.log.Interface = .{
     .popContext = logger.popContext,
 };
 
+const clock: std.Io.Clock = .awake;
+
 pub fn main(init: std.process.Init) !void {
     logger.init(init.io, init.arena.allocator()) catch |err| {
         std.debug.panic("Failed to initialize logger: {t}", .{err});
@@ -79,8 +81,8 @@ pub fn main(init: std.process.Init) !void {
     }
 
     var fps_counter = try FpsCounter.init(init.io);
-    var timer = try std.time.Timer.start();
-    var last_save_time = std.time.timestamp();
+    var frame_time = std.Io.Timestamp.now(init.io, clock);
+    var last_save_time = std.Io.Timestamp.now(init.io, clock);
     var delay_time: i64 = 0;
 
     outer: while (true) {
@@ -132,7 +134,11 @@ pub fn main(init: std.process.Init) !void {
             const lost_sample_count = audio.pollLostSamples();
             const expected_duration = ((sample_count + lost_sample_count) * std.time.ns_per_s) /
                 audio_state.sample_rate;
-            const actual_duration = timer.lap();
+
+            const now = std.Io.Timestamp.now(init.io, clock);
+            const actual_duration = frame_time.durationTo(now).toNanoseconds();
+            frame_time = now;
+
             delay_time += @intCast(expected_duration);
             delay_time -= @intCast(actual_duration);
 
@@ -142,9 +148,10 @@ pub fn main(init: std.process.Init) !void {
         }
 
         {
-            const now = std.time.timestamp();
+            const now = std.Io.Timestamp.now(init.io, clock);
+            const duration = last_save_time.durationTo(now).toSeconds();
 
-            if ((now - last_save_time) >= app_args.save_interval) {
+            if (duration >= app_args.save_interval) {
                 try device.save(init.gpa, vfs);
                 last_save_time = now;
             }
