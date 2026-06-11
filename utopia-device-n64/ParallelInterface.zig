@@ -16,12 +16,13 @@ bsd_dom1: BsdDom = .{},
 bsd_dom2: BsdDom = .{},
 
 pub fn init(
+    io: std.Io,
     arena: *std.heap.ArenaAllocator,
     vfs: fw.Vfs,
     rom: []align(8) const u8,
 ) fw.Vfs.Error!Self {
     const sram = try arena.allocator().alignedAlloc(u8, .@"4", sram_size);
-    _ = try vfs.readSave(arena.allocator(), "sram", sram);
+    _ = try vfs.readSave(io, arena.allocator(), "sram", sram);
 
     return .{
         .rom = rom,
@@ -29,12 +30,12 @@ pub fn init(
     };
 }
 
-pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+pub fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
     if (!self.sram_dirty) {
         return;
     }
 
-    try vfs.writeSave(allocator, "sram", self.sram);
+    try vfs.writeSave(io, allocator, "sram", self.sram);
     self.sram_dirty = false;
 }
 

@@ -46,9 +46,9 @@ const Self = @This();
 data: *[size]u8,
 dirty: bool = false,
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs) fw.Vfs.Error!Self {
+pub fn init(io: std.Io, arena: *std.heap.ArenaAllocator, vfs: fw.Vfs) fw.Vfs.Error!Self {
     const data = try arena.allocator().alloc(u8, size);
-    const read_len = try vfs.readSave(arena.allocator(), "mempak", data);
+    const read_len = try vfs.readSave(io, arena.allocator(), "mempak", data);
 
     if (read_len != size) {
         format(data[0..size]);
@@ -59,12 +59,12 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs) fw.Vfs.Error!Self {
     };
 }
 
-pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+pub fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
     if (!self.dirty) {
         return;
     }
 
-    try vfs.writeSave(allocator, "mempak", self.data);
+    try vfs.writeSave(io, allocator, "mempak", self.data);
     self.dirty = false;
 }
 

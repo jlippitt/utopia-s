@@ -95,7 +95,12 @@ pub const Device = struct {
             getVideoState: *const fn (self: *const T) VideoState,
             getAudioState: *const fn (self: *const T) AudioState,
             updateControllerState: *const fn (self: *T, state: *const ControllerState) void,
-            save: *const fn (self: *T, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void,
+            save: *const fn (
+                self: *T,
+                io: std.Io,
+                allocator: std.mem.Allocator,
+                vfs: Vfs,
+            ) Vfs.Error!void,
         };
     }
 
@@ -136,9 +141,9 @@ pub const Device = struct {
                 return @call(.always_inline, iface.updateControllerState, .{ self, state });
             }
 
-            fn saveImpl(ptr: *anyopaque, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void {
+            fn saveImpl(ptr: *anyopaque, io: std.Io, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void {
                 const self: *T = @ptrCast(@alignCast(ptr));
-                return @call(.always_inline, iface.save, .{ self, allocator, vfs });
+                return @call(.always_inline, iface.save, .{ self, io, allocator, vfs });
             }
 
             const vtable = Interface(anyopaque){
@@ -177,8 +182,13 @@ pub const Device = struct {
         return self.vtable.updateControllerState(self.ptr, state);
     }
 
-    pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: Vfs) Vfs.Error!void {
-        return self.vtable.save(self.ptr, allocator, vfs);
+    pub fn save(
+        self: *Self,
+        io: std.Io,
+        allocator: std.mem.Allocator,
+        vfs: Vfs,
+    ) Vfs.Error!void {
+        return self.vtable.save(self.ptr, io, allocator, vfs);
     }
 };
 

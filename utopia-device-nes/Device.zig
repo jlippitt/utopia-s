@@ -27,7 +27,12 @@ apu: Apu,
 joypad: Joypad,
 cartridge: Cartridge,
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
+pub fn init(
+    io: std.Io,
+    arena: *std.heap.ArenaAllocator,
+    vfs: fw.Vfs,
+    args: Args,
+) fw.InitError!fw.Device {
     _ = args;
 
     const wram = try arena.allocator().alloc(u8, wram_size);
@@ -41,7 +46,7 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .ppu = try .init(arena),
         .apu = try .init(arena),
         .joypad = .init(),
-        .cartridge = try .init(arena, vfs),
+        .cartridge = try .init(io, arena, vfs),
     };
 
     return .init(self, .{
@@ -84,8 +89,8 @@ fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
     self.joypad.update(state);
 }
 
-fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
-    try self.cartridge.save(allocator, vfs);
+fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    try self.cartridge.save(io, allocator, vfs);
 }
 
 fn read(cpu: *Cpu, address: u16) u8 {

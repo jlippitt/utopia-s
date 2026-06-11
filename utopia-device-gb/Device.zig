@@ -16,9 +16,6 @@ const hram_mask = hram_size;
 
 const m_cycle = 4;
 
-var test_rom_buf: [256]u8 = undefined;
-var test_rom_writer = std.fs.File.stderr().writer(&test_rom_buf);
-
 pub const Args = struct {};
 
 const Self = @This();
@@ -35,12 +32,19 @@ hram: *[hram_size]u8,
 timer: Timer,
 gpu: Gpu,
 cartridge: Cartridge,
+test_rom_buf: [256]u8 = undefined,
+test_rom_writer: std.Io.File.Writer,
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
+pub fn init(
+    io: std.Io,
+    arena: *std.heap.ArenaAllocator,
+    vfs: fw.Vfs,
+    args: Args,
+) fw.InitError!fw.Device {
     _ = args;
 
-    const rom = try vfs.readRom(arena.allocator());
-    const boot_rom = try vfs.readBios(arena.allocator(), "dmg_boot.bin");
+    const rom = try vfs.readRom(io, arena.allocator());
+    const boot_rom = try vfs.readBios(io, arena.allocator(), "dmg_boot.bin");
 
     const wram = try arena.allocator().alloc(u8, wram_size);
     const hram = try arena.allocator().alloc(u8, hram_size);
@@ -56,7 +60,10 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .timer = .init(),
         .gpu = try .init(arena),
         .cartridge = try .init(arena, rom),
+        .test_rom_writer = undefined,
     };
+
+    self.test_rom_writer = std.Io.File.stderr().writer(io, &self.test_rom_buf);
 
     return .init(self, .{
         .deinit = deinit,
@@ -107,8 +114,9 @@ pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void
     _ = state;
 }
 
-pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+pub fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
     _ = self;
+    _ = io;
     _ = allocator;
     _ = vfs;
 }
@@ -301,11 +309,11 @@ fn writeIoNormal(self: *Self, address: u8, value: u8) void {
         0x00 => {}, // TODO: Joypad
         0x01 => {
             // TODO: Serial port
-            test_rom_writer.interface.writeByte(value) catch {};
+            self.test_rom_writer.interface.writeByte(value) catch {};
         },
         0x02 => if (value == 0x81) {
             // TODO: Serial port
-            test_rom_writer.interface.flush() catch {};
+            self.test_rom_writer.interface.flush() catch {};
         },
         0x04...0x07 => self.timer.write(address, value),
         0x0f => self.interrupt.setFlags(value),

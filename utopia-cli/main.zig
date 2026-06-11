@@ -44,7 +44,7 @@ pub fn main(init: std.process.Init) !void {
     );
     defer vfs.deinit(init.io, init.arena.allocator());
 
-    var device = try device_args.initDevice(init.arena, vfs);
+    var device = try device_args.initDevice(init.io, init.arena, vfs);
     defer device.deinit();
 
     var video = blk: {
@@ -152,7 +152,7 @@ pub fn main(init: std.process.Init) !void {
             const duration = last_save_time.durationTo(now).toSeconds();
 
             if (duration >= app_args.save_interval) {
-                try device.save(init.gpa, vfs);
+                try device.save(init.io, init.gpa, vfs);
                 last_save_time = now;
             }
         }
@@ -160,7 +160,7 @@ pub fn main(init: std.process.Init) !void {
         try video.setFps(fps_counter.update(init.io));
     }
 
-    try device.save(init.gpa, vfs);
+    try device.save(init.io, init.gpa, vfs);
 }
 
 fn panicHandler(msg: []const u8, first_trace_addr: ?usize) noreturn {

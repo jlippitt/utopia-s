@@ -76,13 +76,19 @@ pi: ParallelInterface,
 ri: RdramInterface,
 si: SerialInterface,
 systest_output: *[systest_output_size]u8,
+systest_writer: std.Io.File.Writer,
 
 // utopia.Device methods
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitError!fw.Device {
+pub fn init(
+    io: std.Io,
+    arena: *std.heap.ArenaAllocator,
+    vfs: fw.Vfs,
+    args: Args,
+) fw.InitError!fw.Device {
     _ = args;
 
-    const rom = try vfs.readRomAligned(arena.allocator(), .@"8");
+    const rom = try vfs.readRomAligned(io, arena.allocator(), .@"8");
     const rdram = try arena.allocator().alignedAlloc(u8, .@"4", rdram_size);
 
     const cic = Cic.init(rom[0x0040..0x1000]);
@@ -108,11 +114,14 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, args: Args) fw.InitErr
         .mi = .init(),
         .vi = vi,
         .ai = ai,
-        .pi = try .init(arena, vfs, rom),
+        .pi = try .init(io, arena, vfs, rom),
         .ri = .init(),
-        .si = try .init(arena, vfs, cic.getSeed()),
+        .si = try .init(io, arena, vfs, cic.getSeed()),
         .systest_output = systest_output[0..systest_output_size],
+        .systest_writer = undefined,
     };
+
+    self.systest_writer = std.Io.File.stderr().writer(io, self.systest_output);
 
     return .init(self, .{
         .deinit = deinit,
@@ -163,9 +172,9 @@ pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void
     self.si.updateControllerState(state);
 }
 
-fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
-    try self.pi.save(allocator, vfs);
-    try self.si.save(allocator, vfs);
+fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    try self.pi.save(io, allocator, vfs);
+    try self.si.save(io, allocator, vfs);
 }
 
 // CPU methods
@@ -237,7 +246,9 @@ pub fn write(self: *Self, address: u32, value: u32, mask: u32) void {
                 mask,
             ),
             0x13ff_0014 => {
-                _ = std.fs.File.stderr().write(self.systest_output[0..(value & mask)]) catch {};
+                _ = self.systest_writer.interface.write(
+                    self.systest_output[0..(value & mask)],
+                ) catch {};
             },
             else => fw.log.warn("Write to cartridge ROM: {X:08} <= {X:08}", .{ address, value }),
         },

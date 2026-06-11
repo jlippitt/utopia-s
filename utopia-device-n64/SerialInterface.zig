@@ -22,8 +22,13 @@ mempak: Mempak,
 eeprom_data: []u8,
 eeprom_dirty: bool = false,
 
-pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, cic_seed: u32) fw.Vfs.Error!Self {
-    const pifdata = try vfs.readBiosAligned(arena.allocator(), "pifdata.bin", .@"4");
+pub fn init(
+    io: std.Io,
+    arena: *std.heap.ArenaAllocator,
+    vfs: fw.Vfs,
+    cic_seed: u32,
+) fw.Vfs.Error!Self {
+    const pifdata = try vfs.readBiosAligned(io, arena.allocator(), "pifdata.bin", .@"4");
 
     // Command byte should be zero at reset
     pifdata[cmd_byte] = 0;
@@ -33,23 +38,23 @@ pub fn init(arena: *std.heap.ArenaAllocator, vfs: fw.Vfs, cic_seed: u32) fw.Vfs.
 
     // TODO: Support 16K EEPROM
     const eeprom_data = try arena.allocator().alloc(u8, 512);
-    _ = try vfs.readSave(arena.allocator(), "eeprom", eeprom_data);
+    _ = try vfs.readSave(io, arena.allocator(), "eeprom", eeprom_data);
 
     return .{
         .pifdata = pifdata[0..pif_size],
-        .mempak = try .init(arena, vfs),
+        .mempak = try .init(io, arena, vfs),
         .eeprom_data = eeprom_data,
     };
 }
 
-pub fn save(self: *Self, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
-    try self.mempak.save(allocator, vfs);
+pub fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
+    try self.mempak.save(io, allocator, vfs);
 
     if (!self.eeprom_dirty) {
         return;
     }
 
-    try vfs.writeSave(allocator, "eeprom", self.eeprom_data);
+    try vfs.writeSave(io, allocator, "eeprom", self.eeprom_data);
     self.eeprom_dirty = false;
 }
 
