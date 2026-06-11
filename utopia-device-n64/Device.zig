@@ -118,10 +118,8 @@ pub fn init(
         .ri = .init(),
         .si = try .init(io, arena, vfs, cic.getSeed()),
         .systest_output = systest_output[0..systest_output_size],
-        .systest_writer = undefined,
+        .systest_writer = std.Io.File.stderr().writer(io, &.{}),
     };
-
-    self.systest_writer = std.Io.File.stderr().writer(io, self.systest_output);
 
     return .init(self, .{
         .deinit = deinit,
