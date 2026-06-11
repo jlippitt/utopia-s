@@ -13,7 +13,11 @@ const AppArgs = struct {
     no_fps_limit: bool,
 };
 
-pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs } {
+pub fn parse(
+    io: std.Io,
+    allocator: std.mem.Allocator,
+    args: *const std.process.Args,
+) !?struct { AppArgs, utopia.DeviceArgs } {
     const parsers = .{
         .device = clap.parsers.enumeration(utopia.DeviceType),
         .path = clap.parsers.string,
@@ -31,7 +35,7 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
         \\
     );
 
-    var iter = try std.process.ArgIterator.initWithAllocator(allocator);
+    var iter = try args.iterateAllocator(allocator);
     defer iter.deinit();
 
     _ = iter.next();
@@ -43,25 +47,26 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
         .allocator = allocator,
         .terminating_positional = 0,
     }) catch |err| {
-        try diag.reportToFile(.stderr(), err);
+        try diag.reportToFile(io, .stderr(), err);
         return err;
     };
 
     defer res.deinit();
 
     if (res.args.help != 0) {
-        try clap.helpToFile(.stderr(), clap.Help, &params, .{});
+        try clap.helpToFile(io, .stderr(), clap.Help, &params, .{});
         return null;
     }
 
     const command = res.positionals[0] orelse {
-        try clap.helpToFile(.stderr(), clap.Help, &params, .{});
+        try clap.helpToFile(io, .stderr(), clap.Help, &params, .{});
         return error.MissingDeviceType;
     };
 
     const device_args, const rom_path = switch (command) {
         inline else => |device_type| try parseDeviceArgs(
             device_type,
+            io,
             allocator,
             &iter,
         ) orelse return null,
@@ -81,8 +86,9 @@ pub fn parse(allocator: std.mem.Allocator) !?struct { AppArgs, utopia.DeviceArgs
 
 fn parseDeviceArgs(
     comptime device_type: utopia.DeviceType,
+    io: std.Io,
     allocator: std.mem.Allocator,
-    iter: *std.process.ArgIterator,
+    iter: *std.process.Args.Iterator,
 ) !?struct { utopia.DeviceArgs, []const u8 } {
     const parsers = .{
         .string = clap.parsers.string,
@@ -98,14 +104,14 @@ fn parseDeviceArgs(
         .allocator = allocator,
         .terminating_positional = 0,
     }) catch |err| {
-        try diag.reportToFile(.stderr(), err);
+        try diag.reportToFile(io, .stderr(), err);
         return err;
     };
 
     defer res.deinit();
 
     if (res.args.help != 0) {
-        try clap.helpToFile(.stderr(), clap.Help, params, .{});
+        try clap.helpToFile(io, .stderr(), clap.Help, params, .{});
         return null;
     }
 

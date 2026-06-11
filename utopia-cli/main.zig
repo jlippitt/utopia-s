@@ -23,7 +23,11 @@ pub fn main(init: std.process.Init) !void {
     };
     defer logger.deinit();
 
-    const app_args, const device_args = try cli.parse(init.gpa) orelse return;
+    const app_args, const device_args = try cli.parse(
+        init.io,
+        init.gpa,
+        &init.minimal.args,
+    ) orelse return;
 
     sdl3.errors.error_callback = sdlError;
 
