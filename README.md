@@ -5,7 +5,7 @@ In-progress multi-emulator in Zig
 Available cores:
 
 | System      | Status                                                                           |
-|-------------|----------------------------------------------------------------------------------|
+| ----------- | -------------------------------------------------------------------------------- |
 | Game Boy    | Very early stages                                                                |
 | NES         | Playable. Supported mappers: NROM, UxROM, CNROM, AxROM, MMC1                     |
 | Nintendo 64 | Some games playable. Many graphical glitches. Some games have frame rate issues. |
@@ -14,8 +14,8 @@ Available cores:
 
 ### Linux
 
-* Install [Zig 0.15.2](https://ziglang.org/download/)
-* Install your distribution's equivalent of Ubuntu's `glsl-tools` (needed for `glslangValidator` in order to compile shaders)
+- Install [Zig 0.16.0](https://ziglang.org/download/)
+- Install your distribution's equivalent of Ubuntu's `glsl-tools` (needed for `glslangValidator` in order to compile shaders)
 
 ```
 zig build --release=safe
@@ -46,7 +46,7 @@ where `<system>` is one of `gb`, `nes` or `n64` (see above)
 Available options:
 
 | Option                          | Description                                                    | Default                    |
-|---------------------------------|----------------------------------------------------------------|----------------------------|
+| ------------------------------- | -------------------------------------------------------------- | -------------------------- |
 | `-b, --bios-path <path>`        | Path where BIOS files are located (see below)                  | Same directory as ROM file |
 | `-s, --save-path <path>`        | Path where save files are located (see below)                  | Same directory as ROM file |
 | `-i, --save-interval <seconds>` | How often to sync save files to disk while emulator is running | 30 seconds                 |
@@ -58,9 +58,9 @@ Available options:
 Some cores require BIOS or boot ROM files
 
 | System      | File name      | Required |
-|-------------|----------------|----------|
-| Game Boy    | `dmg_boot.bin` | Yes*     |
-| Nintendo 64 | `pifdata.bin`  | Yes*     |
+| ----------- | -------------- | -------- |
+| Game Boy    | `dmg_boot.bin` | Yes\*    |
+| Nintendo 64 | `pifdata.bin`  | Yes\*    |
 
 \* There are future plans to make this optional
 
@@ -76,17 +76,17 @@ closes.
 
 Game controller support is available (it must be plugged in when the application starts) as well keyboard controls for 2D systems:
 
-| Button   | Equivalent Key |
-|----------|----------------|
-| A        | X              |
-| B        | Z              |
-| Select   | Space bar      |
-| Start    | Enter          |
-| D-Pad    | Arrow keys     |
+| Button | Equivalent Key |
+| ------ | -------------- |
+| A      | X              |
+| B      | Z              |
+| Select | Space bar      |
+| Start  | Enter          |
+| D-Pad  | Arrow keys     |
 
 Additional keyboard controls (all systems):
 
 | Key    | Description                        |
-|--------|------------------------------------|
+| ------ | ---------------------------------- |
 | F11    | Toggle full screen mode on/off     |
 | Escape | Save data and exit the application |
