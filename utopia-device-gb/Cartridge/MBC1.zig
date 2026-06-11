@@ -52,7 +52,9 @@ pub fn updateMappings(self: *const Self, cartridge: *Cartridge) void {
         1 => (@as(u32, self.bank_upper) << 5),
     });
 
-    cartridge.mapRom(1, (@as(u32, self.bank_upper) << 5) | self.bank_lower);
+    const bank_lower = if (self.bank_lower != 0) self.bank_lower else 1;
+
+    cartridge.mapRom(1, (@as(u32, self.bank_upper) << 5) | bank_lower);
 
     if (self.ram_enable) {
         cartridge.mapRam(switch (self.bank_mode) {
