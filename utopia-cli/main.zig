@@ -40,7 +40,7 @@ pub fn main(init: std.process.Init) !void {
         app_args.bios_path,
         app_args.save_path,
     );
-    defer vfs.deinit(init.arena.allocator());
+    defer vfs.deinit(init.io, init.arena.allocator());
 
     var device = try device_args.initDevice(init.arena, vfs);
     defer device.deinit();

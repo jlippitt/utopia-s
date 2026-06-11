@@ -32,31 +32,35 @@ pub fn init(
     });
 }
 
-fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+fn deinit(self: *Self, io: std.Io, allocator: std.mem.Allocator) void {
+    _ = io;
     allocator.destroy(self);
 }
 
 fn readRom(
     self: *Self,
+    io: std.Io,
     allocator: std.mem.Allocator,
     alignment: std.mem.Alignment,
 ) utopia.Vfs.Error![]u8 {
-    return readFileAlloc(allocator, self.rom_path, alignment);
+    return readFileAlloc(io, allocator, self.rom_path, alignment);
 }
 
 fn readBios(
     self: *Self,
+    io: std.Io,
     allocator: std.mem.Allocator,
     file_path: []const u8,
     alignment: std.mem.Alignment,
 ) utopia.Vfs.Error![]u8 {
     const path = try std.fs.path.join(allocator, &.{ self.bios_path, file_path });
     defer allocator.free(path);
-    return readFileAlloc(allocator, path, alignment);
+    return readFileAlloc(io, allocator, path, alignment);
 }
 
 pub fn readSave(
     self: *Self,
+    io: std.Io,
     allocator: std.mem.Allocator,
     save_type: ?[]const u8,
     data: []u8,
@@ -64,7 +68,7 @@ pub fn readSave(
     const path = try self.getSaveFilePath(allocator, save_type);
     defer allocator.free(path);
 
-    const bytes_read = std.fs.cwd().readFile(path, data) catch |err| switch (err) {
+    const bytes_read = std.Io.Dir.cwd().readFile(io, path, data) catch |err| switch (err) {
         error.FileNotFound => &.{},
         else => {
             utopia.log.err("Failed to read file '{s}': {t}", .{ path, err });
@@ -77,6 +81,7 @@ pub fn readSave(
 
 pub fn writeSave(
     self: *Self,
+    io: std.Io,
     allocator: std.mem.Allocator,
     save_type: ?[]const u8,
     data: []const u8,
@@ -84,7 +89,7 @@ pub fn writeSave(
     const path = try self.getSaveFilePath(allocator, save_type);
     defer allocator.free(path);
 
-    std.fs.cwd().writeFile(.{
+    std.Io.Dir.cwd().writeFile(io, .{
         .sub_path = path,
         .data = data,
     }) catch |err| {
@@ -116,17 +121,18 @@ fn getSaveFilePath(
 }
 
 fn readFileAlloc(
+    io: std.Io,
     allocator: std.mem.Allocator,
     path: []const u8,
     alignment: std.mem.Alignment,
 ) utopia.Vfs.Error![]u8 {
-    const file = std.fs.cwd().openFile(path, .{}) catch |err| {
+    const file = std.Io.Dir.cwd().openFile(io, path, .{}) catch |err| {
         utopia.log.err("Failed to open file '{s}': {t}", .{ path, err });
         return error.VfsError;
     };
-    defer file.close();
+    defer file.close(io);
 
-    const size = file.getEndPos() catch |err| {
+    const size = file.length(io) catch |err| {
         utopia.log.err("Failed to determine size of file '{s}': {t}", .{ path, err });
         return error.VfsError;
     };
@@ -136,13 +142,12 @@ fn readFileAlloc(
     };
 
     const data = ptr[0..size];
+    var reader = file.reader(io, &.{});
 
-    const bytes_read = file.readAll(data) catch |err| {
+    reader.interface.readSliceAll(data) catch |err| {
         utopia.log.err("Failed to read file '{s}': {t}", .{ path, err });
         return error.VfsError;
     };
-
-    std.debug.assert(bytes_read == size);
 
     return data;
 }
