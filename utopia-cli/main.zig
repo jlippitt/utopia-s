@@ -78,7 +78,7 @@ pub fn main(init: std.process.Init) !void {
         try audio.play();
     }
 
-    var fps_counter = try FpsCounter.init();
+    var fps_counter = try FpsCounter.init(init.io);
     var timer = try std.time.Timer.start();
     var last_save_time = std.time.timestamp();
     var delay_time: i64 = 0;
@@ -150,7 +150,7 @@ pub fn main(init: std.process.Init) !void {
             }
         }
 
-        try video.setFps(fps_counter.update());
+        try video.setFps(fps_counter.update(init.io));
     }
 
     try device.save(init.gpa, vfs);
