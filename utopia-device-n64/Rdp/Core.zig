@@ -35,7 +35,7 @@ sampler_linear: sdl3.gpu.Sampler,
 target: Target,
 tmem: Tmem,
 display_list: DisplayList,
-word_buf: std.ArrayListUnmanaged(u64),
+word_buf: std.ArrayList(u64),
 options: Options = .{},
 
 pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
@@ -78,7 +78,7 @@ pub fn init(arena: *std.heap.ArenaAllocator) InitError!Self {
     var display_list = try DisplayList.init(arena, gpu, default_pipeline);
     errdefer display_list.deinit(gpu);
 
-    const word_buf = try std.ArrayListUnmanaged(u64).initCapacity(
+    const word_buf = try std.ArrayList(u64).initCapacity(
         arena.allocator(),
         max_command_len,
     );

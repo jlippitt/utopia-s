@@ -315,7 +315,7 @@ fn queryJoybus(
     recv_buf: []u8,
     send_data: []const u8,
 ) error{OutOfMemory}![]const u8 {
-    var recv_data = std.ArrayListUnmanaged(u8).initBuffer(recv_buf);
+    var recv_data = std.ArrayList(u8).initBuffer(recv_buf);
 
     switch (send_data[0]) {
         0x00, 0xff => {

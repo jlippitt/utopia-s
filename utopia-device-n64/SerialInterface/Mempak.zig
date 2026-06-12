@@ -71,7 +71,7 @@ pub fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) 
 pub fn read(
     self: *const Self,
     channel: u32,
-    recv_data: *std.ArrayListUnmanaged(u8),
+    recv_data: *std.ArrayList(u8),
     send_data: []const u8,
 ) error{OutOfMemory}!void {
     const start = (@as(u16, send_data[1]) << 8) | (send_data[2] & 0xe0);
@@ -96,7 +96,7 @@ pub fn read(
 pub fn write(
     self: *Self,
     channel: u32,
-    recv_data: *std.ArrayListUnmanaged(u8),
+    recv_data: *std.ArrayList(u8),
     send_data: []const u8,
 ) error{OutOfMemory}!void {
     const start = (@as(u16, send_data[1]) << 8) | (send_data[2] & 0xe0);

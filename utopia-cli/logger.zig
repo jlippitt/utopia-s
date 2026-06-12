@@ -27,9 +27,9 @@ const File = struct {
 
 const Logger = struct {
     io: std.Io,
-    files: std.ArrayListUnmanaged(File),
+    files: std.ArrayList(File),
     span_map: std.StringHashMapUnmanaged(*std.Io.File.Writer),
-    stack: std.ArrayListUnmanaged(*std.Io.File.Writer),
+    stack: std.ArrayList(*std.Io.File.Writer),
 };
 
 threadlocal var logger: Logger = undefined;
