@@ -148,8 +148,8 @@ pub fn updateControllerState(self: *Self, new_state: *const fw.ControllerState) 
     const left_x = axis.left_x * (83.0 - @abs(axis.left_y) * 17.0);
     const left_y = axis.left_y * (83.0 - @abs(axis.left_x) * 17.0);
 
-    state[2] = @bitCast(@as(i8, @intFromFloat(left_x)));
-    state[3] = @bitCast(@as(i8, @intFromFloat(-left_y)));
+    state[2] = @bitCast(@as(i8, @trunc(left_x)));
+    state[3] = @bitCast(@as(i8, @trunc(-left_y)));
 }
 
 fn transferDma(self: *Self, comptime direction: DmaDirection, pif_addr: u11) void {

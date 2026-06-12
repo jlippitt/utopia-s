@@ -247,7 +247,7 @@ fn getDeviceConst(self: *Self) *const Device {
 }
 
 fn calcCyclesPerLine(h_total: u12) u64 {
-    return @intFromFloat(
+    return @trunc(
         @as(f64, @floatFromInt(
             Device.clock_rate * (@as(u64, h_total) + 1),
         )) / Device.video_dac_rate,

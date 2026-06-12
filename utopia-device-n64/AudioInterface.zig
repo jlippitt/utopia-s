@@ -198,8 +198,8 @@ fn calcSampleRates(dacrate: u14) struct { u32, u64 } {
     const cycles_per_sample = Device.clock_rate / sample_rate;
 
     return .{
-        @intFromFloat(sample_rate),
-        @intFromFloat(cycles_per_sample),
+        @trunc(sample_rate),
+        @trunc(cycles_per_sample),
     };
 }
 

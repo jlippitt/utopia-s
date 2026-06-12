@@ -188,8 +188,8 @@ fn getBestSize(
             const scale = @min(x_scale, y_scale);
 
             break :blk .{
-                .x = @intFromFloat(min_size_x_f32 * scale),
-                .y = @intFromFloat(min_size_y_f32 * scale),
+                .x = @trunc(min_size_x_f32 * scale),
+                .y = @trunc(min_size_y_f32 * scale),
             };
         },
     };
