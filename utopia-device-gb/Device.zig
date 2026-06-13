@@ -4,6 +4,7 @@ const processor = @import("processor");
 const Cartridge = @import("./Cartridge.zig");
 const Gpu = @import("./Gpu.zig");
 const Interrupt = @import("./Interrupt.zig");
+const Joypad = @import("./Joypad.zig");
 const Timer = @import("./Timer.zig");
 
 const Cpu = processor.Sm83;
@@ -31,6 +32,7 @@ wram: *[wram_size]u8,
 hram: *[hram_size]u8,
 timer: Timer,
 gpu: Gpu,
+joypad: Joypad,
 cartridge: Cartridge,
 test_rom_buf: [256]u8 = undefined,
 test_rom_writer: std.Io.File.Writer,
@@ -59,6 +61,7 @@ pub fn init(
         .hram = hram[0..hram_size],
         .timer = .init(),
         .gpu = try .init(arena),
+        .joypad = .init(),
         .cartridge = try .init(arena, rom),
         .test_rom_writer = undefined,
     };
@@ -110,8 +113,7 @@ pub fn getAudioState(self: *const Self) fw.AudioState {
 }
 
 pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
-    _ = self;
-    _ = state;
+    self.joypad.update(state);
 }
 
 pub fn save(self: *Self, io: std.Io, allocator: std.mem.Allocator, vfs: fw.Vfs) fw.Vfs.Error!void {
@@ -272,7 +274,7 @@ fn readIoRestricted(self: *Self, address: u8) u8 {
 
 fn readIoNormal(self: *Self, address: u8) u8 {
     return switch (address) {
-        0x00 => 0xff, // TODO: Joypad,
+        0x00 => self.joypad.read(),
         0x01, 0x02 => 0, // TODO: Serial port
         0x04...0x07 => self.timer.read(address),
         0x0f => self.interrupt.getFlags(),
@@ -306,7 +308,7 @@ fn writeIoRestricted(self: *Self, address: u8, value: u8) void {
 
 fn writeIoNormal(self: *Self, address: u8, value: u8) void {
     switch (address) {
-        0x00 => {}, // TODO: Joypad
+        0x00 => self.joypad.write(value),
         0x01 => {
             // TODO: Serial port
             self.test_rom_writer.interface.writeByte(value) catch {};
