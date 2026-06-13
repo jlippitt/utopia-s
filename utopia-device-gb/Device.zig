@@ -1,6 +1,7 @@
 const std = @import("std");
 const fw = @import("framework");
 const processor = @import("processor");
+const Apu = @import("./Apu.zig");
 const Cartridge = @import("./Cartridge.zig");
 const Gpu = @import("./Gpu.zig");
 const Interrupt = @import("./Interrupt.zig");
@@ -32,6 +33,7 @@ wram: *[wram_size]u8,
 hram: *[hram_size]u8,
 timer: Timer,
 gpu: Gpu,
+apu: Apu,
 joypad: Joypad,
 cartridge: Cartridge,
 test_rom_buf: [256]u8 = undefined,
@@ -61,6 +63,7 @@ pub fn init(
         .hram = hram[0..hram_size],
         .timer = .init(),
         .gpu = try .init(arena),
+        .apu = try .init(arena),
         .joypad = .init(),
         .cartridge = try .init(arena, rom),
         .test_rom_writer = undefined,
@@ -83,6 +86,7 @@ fn deinit(self: *Self) void {
 }
 
 fn runFrame(self: *Self) void {
+    self.apu.clearSampleBuffer();
     self.gpu.beginFrame();
 
     while (!self.gpu.frameDone()) {
@@ -104,12 +108,7 @@ pub fn getVideoState(self: *const Self) fw.VideoState {
 }
 
 pub fn getAudioState(self: *const Self) fw.AudioState {
-    _ = self;
-
-    return .{
-        .sample_rate = fw.default_sample_rate,
-        .sample_data = &.{},
-    };
+    return self.apu.getAudioState();
 }
 
 pub fn updateControllerState(self: *Self, state: *const fw.ControllerState) void {
@@ -340,6 +339,7 @@ fn step(self: *Self) void {
     self.cycles += m_cycle;
     self.timer.step(m_cycle);
     self.gpu.step(m_cycle);
+    self.apu.step(m_cycle);
 }
 
 fn transferDma(self: *Self) void {
