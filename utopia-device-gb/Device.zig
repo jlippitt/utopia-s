@@ -318,7 +318,7 @@ fn writeIoNormal(self: *Self, address: u8, value: u8) void {
         },
         0x04...0x07 => self.timer.write(address, value),
         0x0f => self.interrupt.setFlags(value),
-        0x10...0x3f => {}, // TODO: APU
+        0x10...0x3f => self.apu.write(address, value),
         0x40...0x4f => self.gpu.write(address, value),
         0x50 => {
             self.boot_rom_enable = false;
@@ -339,7 +339,10 @@ fn step(self: *Self) void {
     self.cycles += m_cycle;
     self.timer.step(m_cycle);
     self.gpu.step(m_cycle);
-    self.apu.step(m_cycle);
+
+    if ((self.cycles & 3) == 0) {
+        self.apu.stepCycle();
+    }
 }
 
 fn transferDma(self: *Self) void {
