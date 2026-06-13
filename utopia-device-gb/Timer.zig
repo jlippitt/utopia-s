@@ -2,6 +2,7 @@ const fw = @import("framework");
 const Device = @import("./Device.zig");
 
 const period_masks: [4]u16 = .{ 1023, 15, 63, 255 };
+const apu_frame_mask = 4095;
 
 const Self = @This();
 
@@ -50,10 +51,17 @@ pub fn write(self: *Self, address: u8, value: u8) void {
 pub fn step(self: *Self, cycles: u16) void {
     self.divider +%= cycles;
 
+    if ((self.divider & apu_frame_mask) < cycles) {
+        @branchHint(.unlikely);
+        self.getDevice().apu.stepFrame();
+    }
+
     if (self.ctrl.enabled and (self.divider & self.period_mask) < cycles) {
+        @branchHint(.unlikely);
         self.counter +%= 1;
 
         if (self.counter == 0) {
+            @branchHint(.unlikely);
             self.counter = self.modulo;
             self.getDevice().interrupt.raise(.timer);
         }

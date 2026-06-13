@@ -58,6 +58,11 @@ pub fn write(self: *Self, address: u8, value: u8) void {
     }
 }
 
+pub fn stepFrame(self: *Self) void {
+    self.pulse1.stepFrame();
+    self.pulse2.stepFrame();
+}
+
 pub fn stepCycle(self: *Self) void {
     self.pulse1.stepCycle();
     self.pulse2.stepCycle();
